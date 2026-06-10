@@ -1,0 +1,1 @@
+export const PRESENTER_SIGNED_URL_SECONDS = 8 * 60 * 60;

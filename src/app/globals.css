@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --line: #cbd5e1;
+  --ink-muted: #475569;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --success: #047857;
+  --warning: #b45309;
+  --danger: #b91c1c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Inter", "Segoe UI", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.lesson-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.17) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.17) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.slide-frame {
+  aspect-ratio: 16 / 10;
+}
+
+.slide-prose {
+  overflow-wrap: anywhere;
+}
+
+.field-title {
+  display: block;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.primary-action,
+.secondary-action,
+.danger-action {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+}
+
+.primary-action {
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.16);
+}
+
+.primary-action:hover {
+  background: #0b514d;
+  border-color: #0b514d;
+  transform: translateY(-1px);
+}
+
+.secondary-action {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #172124;
+}
+
+.secondary-action:hover {
+  border-color: #8ba3a0;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.danger-action {
+  border: 1px solid #fecaca;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.danger-action:hover {
+  border-color: #b91c1c;
+}
+
+.segment-button,
+.segment-active {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.segment-button {
+  background: transparent;
+  color: #475569;
+}
+
+.segment-active {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-slide {
+    break-after: page;
+    min-height: 100vh;
+  }
+}
