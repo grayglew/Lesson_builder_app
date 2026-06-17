@@ -82,20 +82,36 @@ assert(
     buildPowerPointBundleZip.includes("worksheets/"),
   "PowerPoint bundle generation should include PPTX, PDF, worksheets, and a README in one ZIP."
 );
+assert(
+  buildPowerPointBundleZip.includes("describeStaticExportBehavior("),
+  "The bundle README should describe whether saved classroom state or generated answer variants were exported."
+);
+
+const describeStaticExportBehavior = extractFunction(appJs, "describeStaticExportBehavior");
+assert(
+  describeStaticExportBehavior.includes("hasPresentationState(") &&
+    describeStaticExportBehavior.includes("saved classroom visibility") &&
+    describeStaticExportBehavior.includes("answers hidden") &&
+    describeStaticExportBehavior.includes("answers shown"),
+  "Bundle export messaging should cover taught-state and legacy answer-variant behavior."
+);
 
 const expandSlidesForStaticExport = extractFunction(appJs, "expandSlidesForStaticExport");
 assert(
-  expandSlidesForStaticExport.includes("slideHasAnswerImages(") &&
+  expandSlidesForStaticExport.includes("hasPresentationState(") &&
+    expandSlidesForStaticExport.includes('answerMode: "saved"') &&
+    expandSlidesForStaticExport.includes("slideHasAnswerImages(") &&
     expandSlidesForStaticExport.includes('answerMode: "hidden"') &&
     expandSlidesForStaticExport.includes('answerMode: "shown"'),
-  "Static bundle export should duplicate answer-image slides into hidden-answer and shown-answer variants."
+  "Static bundle export should preserve taught slide state while retaining legacy hidden-answer and shown-answer variants."
 );
 
 const renderStaticExportSlides = extractFunction(appJs, "renderStaticExportSlides");
 assert(
-  renderStaticExportSlides.includes("revealHiddenQuestionContent(") &&
+  renderStaticExportSlides.includes("prepareSavedPresentationStateForStaticExport(") &&
+    renderStaticExportSlides.includes("revealHiddenQuestionContent(") &&
     renderStaticExportSlides.includes("applyAnswerVisibilityForStaticExport("),
-  "Static bundle rendering should reveal hidden question content while controlling answer visibility per variant."
+  "Static bundle rendering should preserve saved state or control answer visibility for legacy variants."
 );
 assert(
   renderStaticExportSlides.includes("prepareStaticBundleSlideLayout("),

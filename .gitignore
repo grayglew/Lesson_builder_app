@@ -38,6 +38,7 @@ yarn-error.log*
 .vercel
 backups/
 supabase/.temp/
+.superpowers/
 
 # typescript
 *.tsbuildinfo

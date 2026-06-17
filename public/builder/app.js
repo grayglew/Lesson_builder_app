@@ -4297,10 +4297,18 @@
         <div class="starter-slide-grid">
           ${[0, 1, 2, 3].map((index) => {
             const slot = slots[index] || {};
+            const revealKey = `starter-answer-${index}`;
             return `
               <div class="starter-cell">
                 <div class="live-starter-image-host" data-live-image-host>
-                  ${toggleableImageTag(slot.image, slot.answerImage, "Starter image", "replace")}
+                  ${toggleableImageTag(
+                    slot.image,
+                    slot.answerImage,
+                    "Starter image",
+                    "replace",
+                    revealKey,
+                    revealIsShown(slide, revealKey)
+                  )}
                 </div>
                 ${liveRetrievalButton(slot, index, renderOptions)}
               </div>
@@ -4382,9 +4390,17 @@
         <div class="revision-slide-grid">
           ${[0, 1].map((index) => {
             const item = items[index] || null;
+            const revealKey = `revision-answer-${index}`;
             return `
               <div class="revision-question-cell" data-lo="${escapeAttr(item ? item.lo : "")}">
-                ${item ? toggleableImageTag(item.image, item.answerImage, item.lo || `Revision question ${index + 1}`, "replace") : ""}
+                ${item ? toggleableImageTag(
+                  item.image,
+                  item.answerImage,
+                  item.lo || `Revision question ${index + 1}`,
+                  "replace",
+                  revealKey,
+                  revealIsShown(slide, revealKey)
+                ) : ""}
               </div>
             `;
           }).join("")}
@@ -4399,18 +4415,22 @@
     const panes = [
       { question: slide.image1, answer: slide.answerImage1, label: "Example image 1" },
       { question: slide.image2, answer: slide.answerImage2, label: "Example image 2" }
-    ].filter((pane) => pane.question);
+    ].map((pane, index) => ({
+      ...pane,
+      revealKey: `example-answer-${index}`
+    })).filter((pane) => pane.question);
+    const secondImageShown = revealIsShown(slide, "example-second-image");
     const imageHtml = panes.length > 1
       ? `<div class="example-images">
-          <div class="example-image-pane">${exampleQaImagePane(panes[0])}</div>
-          <div class="example-image-pane example-reveal-region is-hidden" data-example-reveal-region aria-hidden="true">${exampleQaImagePane(panes[1])}</div>
+          <div class="example-image-pane">${exampleQaImagePane(panes[0], revealIsShown(slide, panes[0].revealKey))}</div>
+          <div class="example-image-pane example-reveal-region${secondImageShown ? "" : " is-hidden"}" data-example-reveal-region data-reveal-key="example-second-image" aria-hidden="${secondImageShown ? "false" : "true"}">${exampleQaImagePane(panes[1], revealIsShown(slide, panes[1].revealKey))}</div>
         </div>`
-      : `<div class="single-image">${exampleQaImagePane(panes[0])}</div>`;
+      : `<div class="single-image">${exampleQaImagePane(panes[0], panes[0] ? revealIsShown(slide, panes[0].revealKey) : false)}</div>`;
     return `
       <section class="lesson-slide example-slide">
         <div class="lo-bar">
           <span class="lo-bar-text">${escapeHtml(slide.lo || "")}</span>
-          ${panes.length > 1 ? `<button class="example-reveal-button" type="button" data-example-reveal aria-expanded="false">Show second image</button>` : ""}
+          ${panes.length > 1 ? `<button class="example-reveal-button" type="button" data-example-reveal aria-expanded="${secondImageShown ? "true" : "false"}">${secondImageShown ? "Hide second image" : "Show second image"}</button>` : ""}
         </div>
         ${imageHtml}
         <span class="slide-label">Example</span>
@@ -4418,15 +4438,16 @@
     `;
   }
 
-  function exampleQaImagePane(pane) {
+  function exampleQaImagePane(pane, initiallyShown) {
     if (!pane || !pane.question) return `<div class="empty-state">No image</div>`;
     if (!pane.answer) return imageTag(pane.question, pane.label || "Example image");
+    const showingAnswer = !!initiallyShown;
     return `
-      <div class="example-qa-block" data-qa-toggle="below" aria-expanded="false">
+      <div class="example-qa-block${showingAnswer ? " is-showing-answer" : ""}" data-qa-toggle="below" data-reveal-key="${escapeAttr(pane.revealKey || "")}" aria-expanded="${showingAnswer ? "true" : "false"}">
         <button class="qa-question-button" type="button">
           ${imageTag(pane.question, pane.label || "Example image")}
         </button>
-        <div class="example-answer-region is-hidden" data-qa-answer-region>
+        <div class="example-answer-region${showingAnswer ? "" : " is-hidden"}" data-qa-answer-region aria-hidden="${showingAnswer ? "false" : "true"}">
           ${imageTag(pane.answer, `${pane.label || "Example"} answer`)}
         </div>
       </div>
@@ -4584,7 +4605,7 @@
   }
 
   function renderAnnotationPath(stroke) {
-    return `<path d="${escapeAttr(annotationPathFromPoints(stroke.points))}" fill="none" stroke="${escapeAttr(stroke.color || "#2563eb")}" stroke-width="${escapeAttr(stroke.width || 6)}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>`;
+    return `<path d="${escapeAttr(annotationPathFromPoints(stroke.points))}" fill="none" stroke="${escapeAttr(stroke.color || "#2563eb")}" stroke-width="${escapeAttr(stroke.width || 6)}" stroke-linecap="round" stroke-linejoin="round"></path>`;
   }
 
   function annotationPathFromPoints(points) {
@@ -5094,11 +5115,30 @@
     return `<div class="slide-image-frame"><img class="slide-image-fit" src="${escapeAttr(image.dataUrl)}" alt="${escapeAttr(alt || image.name || "Image")}" draggable="false"></div>`;
   }
 
-  function toggleableImageTag(questionImage, answerImage, alt, mode) {
+  function presentationReveals(slide) {
+    const presentationState = slide && slide.presentationState;
+    if (!presentationState || presentationState.version !== 1) return null;
+    if (!presentationState.reveals || typeof presentationState.reveals !== "object" || Array.isArray(presentationState.reveals)) {
+      return null;
+    }
+    return presentationState.reveals;
+  }
+
+  function hasPresentationState(slide) {
+    return presentationReveals(slide) !== null;
+  }
+
+  function revealIsShown(slide, revealKey) {
+    const reveals = presentationReveals(slide);
+    return !!(reveals && reveals[revealKey] === true);
+  }
+
+  function toggleableImageTag(questionImage, answerImage, alt, mode, revealKey, initiallyShown) {
     if (!answerImage || !answerImage.dataUrl) return imageTag(questionImage, alt);
+    const showingAnswer = !!initiallyShown;
     return `
-      <button class="qa-toggle qa-toggle-${escapeAttr(mode || "replace")}" type="button" data-qa-toggle="${escapeAttr(mode || "replace")}" aria-pressed="false">
-        <span class="qa-toggle-label" data-qa-toggle-label>Question</span>
+      <button class="qa-toggle qa-toggle-${escapeAttr(mode || "replace")}${showingAnswer ? " is-showing-answer" : ""}" type="button" data-qa-toggle="${escapeAttr(mode || "replace")}" data-reveal-key="${escapeAttr(revealKey || "")}" aria-pressed="${showingAnswer ? "true" : "false"}">
+        <span class="qa-toggle-label" data-qa-toggle-label>${showingAnswer ? "Answer" : "Question"}</span>
         <span class="qa-image-layer qa-question-layer">${imageTag(questionImage, alt)}</span>
         <span class="qa-image-layer qa-answer-layer">${imageTag(answerImage, `${alt || "Image"} answer`)}</span>
       </button>
@@ -5925,12 +5965,31 @@
         "",
         "This bundle was exported from Lesson Builder.",
         "The PowerPoint and PDF are static image-based versions of the lesson slides.",
-        "Slides with answer images appear twice: first with answers hidden, then with answers shown.",
+        ...describeStaticExportBehavior(lessonState),
         "Worksheet files are included in the worksheets/ folder."
       ].join("\n")
     );
 
     return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  }
+
+  function describeStaticExportBehavior(lessonState) {
+    const slides = lessonState && Array.isArray(lessonState.slides) ? lessonState.slides : [];
+    const hasSavedClassroomState = slides.some((slide) => hasPresentationState(slide));
+    const hasGeneratedAnswerVariants = slides.some(
+      (slide) => !hasPresentationState(slide) && slideHasAnswerImages(slide)
+    );
+    const lines = [];
+    if (hasSavedClassroomState) {
+      lines.push("Presenter-saved slides preserve their saved classroom visibility state.");
+    }
+    if (hasGeneratedAnswerVariants) {
+      lines.push("Other slides with answer images appear twice: first with answers hidden, then with answers shown.");
+    }
+    if (!lines.length) {
+      lines.push("Each lesson slide appears once in its saved state.");
+    }
+    return lines;
   }
 
   async function renderStaticExportSlides(lessonState) {
@@ -5947,8 +6006,12 @@
         revealHiddenContent: false,
         prepareSlide: (slideElement, index) => {
           prepareStaticBundleSlideLayout(slideElement);
-          revealHiddenQuestionContent(slideElement);
-          applyAnswerVisibilityForStaticExport(slideElement, variants[index].answerMode === "shown");
+          if (variants[index].answerMode === "saved") {
+            prepareSavedPresentationStateForStaticExport(slideElement);
+          } else {
+            revealHiddenQuestionContent(slideElement);
+            applyAnswerVisibilityForStaticExport(slideElement, variants[index].answerMode === "shown");
+          }
         }
       });
     } finally {
@@ -5958,6 +6021,9 @@
 
   function expandSlidesForStaticExport(slides) {
     return (Array.isArray(slides) ? slides : []).flatMap((slide, index) => {
+      if (hasPresentationState(slide)) {
+        return [{ slide, sourceIndex: index, answerMode: "saved" }];
+      }
       if (!slideHasAnswerImages(slide)) {
         return [{ slide, sourceIndex: index, answerMode: "none" }];
       }
@@ -5993,6 +6059,29 @@
   function prepareStaticBundleSlideLayout(slideElement) {
     if (!slideElement || !slideElement.classList) return;
     slideElement.classList.add("static-bundle-export-slide");
+  }
+
+  function prepareSavedPresentationStateForStaticExport(root) {
+    root.querySelectorAll(".qa-toggle").forEach((node) => {
+      const showAnswer = node.classList.contains("is-showing-answer");
+      const label = node.querySelector("[data-qa-toggle-label]");
+      if (label) label.textContent = showAnswer ? "Answer" : "Question";
+      node.querySelectorAll(".qa-question-layer").forEach((layer) => {
+        setStaticExportVisibility(layer, !showAnswer, "");
+      });
+      node.querySelectorAll(".qa-answer-layer").forEach((layer) => {
+        setStaticExportVisibility(layer, showAnswer, "");
+      });
+    });
+    root.querySelectorAll(".example-answer-region").forEach((node) => {
+      const showAnswer = !node.classList.contains("is-hidden");
+      setStaticExportVisibility(node, showAnswer, showAnswer ? "" : "none");
+    });
+    root.querySelectorAll("[data-example-reveal-region]").forEach((node) => {
+      const showSecondImage = !node.classList.contains("is-hidden");
+      setStaticExportVisibility(node, showSecondImage, showSecondImage ? "" : "none");
+    });
+    root.querySelectorAll(".example-reveal-button").forEach((node) => node.remove());
   }
 
   function revealHiddenQuestionContent(root) {
@@ -6325,6 +6414,7 @@ function standalonePresenterHtml(initialAnnotations) {
   var activeSlideIndex = null;
   var activePointerInput = null;
   var activeTouchPan = null;
+  var presentationLayoutFrame = 0;
   var suppressRevealClickUntil = 0;
   var presentedLessonId = "";
   var presentedLessonTitle = "";
@@ -6473,6 +6563,11 @@ function standalonePresenterHtml(initialAnnotations) {
         finishPointerAnnotation(event);
       }, true);
     });
+    slide.addEventListener("lostpointercapture", function(event) {
+      if (activeTouchPan && activeTouchPan.pointerId === event.pointerId) {
+        cancelTouchPan();
+      }
+    }, true);
   }
 
   function handleDocumentPointerMove(event) {
@@ -6527,11 +6622,16 @@ function standalonePresenterHtml(initialAnnotations) {
   }
 
   function beginTouchPan(event, slide) {
-    if (activeTouchPan || activePointerInput) return;
-    if (isInteractivePointerTarget(event.target)) return;
+    if (activePointerInput) return;
+    if (activeTouchPan && activeTouchPan.pointerId !== event.pointerId) cancelTouchPan();
+    if (activeTouchPan) return;
+    var allowTap = isAnswerRevealTarget(event.target);
+    if (isInteractivePointerTarget(event.target) && !isAnswerRevealTarget(event.target)) return;
 
-    event.preventDefault();
-    event.stopPropagation();
+    if (!allowTap) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
     try {
       if (slide.setPointerCapture) slide.setPointerCapture(event.pointerId);
@@ -6542,21 +6642,30 @@ function standalonePresenterHtml(initialAnnotations) {
       slide: slide,
       target: getTouchPanTarget(),
       lastX: event.clientX,
-      lastY: event.clientY
+      lastY: event.clientY,
+      moved: false,
+      travel: 0,
+      allowTap: allowTap
     };
   }
 
   function continueTouchPan(event) {
     if (!activeTouchPan || activeTouchPan.pointerId !== event.pointerId) return;
 
-    event.preventDefault();
-    event.stopPropagation();
-
     var dx = event.clientX - activeTouchPan.lastX;
     var dy = event.clientY - activeTouchPan.lastY;
     if (dx || dy) {
-      activeTouchPan.target.scrollLeft -= dx;
-      activeTouchPan.target.scrollTop -= dy;
+      activeTouchPan.travel += Math.sqrt(dx * dx + dy * dy);
+      if (!activeTouchPan.moved && activeTouchPan.travel >= 6) {
+        activeTouchPan.moved = true;
+        suppressRevealClickUntil = Date.now() + 900;
+      }
+      if (activeTouchPan.moved) {
+        event.preventDefault();
+        event.stopPropagation();
+        activeTouchPan.target.scrollLeft -= dx;
+        activeTouchPan.target.scrollTop -= dy;
+      }
       activeTouchPan.lastX = event.clientX;
       activeTouchPan.lastY = event.clientY;
     }
@@ -6565,15 +6674,27 @@ function standalonePresenterHtml(initialAnnotations) {
   function finishTouchPan(event) {
     if (!activeTouchPan || activeTouchPan.pointerId !== event.pointerId) return;
 
-    event.preventDefault();
-    event.stopPropagation();
-
     var touchPan = activeTouchPan;
     activeTouchPan = null;
+    if (touchPan.moved || !touchPan.allowTap) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
     try {
       if (touchPan.slide && touchPan.slide.releasePointerCapture) {
         touchPan.slide.releasePointerCapture(event.pointerId);
+      }
+    } catch (error) {}
+  }
+
+  function cancelTouchPan() {
+    var touchPan = activeTouchPan;
+    activeTouchPan = null;
+    if (!touchPan) return;
+    try {
+      if (touchPan.slide && touchPan.slide.releasePointerCapture) {
+        touchPan.slide.releasePointerCapture(touchPan.pointerId);
       }
     } catch (error) {}
   }
@@ -6720,12 +6841,12 @@ function standalonePresenterHtml(initialAnnotations) {
   function strokeWidthFromInput(svg) {
     var inputSize = Number(sizeInput.value);
     if (!Number.isFinite(inputSize)) inputSize = 2;
-    return Math.max(0.5, inputSize);
+    var rect = svg.getBoundingClientRect();
+    return Math.max(0.5, inputSize / Math.max(1, rect.width) * VIEWBOX_W);
   }
 
   function eraserThresholdFromInput(svg) {
-    var rect = svg.getBoundingClientRect();
-    return strokeWidthFromInput(svg) * 1.8 / Math.max(1, rect.width) * VIEWBOX_W;
+    return strokeWidthFromInput(svg) * 1.8;
   }
 
   function setPresenterColor(color, activeInput) {
@@ -6830,24 +6951,31 @@ function standalonePresenterHtml(initialAnnotations) {
     var toolbarSpace = Math.ceil((toolbarRect.height || 0) + topGap + edgeSpace);
     var availableWidth = Math.max(160, viewportWidth - edgeSpace * 2);
     var availableHeight = Math.max(120, viewportHeight - toolbarSpace - edgeSpace);
-    var zoomScale = zoomEnabled ? ZOOM_SCALE : 1;
     var defaultFitWidth = Math.floor(Math.min(availableWidth, availableHeight * SLIDE_RATIO));
     var defaultFitHeight = Math.floor(defaultFitWidth / SLIDE_RATIO);
-    var defaultSlideWidth = Math.floor(defaultFitWidth * zoomScale);
-    var defaultSlideHeight = Math.floor(defaultFitHeight * zoomScale);
     var rootStyle = document.documentElement.style;
     rootStyle.setProperty("--presenter-edge-space", edgeSpace + "px");
     rootStyle.setProperty("--presenter-toolbar-space", toolbarSpace + "px");
-    rootStyle.setProperty("--presenter-slide-width", defaultSlideWidth + "px");
-    rootStyle.setProperty("--presenter-slide-height", defaultSlideHeight + "px");
+    rootStyle.setProperty("--presenter-slide-width", defaultFitWidth + "px");
+    rootStyle.setProperty("--presenter-slide-height", defaultFitHeight + "px");
     slides.forEach(function(slide) {
       var aspect = slideAspect(slide);
       var fitWidth = usesDefaultPresenterWidth(slide) ? defaultFitWidth : Math.floor(Math.min(availableWidth, availableHeight * aspect));
       var fitHeight = Math.floor(fitWidth / aspect);
-      var slideWidth = Math.floor(fitWidth * zoomScale);
-      var slideHeight = Math.floor(fitHeight * zoomScale);
-      slide.style.setProperty("--presenter-slide-width", slideWidth + "px");
-      slide.style.setProperty("--presenter-slide-height", slideHeight + "px");
+      slide.style.setProperty("--presenter-slide-width", fitWidth + "px");
+      slide.style.setProperty("--presenter-slide-height", fitHeight + "px");
+      slide.style.zoom = zoomEnabled ? String(ZOOM_SCALE) : "";
+    });
+  }
+
+  function schedulePresentationLayout() {
+    if (presentationLayoutFrame) return;
+    var requestFrame = window.requestAnimationFrame || function(callback) {
+      return window.setTimeout(callback, 16);
+    };
+    presentationLayoutFrame = requestFrame(function() {
+      presentationLayoutFrame = 0;
+      updatePresentationLayout();
     });
   }
 
@@ -6879,8 +7007,10 @@ function standalonePresenterHtml(initialAnnotations) {
       slide.scrollIntoView({ block: "center", inline: "center" });
       return;
     }
-    var left = slide.offsetLeft + slide.offsetWidth / 2 - deck.clientWidth / 2;
-    var top = slide.offsetTop + slide.offsetHeight / 2 - deck.clientHeight / 2;
+    var slideRect = slide.getBoundingClientRect();
+    var deckRect = deck.getBoundingClientRect();
+    var left = deck.scrollLeft + (slideRect.left - deckRect.left) + slideRect.width / 2 - deck.clientWidth / 2;
+    var top = deck.scrollTop + (slideRect.top - deckRect.top) + slideRect.height / 2 - deck.clientHeight / 2;
     deck.scrollLeft = Math.max(0, left);
     deck.scrollTop = Math.max(0, top);
   }
@@ -7093,8 +7223,24 @@ function standalonePresenterHtml(initialAnnotations) {
   }
 
   function captureLiveDomStateForSlide(slideState, slide, index) {
+    if (!slideState || !slide) return slideState;
+    var reveals = {};
+    Array.prototype.forEach.call(slide.querySelectorAll("[data-reveal-key]"), function(control) {
+      var revealKey = control.getAttribute("data-reveal-key") || "";
+      if (!revealKey) return;
+      if (control.matches("[data-qa-toggle]")) {
+        reveals[revealKey] = control.classList.contains("is-showing-answer");
+      } else if (control.matches("[data-example-reveal-region]")) {
+        reveals[revealKey] = !control.classList.contains("is-hidden");
+      }
+    });
+    slideState.presentationState = {
+      version: 1,
+      reveals: reveals
+    };
+
     var isStarterSlide = slideState && slideState.type === "starter";
-    if (!slideState || !slide || !isStarterSlide || !Array.isArray(slideState.slots)) return slideState;
+    if (!isStarterSlide || !Array.isArray(slideState.slots)) return slideState;
     var cells = Array.prototype.slice.call(slide.querySelectorAll(".starter-cell")).slice(0, 4);
     cells.forEach(function(cell, slotIndex) {
       var slot = slideState.slots[slotIndex];
@@ -7235,7 +7381,6 @@ function standalonePresenterHtml(initialAnnotations) {
     path.setAttribute("stroke-width", String(stroke.width || 6));
     path.setAttribute("stroke-linecap", "round");
     path.setAttribute("stroke-linejoin", "round");
-    path.setAttribute("vector-effect", "non-scaling-stroke");
     return path;
   }
 
@@ -7316,7 +7461,12 @@ function standalonePresenterHtml(initialAnnotations) {
   function downloadAnnotatedHtml() {
     syncBuilderStateForSave();
     dataEl.textContent = JSON.stringify(strokesBySlide).replace(/</g, "\\\\u003c");
-    var html = "<!doctype html>\\n" + document.documentElement.outerHTML;
+    var clone = document.documentElement.cloneNode(true);
+    Array.prototype.slice.call(clone.querySelectorAll("[data-bound],[data-pointer-input-bound]")).forEach(function(node) {
+      node.removeAttribute("data-bound");
+      node.removeAttribute("data-pointer-input-bound");
+    });
+    var html = "<!doctype html>\\n" + clone.outerHTML;
     var blob = new Blob([html], { type: "text/html" });
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
@@ -7542,7 +7692,7 @@ function standalonePresenterHtml(initialAnnotations) {
       ".print-window-bar button+button{background:#fff;color:#172124;border-color:#cad7d7;}",
       "body.presenter-print-view .lesson-header{max-width:1120px;margin:14px auto 0;padding:8px 12px;box-sizing:border-box;}",
       "body.presenter-print-view .lesson-deck{display:grid;gap:14px;place-items:center;max-width:none;margin:0;padding:14px;box-sizing:border-box;}",
-      "body.presenter-print-view .lesson-slide{width:min(1120px,calc(100vw - 28px));height:auto;aspect-ratio:16/10;margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);}",
+      "body.presenter-print-view .lesson-slide{width:min(1120px,calc(100vw - 28px));height:auto;aspect-ratio:16/10;margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);zoom:1!important;}",
       "@media print{.print-window-bar{display:none!important;}html,body{background:#fff!important;}body.presenter-print-view .lesson-header{display:none!important;}body.presenter-print-view .lesson-deck{display:block!important;margin:0!important;padding:0!important;}body.presenter-print-view .lesson-slide{width:16in!important;height:10in!important;max-width:none!important;max-height:none!important;margin:0!important;border:0!important;box-shadow:none!important;break-after:page;page-break-after:always;overflow:hidden!important;}body.presenter-print-view .lesson-slide:last-child{break-after:auto;page-break-after:auto;}.annotation-svg{pointer-events:none!important;}}"
     ].join("\\n");
   }
@@ -7657,6 +7807,7 @@ function standalonePresenterHtml(initialAnnotations) {
     slide.style.boxShadow = "none";
     slide.style.border = "none";
     slide.style.transform = "none";
+    slide.style.zoom = "";
   }
 
   function getPdfSlideAspect(slide) {
@@ -7914,11 +8065,10 @@ function standalonePresenterHtml(initialAnnotations) {
   if (cameraInput) cameraInput.addEventListener("change", handleCameraCapture);
   zoomBtn.addEventListener("click", toggleZoom);
   fullscreenBtn.addEventListener("click", toggleFullscreen);
-  window.addEventListener("resize", updatePresentationLayout);
-  window.addEventListener("orientationchange", updatePresentationLayout);
+  window.addEventListener("resize", schedulePresentationLayout);
+  window.addEventListener("orientationchange", schedulePresentationLayout);
   if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", updatePresentationLayout);
-    window.visualViewport.addEventListener("scroll", updatePresentationLayout);
+    window.visualViewport.addEventListener("resize", schedulePresentationLayout);
   }
   document.addEventListener("fullscreenchange", updateFullscreenUi);
   document.addEventListener("webkitfullscreenchange", updateFullscreenUi);
@@ -8132,8 +8282,10 @@ function standalonePresenterHtml(initialAnnotations) {
     var cell = button.closest ? button.closest(".starter-cell") : null;
     var host = cell ? cell.querySelector("[data-live-image-host]") : null;
     if (!host) return;
+    var slotIndex = Number(button.getAttribute("data-live-slot-index") || 0);
+    var revealKey = "starter-answer-" + Math.max(0, Math.min(3, Math.round(slotIndex)));
     host.innerHTML = "";
-    host.appendChild(createLiveImageNode(result.questionImage, result.answerImage));
+    host.appendChild(createLiveImageNode(result.questionImage, result.answerImage, revealKey));
   }
 
   function updateLiveRetrievalButtons(button, result) {
@@ -8145,13 +8297,14 @@ function standalonePresenterHtml(initialAnnotations) {
     });
   }
 
-  function createLiveImageNode(questionImage, answerImage) {
+  function createLiveImageNode(questionImage, answerImage, revealKey) {
     if (!answerImage || !answerImage.dataUrl) return createImageFrame(questionImage, "Starter image");
 
     var button = document.createElement("button");
     button.type = "button";
     button.className = "qa-toggle qa-toggle-replace";
     button.setAttribute("data-qa-toggle", "replace");
+    button.setAttribute("data-reveal-key", revealKey || "");
     button.setAttribute("aria-pressed", "false");
 
     var label = document.createElement("span");
@@ -8195,7 +8348,7 @@ body{margin:0;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,s
 .lesson-header h1{font-size:22px;margin:0;}
 .lesson-header span,.lesson-header div:last-child{color:#5b6a70;font-size:13px;}
 .lesson-deck{display:grid;gap:20px;padding:20px;max-width:1180px;margin:0 auto;}
-.lesson-slide{aspect-ratio:var(--slide-aspect,16/10);background:#fffefb;color:#111827;position:relative;overflow:hidden;padding:24px;border:1px solid #cad7d7;box-shadow:0 16px 34px rgba(19,37,42,.12);page-break-after:always;touch-action:none;}
+.lesson-slide{box-sizing:border-box;aspect-ratio:var(--slide-aspect,16/10);background:#fffefb;color:#111827;position:relative;overflow:hidden;padding:24px;border:1px solid #cad7d7;box-shadow:0 16px 34px rgba(19,37,42,.12);page-break-after:always;touch-action:none;}
 .lesson-slide h4{margin:0 0 14px;font-size:28px;line-height:1.2;}
 .slide-label{position:absolute;right:12px;bottom:10px;font-size:11px;color:#6b7280;}
 .blank-slide{padding:0;background:#fff;}

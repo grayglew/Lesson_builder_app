@@ -16,7 +16,7 @@ function assertExcludes(needle, message) {
 }
 
 assertIncludes(
-  ".lesson-slide{aspect-ratio:var(--slide-aspect,16/10);background:#fffefb;color:#111827;position:relative;overflow:hidden;padding:24px;border:1px solid #cad7d7;box-shadow:0 16px 34px rgba(19,37,42,.12);page-break-after:always;touch-action:none;}",
+  ".lesson-slide{box-sizing:border-box;aspect-ratio:var(--slide-aspect,16/10);background:#fffefb;color:#111827;position:relative;overflow:hidden;padding:24px;border:1px solid #cad7d7;box-shadow:0 16px 34px rgba(19,37,42,.12);page-break-after:always;touch-action:none;}",
   "Exported presenter slides must use touch-action:none so pen pointer streams are not cancelled by browser panning."
 );
 assertIncludes(
@@ -38,6 +38,38 @@ assertIncludes(
 assertIncludes(
   "function continueTouchPan(event) {",
   "Presenter must continue manual finger pan during touch pointer movement."
+);
+assertIncludes(
+  "if (activeTouchPan && activeTouchPan.pointerId !== event.pointerId) cancelTouchPan();",
+  "A new finger gesture must clear a stale interrupted touch stream instead of leaving scrolling locked."
+);
+assertIncludes(
+  "if (isInteractivePointerTarget(event.target) && !isAnswerRevealTarget(event.target)) return;",
+  "Finger panning must be allowed to start over clickable question and answer images."
+);
+assertIncludes(
+  "activeTouchPan.moved = true;",
+  "Presenter touch panning must distinguish a swipe from a tap on a reveal image."
+);
+assertIncludes(
+  "suppressRevealClickUntil = Date.now() + 900;",
+  "A finger swipe over a reveal image must suppress the follow-up answer toggle click."
+);
+assertIncludes(
+  'slide.addEventListener("lostpointercapture", function(event) {',
+  "Losing touch pointer capture must clear stale manual pan state."
+);
+assertIncludes(
+  "function schedulePresentationLayout() {",
+  "Presenter layout recalculation should be frame-throttled during viewport changes."
+);
+assertExcludes(
+  'window.visualViewport.addEventListener("scroll", updatePresentationLayout);',
+  "Visual viewport scrolling must not synchronously recalculate every slide layout."
+);
+assertIncludes(
+  'clone.querySelectorAll("[data-bound],[data-pointer-input-bound]")',
+  "Downloaded annotated HTML must remove runtime listener-binding markers before serialization."
 );
 assertIncludes(
   "if (pointerType === \"touch\") return null;",
@@ -98,10 +130,6 @@ assertIncludes(
 assertIncludes(
   ".qa-toggle img,.qa-question-button img,.example-qa-block img{pointer-events:none;-webkit-user-drag:none;user-select:none;}",
   "Images inside reveal controls should not become separate pointer or drag targets while writing."
-);
-assertExcludes(
-  "\"lostpointercapture\"",
-  "Losing pointer capture must not be treated as the end of a pen stroke; document-level pointerup/cancel handles completion."
 );
 assertIncludes(
   "var PDF_EXPORT_WIDTHS = [1280,1024,800];",
