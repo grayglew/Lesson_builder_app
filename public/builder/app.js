@@ -6401,12 +6401,16 @@ function standalonePresenterHtml(initialAnnotations) {
   var VIEWBOX_H = ${SLIDE_VIEWBOX_HEIGHT};
   var SLIDE_RATIO = 16 / 10;
   var ZOOM_SCALE = 1.6;
+  var MIN_ZOOM_SCALE = 1;
+  var MAX_ZOOM_SCALE = 3;
+  var ZOOM_RESET_EPSILON = 0.01;
   var PDF_EXPORT_WIDTHS = [1280,1024,800];
   var PDF_EXPORT_WIDTH = PDF_EXPORT_WIDTHS[0] || ${PDF_EXPORT_WIDTH};
   var PDF_JPEG_QUALITY = ${PDF_JPEG_QUALITY};
 
   var mode = "pen";
   var zoomEnabled = false;
+  var zoomScale = 1;
   var strokesBySlide = {};
   var history = [];
   var activeStroke = null;
@@ -6414,6 +6418,8 @@ function standalonePresenterHtml(initialAnnotations) {
   var activeSlideIndex = null;
   var activePointerInput = null;
   var activeTouchPan = null;
+  var activeTouchPoints = {};
+  var activePinchZoom = null;
   var presentationLayoutFrame = 0;
   var suppressRevealClickUntil = 0;
   var presentedLessonId = "";
@@ -6548,7 +6554,7 @@ function standalonePresenterHtml(initialAnnotations) {
       beginPointerAnnotation(event, slide);
     }, true);
     slide.addEventListener("pointermove", function(event) {
-      if (activeTouchPan && activeTouchPan.pointerId === event.pointerId) {
+      if (event.pointerType === "touch") {
         continueTouchPan(event);
         return;
       }
@@ -6556,7 +6562,7 @@ function standalonePresenterHtml(initialAnnotations) {
     }, true);
     ["pointerup", "pointercancel"].forEach(function(eventName) {
       slide.addEventListener(eventName, function(event) {
-        if (activeTouchPan && activeTouchPan.pointerId === event.pointerId) {
+        if (event.pointerType === "touch") {
           finishTouchPan(event);
           return;
         }
@@ -6567,11 +6573,14 @@ function standalonePresenterHtml(initialAnnotations) {
       if (activeTouchPan && activeTouchPan.pointerId === event.pointerId) {
         cancelTouchPan();
       }
+      if (activePinchZoom && pinchHasPointerId(event.pointerId)) {
+        finishTouchPan(event);
+      }
     }, true);
   }
 
   function handleDocumentPointerMove(event) {
-    if (activeTouchPan && activeTouchPan.pointerId === event.pointerId) {
+    if (event.pointerType === "touch" || (activeTouchPan && activeTouchPan.pointerId === event.pointerId) || (activePinchZoom && pinchHasPointerId(event.pointerId))) {
       continueTouchPan(event);
       return;
     }
@@ -6579,7 +6588,7 @@ function standalonePresenterHtml(initialAnnotations) {
   }
 
   function handleDocumentPointerEnd(event) {
-    if (activeTouchPan && activeTouchPan.pointerId === event.pointerId) {
+    if (event.pointerType === "touch" || (activeTouchPan && activeTouchPan.pointerId === event.pointerId) || (activePinchZoom && pinchHasPointerId(event.pointerId))) {
       finishTouchPan(event);
       return;
     }
@@ -6621,12 +6630,80 @@ function standalonePresenterHtml(initialAnnotations) {
     return mode === "eraser" ? "eraser" : "pen";
   }
 
+  function touchPointKey(pointerId) {
+    return String(pointerId);
+  }
+
+  function getActiveTouchPointList() {
+    return Object.keys(activeTouchPoints).map(function(key) {
+      return activeTouchPoints[key];
+    }).filter(Boolean);
+  }
+
+  function rememberTouchPoint(event, slide) {
+    activeTouchPoints[touchPointKey(event.pointerId)] = {
+      pointerId: event.pointerId,
+      slide: slide,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      allowTap: isAnswerRevealTarget(event.target)
+    };
+  }
+
+  function updateTouchPoint(event) {
+    var point = activeTouchPoints[touchPointKey(event.pointerId)];
+    if (!point) return null;
+    point.clientX = event.clientX;
+    point.clientY = event.clientY;
+    return point;
+  }
+
+  function releaseTouchPoint(pointerId) {
+    var key = touchPointKey(pointerId);
+    var point = activeTouchPoints[key];
+    delete activeTouchPoints[key];
+    if (!point) return;
+    try {
+      if (point.slide && point.slide.releasePointerCapture) {
+        point.slide.releasePointerCapture(pointerId);
+      }
+    } catch (error) {}
+  }
+
+  function clearTouchPoints() {
+    Object.keys(activeTouchPoints).forEach(function(key) {
+      if (activeTouchPoints[key]) releaseTouchPoint(activeTouchPoints[key].pointerId);
+    });
+  }
+
+  function touchDistance(first, second) {
+    var dx = second.clientX - first.clientX;
+    var dy = second.clientY - first.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function touchMidpoint(first, second) {
+    return {
+      x: (first.clientX + second.clientX) / 2,
+      y: (first.clientY + second.clientY) / 2
+    };
+  }
+
+  function pinchHasPointerId(pointerId) {
+    if (!activePinchZoom) return false;
+    var key = touchPointKey(pointerId);
+    return activePinchZoom.pointerIds.indexOf(key) !== -1;
+  }
+
   function beginTouchPan(event, slide) {
     if (activePointerInput) return;
-    if (activeTouchPan && activeTouchPan.pointerId !== event.pointerId) cancelTouchPan();
-    if (activeTouchPan) return;
     var allowTap = isAnswerRevealTarget(event.target);
     if (isInteractivePointerTarget(event.target) && !isAnswerRevealTarget(event.target)) return;
+
+    if (activeTouchPan && activeTouchPan.pointerId !== event.pointerId && activeTouchPan.moved) {
+      cancelTouchPan();
+      clearTouchPoints();
+    }
 
     if (!allowTap) {
       event.preventDefault();
@@ -6637,6 +6714,15 @@ function standalonePresenterHtml(initialAnnotations) {
       if (slide.setPointerCapture) slide.setPointerCapture(event.pointerId);
     } catch (error) {}
 
+    rememberTouchPoint(event, slide);
+    if (getActiveTouchPointList().length >= 2) {
+      beginPinchZoom(event);
+      return;
+    }
+
+    if (activeTouchPan && activeTouchPan.pointerId !== event.pointerId) cancelTouchPan();
+    if (activeTouchPan) return;
+
     activeTouchPan = {
       pointerId: event.pointerId,
       slide: slide,
@@ -6645,11 +6731,19 @@ function standalonePresenterHtml(initialAnnotations) {
       lastY: event.clientY,
       moved: false,
       travel: 0,
-      allowTap: allowTap
+      allowTap: allowTap,
+      startedAt: Date.now()
     };
   }
 
   function continueTouchPan(event) {
+    updateTouchPoint(event);
+
+    if (activePinchZoom && pinchHasPointerId(event.pointerId)) {
+      continuePinchZoom(event);
+      return;
+    }
+
     if (!activeTouchPan || activeTouchPan.pointerId !== event.pointerId) return;
 
     var dx = event.clientX - activeTouchPan.lastX;
@@ -6672,7 +6766,19 @@ function standalonePresenterHtml(initialAnnotations) {
   }
 
   function finishTouchPan(event) {
-    if (!activeTouchPan || activeTouchPan.pointerId !== event.pointerId) return;
+    if (activePinchZoom && pinchHasPointerId(event.pointerId)) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressRevealClickUntil = Date.now() + 900;
+      releaseTouchPoint(event.pointerId);
+      if (getActiveTouchPointList().length < 2) activePinchZoom = null;
+      return;
+    }
+
+    if (!activeTouchPan || activeTouchPan.pointerId !== event.pointerId) {
+      releaseTouchPoint(event.pointerId);
+      return;
+    }
 
     var touchPan = activeTouchPan;
     activeTouchPan = null;
@@ -6681,22 +6787,53 @@ function standalonePresenterHtml(initialAnnotations) {
       event.stopPropagation();
     }
 
-    try {
-      if (touchPan.slide && touchPan.slide.releasePointerCapture) {
-        touchPan.slide.releasePointerCapture(event.pointerId);
-      }
-    } catch (error) {}
+    releaseTouchPoint(event.pointerId);
   }
 
   function cancelTouchPan() {
     var touchPan = activeTouchPan;
     activeTouchPan = null;
     if (!touchPan) return;
-    try {
-      if (touchPan.slide && touchPan.slide.releasePointerCapture) {
-        touchPan.slide.releasePointerCapture(touchPan.pointerId);
-      }
-    } catch (error) {}
+    releaseTouchPoint(touchPan.pointerId);
+  }
+
+  function beginPinchZoom(event) {
+    var points = getActiveTouchPointList().slice(0, 2);
+    if (points.length < 2) return;
+    var distance = touchDistance(points[0], points[1]);
+    if (distance < 8) return;
+    activeTouchPan = null;
+    activePinchZoom = {
+      pointerIds: [touchPointKey(points[0].pointerId), touchPointKey(points[1].pointerId)],
+      startDistance: distance,
+      startScale: zoomScale
+    };
+    suppressRevealClickUntil = Date.now() + 900;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function continuePinchZoom(event) {
+    var first = activeTouchPoints[activePinchZoom.pointerIds[0]];
+    var second = activeTouchPoints[activePinchZoom.pointerIds[1]];
+    if (!first || !second) {
+      activePinchZoom = null;
+      return;
+    }
+    var distance = touchDistance(first, second);
+    if (distance < 8 || activePinchZoom.startDistance < 8) return;
+    var midpoint = touchMidpoint(first, second);
+    var nextScale = activePinchZoom.startScale * (distance / activePinchZoom.startDistance);
+    event.preventDefault();
+    event.stopPropagation();
+    suppressRevealClickUntil = Date.now() + 900;
+    applyZoomScaleAroundClientPoint(nextScale, midpoint.x, midpoint.y);
+  }
+
+  function cancelTouchGestures() {
+    activeTouchPan = null;
+    activePinchZoom = null;
+    clearTouchPoints();
   }
 
   function getTouchPanTarget() {
@@ -6901,32 +7038,52 @@ function standalonePresenterHtml(initialAnnotations) {
   }
 
   function toggleZoom() {
-    setZoomEnabled(!zoomEnabled);
+    setZoomEnabled(!isZoomActive());
   }
 
   function setZoomEnabled(nextZoomEnabled) {
+    setZoomScale(nextZoomEnabled ? ZOOM_SCALE : 1, { restorePosition: true });
+  }
+
+  function isZoomActive() {
+    return zoomScale > MIN_ZOOM_SCALE + ZOOM_RESET_EPSILON;
+  }
+
+  function clampZoomScale(nextZoomScale) {
+    var numericScale = Number(nextZoomScale);
+    if (!Number.isFinite(numericScale)) numericScale = 1;
+    numericScale = Math.max(MIN_ZOOM_SCALE, Math.min(MAX_ZOOM_SCALE, numericScale));
+    return Math.abs(numericScale - 1) <= ZOOM_RESET_EPSILON ? 1 : numericScale;
+  }
+
+  function setZoomScale(nextZoomScale, options) {
+    options = options || {};
     var targetSlideIndex = getCurrentSlideIndex();
-    zoomEnabled = !!nextZoomEnabled;
+    zoomScale = clampZoomScale(nextZoomScale);
+    zoomEnabled = isZoomActive();
     if (zoomEnabled && !isPresentationMode()) {
       document.body.classList.add("focus-mode");
     }
     if (zoomEnabled) setMode("pan");
     updateZoomUi();
-    updateFullscreenUi();
-    scheduleSlidePositionRestore(targetSlideIndex);
+    updateFullscreenUi({ skipDelayedLayout: !!options.skipDelayedLayout });
+    if (options.restorePosition) scheduleSlidePositionRestore(targetSlideIndex);
   }
 
   function updateZoomUi() {
-    document.body.classList.toggle("presenter-zoom-mode", zoomEnabled);
-    zoomBtn.classList.toggle("is-active", zoomEnabled);
-    zoomBtn.setAttribute("aria-pressed", zoomEnabled ? "true" : "false");
-    zoomBtn.setAttribute("aria-label", zoomEnabled ? "Fit slide to screen" : "Zoom in 60 percent");
-    zoomBtn.textContent = zoomEnabled ? "Fit" : "60%";
+    var active = isZoomActive();
+    zoomEnabled = active;
+    document.body.classList.toggle("presenter-zoom-mode", active);
+    zoomBtn.classList.toggle("is-active", active);
+    zoomBtn.setAttribute("aria-pressed", active ? "true" : "false");
+    zoomBtn.setAttribute("aria-label", active ? "Fit slide to screen" : "Zoom in 60 percent");
+    zoomBtn.textContent = active ? "Fit" : "60%";
   }
 
-  function updateFullscreenUi() {
+  function updateFullscreenUi(options) {
+    options = options || {};
     var isFullscreen = !!getFullscreenElement();
-    if (zoomEnabled && !isFullscreen && !document.body.classList.contains("focus-mode")) {
+    if (isZoomActive() && !isFullscreen && !document.body.classList.contains("focus-mode")) {
       document.body.classList.add("focus-mode");
     }
     var isPresentationMode = isFullscreen || document.body.classList.contains("focus-mode");
@@ -6936,7 +7093,7 @@ function standalonePresenterHtml(initialAnnotations) {
     fullscreenBtn.setAttribute("aria-label", isPresentationMode ? "Exit full screen" : "Enter full screen");
     fullscreenBtn.textContent = isPresentationMode ? "Exit" : "Full";
     updatePresentationLayout();
-    window.setTimeout(updatePresentationLayout, 80);
+    if (!options.skipDelayedLayout) window.setTimeout(updatePresentationLayout, 80);
   }
 
   function updatePresentationLayout() {
@@ -6964,8 +7121,35 @@ function standalonePresenterHtml(initialAnnotations) {
       var fitHeight = Math.floor(fitWidth / aspect);
       slide.style.setProperty("--presenter-slide-width", fitWidth + "px");
       slide.style.setProperty("--presenter-slide-height", fitHeight + "px");
-      slide.style.zoom = zoomEnabled ? String(ZOOM_SCALE) : "";
+      slide.style.zoom = isZoomActive() ? String(zoomScale) : "";
     });
+  }
+
+  function applyZoomScaleAroundClientPoint(nextZoomScale, clientX, clientY) {
+    var deck = document.querySelector(".lesson-deck");
+    refreshSlides();
+    var elementAtPoint = document.elementFromPoint ? document.elementFromPoint(clientX, clientY) : null;
+    var slide = elementAtPoint && elementAtPoint.closest ? elementAtPoint.closest(".lesson-slide") : null;
+    if (!slide) slide = slides[getCurrentSlideIndex()] || slides[0];
+    if (!slide) {
+      setZoomScale(nextZoomScale, { skipDelayedLayout: true });
+      return;
+    }
+
+    var beforeRect = slide.getBoundingClientRect();
+    var relativeX = beforeRect.width ? (clientX - beforeRect.left) / beforeRect.width : 0.5;
+    var relativeY = beforeRect.height ? (clientY - beforeRect.top) / beforeRect.height : 0.5;
+    relativeX = Math.max(0, Math.min(1, relativeX));
+    relativeY = Math.max(0, Math.min(1, relativeY));
+
+    setZoomScale(nextZoomScale, { skipDelayedLayout: true });
+
+    if (!deck || !isPresentationMode()) return;
+    var afterRect = slide.getBoundingClientRect();
+    var deltaX = afterRect.left + afterRect.width * relativeX - clientX;
+    var deltaY = afterRect.top + afterRect.height * relativeY - clientY;
+    deck.scrollLeft = Math.max(0, deck.scrollLeft + deltaX);
+    deck.scrollTop = Math.max(0, deck.scrollTop + deltaY);
   }
 
   function schedulePresentationLayout() {
@@ -8079,6 +8263,10 @@ function standalonePresenterHtml(initialAnnotations) {
   document.addEventListener("pointercancel", handleDocumentPointerEnd, true);
   document.addEventListener("dragstart", suppressAnnotationDragStart, true);
   document.addEventListener("click", suppressRevealClickAfterAnnotation, true);
+  window.addEventListener("blur", cancelTouchGestures);
+  document.addEventListener("visibilitychange", function() {
+    if (document.hidden) cancelTouchGestures();
+  });
   colorPickers.forEach(function(input) {
     input.addEventListener("click", function() { setPresenterColor(input.getAttribute("data-color") || input.value, input); });
   });

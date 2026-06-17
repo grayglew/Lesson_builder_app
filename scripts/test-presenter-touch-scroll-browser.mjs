@@ -48,10 +48,21 @@ function extractFunction(source, name) {
 const functionNames = [
   "isInteractivePointerTarget",
   "isAnswerRevealTarget",
+  "touchPointKey",
+  "getActiveTouchPointList",
+  "rememberTouchPoint",
+  "updateTouchPoint",
+  "releaseTouchPoint",
+  "clearTouchPoints",
+  "touchDistance",
+  "touchMidpoint",
+  "pinchHasPointerId",
   "beginTouchPan",
   "continueTouchPan",
   "finishTouchPan",
   "cancelTouchPan",
+  "beginPinchZoom",
+  "continuePinchZoom",
   "getTouchPanTarget",
 ];
 const productionFunctions = functionNames.map((name) => extractFunction(appJs, name)).join("\n");
@@ -88,9 +99,17 @@ try {
   await page.addScriptTag({
     content: `
       var activeTouchPan = null;
+      var activeTouchPoints = {};
+      var activePinchZoom = null;
       var activePointerInput = null;
       var suppressRevealClickUntil = 0;
+      var zoomScale = 1;
+      window.pinchUpdates = [];
       function isPresentationMode() { return true; }
+      function applyZoomScaleAroundClientPoint(nextScale, clientX, clientY) {
+        zoomScale = nextScale;
+        window.pinchUpdates.push({ nextScale, clientX, clientY });
+      }
       ${productionFunctions}
     `,
   });
@@ -142,12 +161,59 @@ try {
       suppressed: suppressRevealClickUntil > Date.now(),
     };
 
+    activeTouchPan = null;
+    activeTouchPoints = {};
+    activePinchZoom = null;
+    zoomScale = 1;
+    window.pinchUpdates = [];
+    const pinchStartA = {
+      target: slide,
+      pointerId: 5,
+      clientX: 100,
+      clientY: 100,
+      prevented: false,
+      stopped: false,
+      preventDefault() { this.prevented = true; },
+      stopPropagation() { this.stopped = true; },
+    };
+    const pinchStartB = {
+      target: slide,
+      pointerId: 6,
+      clientX: 200,
+      clientY: 100,
+      prevented: false,
+      stopped: false,
+      preventDefault() { this.prevented = true; },
+      stopPropagation() { this.stopped = true; },
+    };
+    const pinchMoveB = {
+      target: slide,
+      pointerId: 6,
+      clientX: 300,
+      clientY: 100,
+      prevented: false,
+      stopped: false,
+      preventDefault() { this.prevented = true; },
+      stopPropagation() { this.stopped = true; },
+    };
+    beginTouchPan(pinchStartA, slide);
+    beginTouchPan(pinchStartB, slide);
+    continueTouchPan(pinchMoveB);
+    const pinchUpdate = window.pinchUpdates[0] || null;
+    finishTouchPan({ ...pinchMoveB });
+    finishTouchPan({ ...pinchStartA });
+
     return {
       swipeResult,
       staleRecoveryPointerId,
       staleRecoveryScrollTop,
       tapPrevented: tapResult.prevented,
       tapSuppressed: tapResult.suppressed,
+      pinchStarted: !!pinchUpdate,
+      pinchScale: pinchUpdate && pinchUpdate.nextScale,
+      pinchMidpointX: pinchUpdate && pinchUpdate.clientX,
+      pinchPrevented: pinchStartB.prevented && pinchMoveB.prevented,
+      pinchCleared: activePinchZoom === null,
     };
   });
 
@@ -158,6 +224,11 @@ try {
   assert(result.staleRecoveryScrollTop > 160, "Scrolling should continue after recovering from a stale pointer.");
   assert(!result.tapPrevented, "A stationary touch on a reveal image should remain available as a tap.");
   assert(!result.tapSuppressed, "A stationary reveal-image tap should not be suppressed.");
+  assert(result.pinchStarted, "A second active touch should start presenter pinch zoom.");
+  assert(Math.abs(result.pinchScale - 2) < 0.001, "Pinch distance growth should update the presenter zoom scale.");
+  assert(result.pinchMidpointX === 200, "Pinch zoom should use the two-finger midpoint as its zoom anchor.");
+  assert(result.pinchPrevented, "Pinch gestures should prevent browser/default reveal handling.");
+  assert(result.pinchCleared, "Ending a pinch gesture should clear active pinch state.");
 
   console.log("Presenter touch-scroll browser regression checks passed.");
 } finally {

@@ -36,8 +36,33 @@ assertIncludes(
 );
 
 assertIncludes(
-  'slide.style.zoom = zoomEnabled ? String(ZOOM_SCALE) : "";',
+  "setZoomScale(nextZoomEnabled ? ZOOM_SCALE : 1, { restorePosition: true });",
+  "The existing 60% presenter zoom button must remain as the 1.6 preset."
+);
+
+assertIncludes(
+  "var zoomScale = 1;",
+  "Presenter zoom must be backed by a numeric scale so pinch can share the same zoom path."
+);
+
+assertIncludes(
+  'slide.style.zoom = isZoomActive() ? String(zoomScale) : "";',
   "Presenter zoom must uniformly scale the fitted slide content and annotation overlay together."
+);
+
+assertIncludes(
+  "function beginPinchZoom(event) {",
+  "Presenter must recognise two-finger touch gestures as pinch zoom."
+);
+
+assertIncludes(
+  "applyZoomScaleAroundClientPoint(nextScale, midpoint.x, midpoint.y);",
+  "Pinch zoom must preserve the gesture midpoint while changing the slide scale."
+);
+
+assertIncludes(
+  "var MAX_ZOOM_SCALE = 3;",
+  "Presenter pinch zoom must be clamped to a practical maximum scale."
 );
 
 assertExcludes(

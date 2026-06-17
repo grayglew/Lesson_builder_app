@@ -32,6 +32,10 @@ assertIncludes(
   "Presenter must track finger panning separately from pen annotation."
 );
 assertIncludes(
+  "var activePinchZoom = null;",
+  "Presenter must track two-finger pinch zoom separately from one-finger panning."
+);
+assertIncludes(
   "function beginTouchPan(event, slide) {",
   "Presenter must implement manual finger pan when touch-action is disabled on slides."
 );
@@ -54,6 +58,18 @@ assertIncludes(
 assertIncludes(
   "suppressRevealClickUntil = Date.now() + 900;",
   "A finger swipe over a reveal image must suppress the follow-up answer toggle click."
+);
+assertIncludes(
+  "function beginPinchZoom(event) {",
+  "Two-finger touch input should enter pinch zoom instead of annotation."
+);
+assertIncludes(
+  "function continuePinchZoom(event) {",
+  "Presenter must continue pinch zoom during touch pointer movement."
+);
+assertIncludes(
+  "window.addEventListener(\"blur\", cancelTouchGestures);",
+  "Interrupted tablet gestures must be cleaned up when the browser loses focus."
 );
 assertIncludes(
   'slide.addEventListener("lostpointercapture", function(event) {',
