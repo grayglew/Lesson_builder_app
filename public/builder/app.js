@@ -2022,6 +2022,8 @@
       downloadSavedLessonPowerPointBundle(id);
     } else if (action === "toggle-taught") {
       toggleSavedLessonTaught(id);
+    } else if (action === "confidence") {
+      showSavedLessonConfidence(id);
     } else if (action === "change-class") {
       changeSavedLessonClass(id);
     } else if (action === "rename") {
@@ -2533,6 +2535,124 @@
     );
   }
 
+  function hasConfidenceSummary(summary) {
+    return !!(summary && typeof summary === "object" && Number(summary.total) > 0 && Number(summary.average) >= 1);
+  }
+
+  function formatConfidenceAverage(value) {
+    const average = Number(value);
+    return Number.isFinite(average) ? average.toFixed(1) : "-";
+  }
+
+  function confidenceAverageColor(average) {
+    const value = Math.max(1, Math.min(5, Number(average) || 3));
+    const stops = [
+      { score: 1, bg: "#fee2e2", border: "#ef4444" },
+      { score: 2, bg: "#ffedd5", border: "#f97316" },
+      { score: 3, bg: "#fef9c3", border: "#eab308" },
+      { score: 4, bg: "#dcfce7", border: "#22c55e" },
+      { score: 5, bg: "#bbf7d0", border: "#16a34a" }
+    ];
+    const lower = stops[Math.max(0, Math.min(3, Math.floor(value) - 1))];
+    const upper = stops[Math.max(1, Math.min(4, Math.ceil(value) - 1))];
+    const ratio = Math.max(0, Math.min(1, value - Math.floor(value)));
+    return {
+      background: mixHexColor(lower.bg, upper.bg, ratio),
+      border: mixHexColor(lower.border, upper.border, ratio)
+    };
+  }
+
+  function confidenceStyleForLesson(lesson) {
+    const summary = lesson && lesson.confidenceSummary;
+    if (!hasConfidenceSummary(summary)) return "";
+    const colors = confidenceAverageColor(summary.average);
+    return ` style="--confidence-bg:${colors.background};--confidence-border:${colors.border};"`;
+  }
+
+  function mixHexColor(left, right, ratio) {
+    const l = parseHexColor(left);
+    const r = parseHexColor(right);
+    const value = [0, 1, 2].map((index) => {
+      const channel = Math.round(l[index] + (r[index] - l[index]) * ratio);
+      return channel.toString(16).padStart(2, "0");
+    }).join("");
+    return `#${value}`;
+  }
+
+  function parseHexColor(value) {
+    const clean = String(value || "").replace(/^#/, "");
+    if (!/^[0-9a-f]{6}$/i.test(clean)) return [255, 255, 255];
+    return [0, 2, 4].map((index) => parseInt(clean.slice(index, index + 2), 16));
+  }
+
+  function showSavedLessonConfidence(id) {
+    const lesson = savedLessons.find((entry) => entry.id === id);
+    if (!lesson || !hasConfidenceSummary(lesson.confidenceSummary)) {
+      setStatus("No confidence poll data is saved for that lesson.", "warn");
+      return;
+    }
+
+    const existing = document.querySelector(".confidence-dialog");
+    if (existing) existing.remove();
+
+    const dialog = document.createElement("div");
+    dialog.className = "modal-backdrop confidence-dialog";
+    dialog.innerHTML = `
+      <section class="modal-panel confidence-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="confidence-dialog-title">
+        <div class="modal-head">
+          <div>
+            <span class="eyebrow">Confidence poll</span>
+            <h2 id="confidence-dialog-title">${escapeHtml(lesson.title || "Untitled lesson")}</h2>
+          </div>
+          <button class="secondary-button compact" type="button" data-confidence-close>Close</button>
+        </div>
+        ${confidenceHistogramHtml(lesson.confidenceSummary)}
+      </section>
+    `;
+    const close = () => {
+      dialog.remove();
+      document.removeEventListener("keydown", onKeyDown);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") close();
+    };
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog || (event.target instanceof Element && event.target.closest("[data-confidence-close]"))) {
+        close();
+      }
+    });
+    document.addEventListener("keydown", onKeyDown);
+    document.body.appendChild(dialog);
+    const closeButton = dialog.querySelector("[data-confidence-close]");
+    if (closeButton) closeButton.focus();
+  }
+
+  function confidenceHistogramHtml(summary) {
+    const counts = summary && summary.counts && typeof summary.counts === "object" ? summary.counts : {};
+    const total = Math.max(0, Number(summary && summary.total) || 0);
+    const maxCount = Math.max(1, ...[1, 2, 3, 4, 5].map((score) => Number(counts[String(score)]) || 0));
+    return `
+      <div class="confidence-summary">
+        <strong>Average ${escapeHtml(formatConfidenceAverage(summary && summary.average))}</strong>
+        <span>${escapeHtml(String(total))} response${total === 1 ? "" : "s"}</span>
+      </div>
+      <div class="confidence-histogram" aria-label="Confidence score histogram">
+        ${[1, 2, 3, 4, 5].map((score) => {
+          const count = Math.max(0, Number(counts[String(score)]) || 0);
+          const height = Math.max(8, Math.round((count / maxCount) * 100));
+          const colors = confidenceAverageColor(score);
+          return `
+            <div class="confidence-bar" style="--bar-height:${height}%;--bar-bg:${colors.background};--bar-border:${colors.border};">
+              <div class="confidence-bar-fill"></div>
+              <strong>${score}</strong>
+              <span>${count}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
   function renderSavedLessons() {
     const activeEl = $("active-lesson-name");
     const storageEl = $("saved-lesson-storage");
@@ -2571,12 +2691,17 @@
         const taught = !!lesson.isTaught;
         const className = lesson.className ? lesson.className : "No class";
         const taughtText = taught ? "Taught" : "Not taught";
+        const hasConfidence = hasConfidenceSummary(lesson.confidenceSummary);
+        const confidenceStyle = confidenceStyleForLesson(lesson);
+        const confidenceText = hasConfidence
+          ? ` - confidence ${formatConfidenceAverage(lesson.confidenceSummary.average)}`
+          : "";
         return `
-          <article class="saved-lesson-item${active ? " is-active" : ""}${taught ? " is-taught" : ""}">
+          <article class="saved-lesson-item${active ? " is-active" : ""}${taught ? " is-taught" : ""}${hasConfidence ? " has-confidence" : ""}"${confidenceStyle}>
             <div class="saved-lesson-main">
               <strong>${escapeHtml(lesson.title || "Untitled lesson")}</strong>
               <span>${escapeHtml(className)} - ${escapeHtml(formatSavedLessonDate(lesson.teachingDate))}</span>
-              <span>${escapeHtml(taughtText)} - ${escapeHtml(formatBytes(lesson.byteSize))} - updated ${escapeHtml(formatSavedLessonUpdatedAt(lesson.updatedAt))}</span>
+              <span>${escapeHtml(taughtText)}${escapeHtml(confidenceText)} - ${escapeHtml(formatBytes(lesson.byteSize))} - updated ${escapeHtml(formatSavedLessonUpdatedAt(lesson.updatedAt))}</span>
             </div>
             <div class="saved-lesson-row-actions">
               <button class="mini-button" type="button" data-saved-action="open" data-id="${escapeAttr(lesson.id)}">Open</button>
@@ -2584,6 +2709,7 @@
               <button class="mini-button" type="button" data-saved-action="download" data-id="${escapeAttr(lesson.id)}">Download</button>
               <button class="mini-button" type="button" data-saved-action="ppt-bundle" data-id="${escapeAttr(lesson.id)}">PPT bundle</button>
               <button class="mini-button" type="button" data-saved-action="toggle-taught" data-id="${escapeAttr(lesson.id)}">${taught ? "Unmark taught" : "Mark taught"}</button>
+              ${hasConfidence ? `<button class="mini-button" type="button" data-saved-action="confidence" data-id="${escapeAttr(lesson.id)}">Confidence</button>` : ""}
               <button class="mini-button" type="button" data-saved-action="change-class" data-id="${escapeAttr(lesson.id)}">Class</button>
               <button class="mini-button" type="button" data-saved-action="rename" data-id="${escapeAttr(lesson.id)}">Rename</button>
               <button class="mini-button danger-mini" type="button" data-saved-action="delete" data-id="${escapeAttr(lesson.id)}">Delete</button>
@@ -6427,6 +6553,7 @@ function standalonePresenterHtml(initialAnnotations) {
   <button id="presenter-blank-slide" class="presenter-tool" type="button" aria-label="Add blank slide">+</button>
   <button id="presenter-camera" class="presenter-tool" type="button" aria-label="Take a photo and add it as a slide">Camera</button>
   <input id="presenter-camera-input" class="presenter-camera-input" type="file" accept="image/*" capture="environment" aria-label="Take a photo">
+  <button id="presenter-poll" class="presenter-tool primary" type="button" hidden>Poll</button>
   <button id="presenter-zoom" class="presenter-tool" type="button" aria-label="Zoom in 60 percent" aria-pressed="false">60%</button>
   <button id="presenter-fullscreen" class="presenter-tool" type="button" aria-label="Toggle full screen" aria-pressed="false">Full</button>
   <div class="presenter-colors" aria-label="Pen colours">
@@ -6461,6 +6588,7 @@ function standalonePresenterHtml(initialAnnotations) {
   var blankSlideBtn = document.getElementById("presenter-blank-slide");
   var cameraBtn = document.getElementById("presenter-camera");
   var cameraInput = document.getElementById("presenter-camera-input");
+  var pollBtn = document.getElementById("presenter-poll");
   var zoomBtn = document.getElementById("presenter-zoom");
   var fullscreenBtn = document.getElementById("presenter-fullscreen");
   var colorInput = document.getElementById("presenter-color");
@@ -6503,6 +6631,7 @@ function standalonePresenterHtml(initialAnnotations) {
   var presentedLessonId = "";
   var presentedLessonTitle = "";
   var presentedAt = new Date().toISOString();
+  var confidencePoll = defaultConfidencePollState();
 
   try {
     presenterConfig = JSON.parse(presenterConfigElement ? presenterConfigElement.textContent || "null" : "null");
@@ -6513,6 +6642,9 @@ function standalonePresenterHtml(initialAnnotations) {
 
   if (presenterConfig && presenterConfig.enabled && saveBuilderBtn) {
     saveBuilderBtn.hidden = false;
+  }
+  if (presenterConfig && presenterConfig.enabled && pollBtn) {
+    pollBtn.hidden = false;
   }
 
   try {
@@ -7426,6 +7558,138 @@ function standalonePresenterHtml(initialAnnotations) {
     slide.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  function defaultConfidencePollState() {
+    return {
+      version: 1,
+      counts: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+      completedAt: ""
+    };
+  }
+
+  function showConfidencePollSlide() {
+    if (!hasHostedPresenterConfig()) {
+      alert("This downloaded lesson cannot save a confidence poll back to Lesson Builder.");
+      return;
+    }
+    refreshSlides();
+    var deck = document.querySelector(".lesson-deck");
+    if (!deck) return;
+    var existing = deck.querySelector('[data-generated-poll="true"]');
+    if (existing) {
+      existing.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    var afterIndex = slides.length ? getCurrentSlideIndex() : -1;
+    var insertIndex = afterIndex + 1;
+    shiftStrokesForInsert(insertIndex);
+
+    var slide = document.createElement("section");
+    slide.className = "lesson-slide confidence-poll-slide";
+    slide.setAttribute("data-generated-poll", "true");
+    slide.setAttribute("data-presenter-transient", "true");
+    slide.setAttribute("data-builder-slide-id", "poll_" + Date.now().toString(36));
+    slide.setAttribute("data-builder-slide-type", "confidence-poll");
+    slide.innerHTML = [
+      '<div class="confidence-poll-content" data-ignore-annotation>',
+      '<h2>How confident do you feel?</h2>',
+      '<div class="confidence-poll-buttons" aria-label="Confidence rating">',
+      [1, 2, 3, 4, 5].map(function(score) {
+        return '<button class="confidence-poll-choice confidence-poll-choice-' + score + '" type="button" data-confidence-score="' + score + '" aria-label="Confidence ' + score + '">' + score + '<span data-confidence-count="' + score + '">0</span></button>';
+      }).join(""),
+      '</div>',
+      '<div class="confidence-poll-total" data-confidence-total>0 responses</div>',
+      '<button class="confidence-end-lesson" type="button" data-confidence-end>End lesson</button>',
+      '</div>'
+    ].join("");
+
+    if (afterIndex >= 0 && slides[afterIndex] && slides[afterIndex].parentNode === deck) {
+      deck.insertBefore(slide, slides[afterIndex].nextSibling);
+    } else {
+      deck.appendChild(slide);
+    }
+
+    refreshSlides();
+    ensureSlideOverlays();
+    bindConfidencePollSlide(slide);
+    setMode("pan");
+    slide.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function bindConfidencePollSlide(slide) {
+    if (!slide || slide.dataset.pollBound === "true") return;
+    slide.dataset.pollBound = "true";
+    Array.prototype.slice.call(slide.querySelectorAll("[data-confidence-score]")).forEach(function(button) {
+      button.addEventListener("click", function() {
+        incrementConfidencePoll(button.getAttribute("data-confidence-score"));
+      });
+    });
+    var endButton = slide.querySelector("[data-confidence-end]");
+    if (endButton) endButton.addEventListener("click", endLessonWithConfidencePoll);
+    updateConfidencePollSlide();
+  }
+
+  function incrementConfidencePoll(score) {
+    var key = String(Math.max(1, Math.min(5, Math.round(Number(score) || 0))));
+    confidencePoll.counts[key] = Math.max(0, Number(confidencePoll.counts[key]) || 0) + 1;
+    confidencePoll.completedAt = "";
+    updateConfidencePollSlide();
+  }
+
+  function updateConfidencePollSlide() {
+    var total = [1, 2, 3, 4, 5].reduce(function(sum, score) {
+      var key = String(score);
+      var count = Math.max(0, Number(confidencePoll.counts[key]) || 0);
+      Array.prototype.slice.call(document.querySelectorAll('[data-confidence-count="' + key + '"]')).forEach(function(node) {
+        node.textContent = String(count);
+      });
+      return sum + count;
+    }, 0);
+    Array.prototype.slice.call(document.querySelectorAll("[data-confidence-total]")).forEach(function(node) {
+      node.textContent = total + " response" + (total === 1 ? "" : "s");
+    });
+  }
+
+  function confidenceSummaryForSave() {
+    var counts = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+    var total = 0;
+    var weighted = 0;
+    [1, 2, 3, 4, 5].forEach(function(score) {
+      var key = String(score);
+      var count = Math.max(0, Math.round(Number(confidencePoll.counts[key]) || 0));
+      counts[key] = count;
+      total += count;
+      weighted += count * score;
+    });
+    if (total <= 0) return {};
+    if (!confidencePoll.completedAt) confidencePoll.completedAt = new Date().toISOString();
+    return {
+      version: 1,
+      counts: counts,
+      total: total,
+      average: Number((weighted / total).toFixed(2)),
+      completedAt: confidencePoll.completedAt
+    };
+  }
+
+  async function endLessonWithConfidencePoll(event) {
+    var button = event && event.currentTarget ? event.currentTarget : null;
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Saving...";
+    }
+    try {
+      confidencePoll.completedAt = new Date().toISOString();
+      await savePresentedLessonToBuilder();
+      if (button) button.textContent = "Saved";
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "End lesson";
+      }
+    }
+  }
+
   function getCurrentSlideIndex() {
     var viewportCenter = window.innerHeight / 2;
     var bestIndex = 0;
@@ -7471,9 +7735,19 @@ function standalonePresenterHtml(initialAnnotations) {
       if (slide && slide.id) baseById[String(slide.id)] = slide;
     });
 
-    builderState.slides = slides.map(function(slide, index) {
+    var saveableSlides = slides.map(function(slide, index) {
+      return { slide: slide, index: index };
+    }).filter(function(entry) {
+      var slide = entry.slide;
+      if (slide.dataset.generatedPoll === "true") return false;
+      return true;
+    });
+
+    builderState.slides = saveableSlides.map(function(entry, saveIndex) {
+      var slide = entry.slide;
+      var index = entry.index;
       var id = slide.getAttribute("data-builder-slide-id") || "";
-      var nextSlide = id && baseById[id] ? clonePlain(baseById[id]) : stateFromSlideElement(slide, index);
+      var nextSlide = id && baseById[id] ? clonePlain(baseById[id]) : stateFromSlideElement(slide, saveIndex);
       nextSlide.id = nextSlide.id || id || ("html_" + Date.now().toString(36) + "_" + index);
       nextSlide = captureLiveDomStateForSlide(nextSlide, slide, index);
       nextSlide.annotations = getSlideStrokes(index);
@@ -7763,9 +8037,11 @@ function standalonePresenterHtml(initialAnnotations) {
       slides: Array.isArray(builderState.slides) ? clonePlain(builderState.slides) : [],
       presentedAt: presentedAt,
       savedAt: now,
+      confidencePoll: confidenceSummaryForSave(),
       metadata: {
         sourceLessonId: presenterConfig.sourceLessonId,
-        presentedAt: presentedAt
+        presentedAt: presentedAt,
+        confidencePoll: confidenceSummaryForSave()
       }
     };
   }
@@ -7836,7 +8112,8 @@ function standalonePresenterHtml(initialAnnotations) {
         title: doc.title,
         className: doc.className,
         teachingDate: doc.teachingDate,
-        byteSize: blob.size
+        byteSize: blob.size,
+        confidenceSummary: doc.metadata.confidencePoll
       })
     });
     return readPresenterApiJson(completeResponse, "Could not complete taught lesson save.");
@@ -8413,6 +8690,7 @@ function standalonePresenterHtml(initialAnnotations) {
   blankSlideBtn.addEventListener("click", addBlankSlide);
   if (cameraBtn) cameraBtn.addEventListener("click", requestCameraCapture);
   if (cameraInput) cameraInput.addEventListener("change", handleCameraCapture);
+  if (pollBtn) pollBtn.addEventListener("click", showConfidencePollSlide);
   zoomBtn.addEventListener("click", toggleZoom);
   fullscreenBtn.addEventListener("click", toggleFullscreen);
   window.addEventListener("resize", schedulePresentationLayout);
@@ -8755,6 +9033,20 @@ body{margin:0;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,s
 .revision-working-area{grid-column:1/-1;}
 .drawing-slide{padding:0;background:#fff;}
 .drawing-slide img{display:block;width:100%;height:100%;object-fit:contain;background:#fff;}
+.confidence-poll-slide{display:grid;place-items:center;background:#fff;padding:32px;}
+.confidence-poll-content{display:grid;gap:26px;width:100%;height:100%;align-content:center;text-align:center;}
+.confidence-poll-content h2{margin:0;font-size:clamp(34px,5vw,72px);line-height:1.05;color:#111827;}
+.confidence-poll-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;width:100%;}
+.confidence-poll-choice{min-height:220px;border:4px solid rgba(17,24,39,.28);border-radius:14px;color:#111827;font:900 clamp(54px,8vw,112px)/1 system-ui,sans-serif;display:grid;place-items:center;gap:8px;cursor:pointer;touch-action:manipulation;box-shadow:0 16px 28px rgba(17,24,39,.16);}
+.confidence-poll-choice span{display:block;font-size:clamp(22px,3vw,36px);font-weight:800;}
+.confidence-poll-choice-1{background:#fecaca;}
+.confidence-poll-choice-2{background:#fed7aa;}
+.confidence-poll-choice-3{background:#fef08a;}
+.confidence-poll-choice-4{background:#bbf7d0;}
+.confidence-poll-choice-5{background:#86efac;}
+.confidence-poll-total{font-size:clamp(24px,3vw,40px);font-weight:900;color:#374151;}
+.confidence-end-lesson{justify-self:center;border:1px solid #111827;border-radius:10px;background:#111827;color:#fff;padding:12px 18px;font:800 20px system-ui,sans-serif;cursor:pointer;touch-action:manipulation;}
+.confidence-end-lesson:disabled{opacity:.72;cursor:wait;}
 .pdf-page-slide{padding:0;background:#fff;}
 .pdf-page-slide .slide-image-fit{object-position:top center;}
 .placeholder-slide,.math-slide,.retrieval-slide,.worksheet-slide{display:grid;place-items:center;text-align:center;}

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await auth.supabase
     .from("builder_lessons")
-    .select("id, title, class_name, teaching_date, storage_path, byte_size, taught_at, created_at, updated_at")
+    .select("id, title, class_name, teaching_date, storage_path, byte_size, taught_at, confidence_summary, created_at, updated_at")
     .eq("id", id)
     .eq("owner_id", auth.user.id)
     .is("deleted_at", null)

@@ -373,6 +373,17 @@ button {
   opacity: 0.82;
 }
 
+.saved-lesson-item.has-confidence {
+  background: var(--confidence-bg, #fff);
+  border-color: var(--confidence-border, var(--line));
+  filter: none;
+  opacity: 1;
+}
+
+.saved-lesson-item.has-confidence.is-active {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--confidence-border, #0f766e) 22%, transparent);
+}
+
 .saved-lesson-main {
   display: grid;
   gap: 2px;
@@ -399,6 +410,75 @@ button {
   display: grid;
   grid-template-columns: repeat(4, minmax(74px, auto));
   gap: 6px;
+}
+
+.confidence-dialog {
+  z-index: 80;
+}
+
+.confidence-dialog-panel {
+  max-width: 620px;
+}
+
+.confidence-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfb;
+}
+
+.confidence-summary strong {
+  font-size: 22px;
+}
+
+.confidence-summary span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.confidence-histogram {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(54px, 1fr));
+  align-items: end;
+  gap: 12px;
+  min-height: 230px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.confidence-bar {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  align-items: end;
+  justify-items: center;
+  gap: 6px;
+  height: 190px;
+  color: var(--ink);
+}
+
+.confidence-bar-fill {
+  width: 100%;
+  height: var(--bar-height, 8%);
+  min-height: 8px;
+  border: 1px solid var(--bar-border, var(--line));
+  border-radius: 8px 8px 3px 3px;
+  background: var(--bar-bg, #eef4f4);
+}
+
+.confidence-bar strong {
+  font-size: 18px;
+}
+
+.confidence-bar span {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .danger-mini {

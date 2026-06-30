@@ -9,6 +9,7 @@ import {
   BuilderLessonRow,
   isUuid,
   mapBuilderLessonRow,
+  normalizeConfidenceSummary,
   normalizeByteSize,
   normalizeClassName,
   normalizeLessonTitle,
@@ -32,23 +33,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid saved lesson size." }, { status: 400 });
   }
 
+  const lessonRow: Record<string, unknown> = {
+    id,
+    owner_id: auth.user.id,
+    bucket: BUILDER_SYNC_BUCKET,
+    storage_path: path,
+    title: normalizeLessonTitle(body.title),
+    class_name: normalizeClassName(body.className),
+    teaching_date: normalizeTeachingDate(body.teachingDate),
+    byte_size: byteSize,
+    deleted_at: null,
+  };
+  if (Object.prototype.hasOwnProperty.call(body, "confidenceSummary")) {
+    lessonRow.confidence_summary = normalizeConfidenceSummary(body.confidenceSummary);
+  }
+
   const { data, error } = await auth.supabase
     .from("builder_lessons")
     .upsert(
-      {
-        id,
-        owner_id: auth.user.id,
-        bucket: BUILDER_SYNC_BUCKET,
-        storage_path: path,
-        title: normalizeLessonTitle(body.title),
-        class_name: normalizeClassName(body.className),
-        teaching_date: normalizeTeachingDate(body.teachingDate),
-        byte_size: byteSize,
-        deleted_at: null,
-      },
+      lessonRow,
       { onConflict: "id" }
     )
-    .select("id, title, class_name, teaching_date, byte_size, taught_at, created_at, updated_at")
+    .select("id, title, class_name, teaching_date, byte_size, taught_at, confidence_summary, created_at, updated_at")
     .single();
 
   if (error) {

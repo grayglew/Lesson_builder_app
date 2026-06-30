@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     .eq("id", id)
     .eq("owner_id", auth.user.id)
     .is("deleted_at", null)
-    .select("id, title, class_name, teaching_date, byte_size, taught_at, created_at, updated_at")
+    .select("id, title, class_name, teaching_date, byte_size, taught_at, confidence_summary, created_at, updated_at")
     .maybeSingle();
 
   if (error) {

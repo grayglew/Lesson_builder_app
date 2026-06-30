@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data, error } = await auth.supabase
     .from("builder_lessons")
-    .select("id, title, class_name, teaching_date, byte_size, taught_at, created_at, updated_at")
+    .select("id, title, class_name, teaching_date, byte_size, taught_at, confidence_summary, created_at, updated_at")
     .eq("owner_id", auth.user.id)
     .is("deleted_at", null)
     .order("taught_at", { ascending: true, nullsFirst: true })
