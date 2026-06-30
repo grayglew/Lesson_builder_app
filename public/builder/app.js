@@ -6408,6 +6408,7 @@ function standalonePresenterHtml(initialAnnotations) {
   var PDF_EXPORT_WIDTHS = [1280,1024,800];
   var PDF_EXPORT_WIDTH = PDF_EXPORT_WIDTHS[0] || ${PDF_EXPORT_WIDTH};
   var PDF_JPEG_QUALITY = ${PDF_JPEG_QUALITY};
+  var EXPORT_TRANSPARENT_IMAGE_DATA_URL = "${EXPORT_TRANSPARENT_IMAGE_DATA_URL}";
 
   var mode = "pen";
   var zoomEnabled = false;
@@ -8044,6 +8045,7 @@ function standalonePresenterHtml(initialAnnotations) {
     clone.style.boxShadow = "none";
     clone.style.border = "none";
     clone.style.transform = "none";
+    await inlineRemoteDomResources(clone);
 
     var wrapper = document.createElement("div");
     wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
@@ -8080,6 +8082,93 @@ function standalonePresenterHtml(initialAnnotations) {
     } finally {
       URL.revokeObjectURL(url);
     }
+  }
+
+  async function inlineRemoteDomResources(root) {
+    if (!root || !(root instanceof Element)) return;
+    var cache = new Map();
+    var tasks = [];
+
+    Array.prototype.slice.call(root.querySelectorAll("img[src]")).forEach(function(image) {
+      tasks.push(inlineRemoteElementAttribute(image, "src", cache));
+    });
+    Array.prototype.slice.call(root.querySelectorAll("img[srcset], source[srcset]")).forEach(function(node) {
+      node.removeAttribute("srcset");
+    });
+    Array.prototype.slice.call(root.querySelectorAll("image")).forEach(function(image) {
+      tasks.push(inlineSvgImageHref(image, cache));
+    });
+
+    [root].concat(Array.prototype.slice.call(root.querySelectorAll("[style]"))).forEach(function(element) {
+      tasks.push(inlineRemoteStyleUrls(element, cache));
+    });
+
+    await Promise.all(tasks);
+  }
+
+  async function inlineRemoteElementAttribute(element, attribute, cache) {
+    var value = element && element.getAttribute(attribute);
+    if (!isRemoteImageUrl(value)) return;
+    var embedded = await dataUrlFromRemoteImage(value, cache);
+    element.setAttribute(attribute, embedded || EXPORT_TRANSPARENT_IMAGE_DATA_URL);
+  }
+
+  async function inlineSvgImageHref(element, cache) {
+    var xlinkNamespace = "http://www.w3.org/1999/xlink";
+    var value = element.getAttribute("href") || element.getAttributeNS(xlinkNamespace, "href");
+    if (!isRemoteImageUrl(value)) return;
+    var embedded = await dataUrlFromRemoteImage(value, cache) || EXPORT_TRANSPARENT_IMAGE_DATA_URL;
+    element.setAttribute("href", embedded);
+    element.setAttributeNS(xlinkNamespace, "xlink:href", embedded);
+  }
+
+  async function inlineRemoteStyleUrls(element, cache) {
+    var original = element && element.getAttribute("style");
+    if (!original || !/url\\(\\s*['"]?https?:\\/\\//i.test(original)) return;
+
+    var matches = [];
+    original.replace(/url\\(\\s*(['"]?)(https?:\\/\\/[^'")]+)\\1\\s*\\)/gi, function(match, quote, url) {
+      matches.push({ match: match, url: url });
+      return match;
+    });
+    if (!matches.length) return;
+
+    var next = original;
+    for (var index = 0; index < matches.length; index += 1) {
+      var entry = matches[index];
+      var embedded = await dataUrlFromRemoteImage(entry.url, cache);
+      next = next.split(entry.match).join("url(\\"" + (embedded || EXPORT_TRANSPARENT_IMAGE_DATA_URL) + "\\")");
+    }
+    element.setAttribute("style", next);
+  }
+
+  function isRemoteImageUrl(value) {
+    return /^https?:\\/\\//i.test(String(value || ""));
+  }
+
+  async function dataUrlFromRemoteImage(url, cache) {
+    var key = String(url || "");
+    if (cache.has(key)) return cache.get(key);
+    try {
+      var response = await fetch(key, { cache: "no-store" });
+      if (!response.ok) throw new Error("Image download failed with status " + response.status + ".");
+      var dataUrl = await blobToDataUrl(await response.blob());
+      cache.set(key, dataUrl);
+      return dataUrl;
+    } catch (error) {
+      console.warn("Could not embed remote lesson image", error);
+      cache.set(key, "");
+      return "";
+    }
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() { resolve(String(reader.result || "")); };
+      reader.onerror = function() { reject(reader.error || new Error("Could not read downloaded image.")); };
+      reader.readAsDataURL(blob);
+    });
   }
 
   function inlineComputedStyles(source, clone) {

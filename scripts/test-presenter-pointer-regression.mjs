@@ -159,5 +159,21 @@ assertIncludes(
   "canvas.width = 1;",
   "PDF rendering should release large canvas backing stores after each slide."
 );
+assertIncludes(
+  "var EXPORT_TRANSPARENT_IMAGE_DATA_URL =",
+  "Standalone presenter PDF export should define a transparent fallback image for resources that cannot be inlined."
+);
+assertIncludes(
+  "await inlineRemoteDomResources(clone);",
+  "Standalone presenter PDF export should inline remote DOM image sources before SVG canvas capture."
+);
+assertIncludes(
+  "function inlineRemoteDomResources(root) {",
+  "Standalone presenter PDF export should include the DOM resource inliner used to prevent tainted canvases."
+);
+assertIncludes(
+  "function inlineRemoteStyleUrls(element, cache) {",
+  "Standalone presenter PDF export should inline CSS url() resources inside imported or presenter-saved slides."
+);
 
 console.log("Presenter pointer regression checks passed.");
