@@ -118,6 +118,21 @@ assert(
   "Static bundle rendering should apply export-only layout constraints before slides are captured."
 );
 
+const renderSlideToJpegPage = extractFunction(appJs, "renderSlideToJpegPage");
+assert(
+  renderSlideToJpegPage.includes("await inlineRemoteDomResources(clone)") &&
+    renderSlideToJpegPage.indexOf("await inlineRemoteDomResources(clone)") < renderSlideToJpegPage.indexOf("new XMLSerializer()"),
+  "Static bundle/PDF rendering should inline remote DOM image sources before SVG canvas capture to avoid tainted canvases."
+);
+
+const inlineRemoteDomResources = extractFunction(appJs, "inlineRemoteDomResources");
+assert(
+  inlineRemoteDomResources.includes("img[src]") &&
+    inlineRemoteDomResources.includes("source[srcset]") &&
+    inlineRemoteDomResources.includes("inlineRemoteStyleUrls("),
+  "DOM resource inlining should cover image src/srcset and CSS url() resources inside imported/presenter-saved slides."
+);
+
 const prepareStaticBundleSlideLayout = extractFunction(appJs, "prepareStaticBundleSlideLayout");
 assert(
   prepareStaticBundleSlideLayout.includes("static-bundle-export-slide"),

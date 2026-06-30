@@ -11,6 +11,7 @@
   const PDF_EXPORT_WIDTH = 1280;
   const PDF_EXPORT_WIDTHS = [1280, 1024, 800];
   const PDF_JPEG_QUALITY = 0.86;
+  const EXPORT_TRANSPARENT_IMAGE_DATA_URL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
   const DEFAULT_CLASSES = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11", "Year 12", "Year 13"];
   const DEFAULT_SLIDE_TEMPLATES = [
     {
@@ -8793,6 +8794,7 @@ body.presenter-zoom-mode.focus-mode .lesson-slide,body.presenter-zoom-mode.fulls
       border: "none",
       transform: "none"
     });
+    await inlineRemoteDomResources(clone);
 
     const wrapper = document.createElement("div");
     wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
@@ -8839,6 +8841,63 @@ body.presenter-zoom-mode.focus-mode .lesson-slide,body.presenter-zoom-mode.fulls
     } finally {
       URL.revokeObjectURL(url);
     }
+  }
+
+  async function inlineRemoteDomResources(root) {
+    if (!root || !(root instanceof Element)) return;
+    const cache = new Map();
+    const tasks = [];
+
+    root.querySelectorAll("img[src]").forEach((image) => {
+      tasks.push(inlineRemoteElementAttribute(image, "src", cache));
+    });
+    root.querySelectorAll("img[srcset], source[srcset]").forEach((node) => {
+      node.removeAttribute("srcset");
+    });
+    root.querySelectorAll("image").forEach((image) => {
+      tasks.push(inlineSvgImageHref(image, cache));
+    });
+
+    [root, ...Array.from(root.querySelectorAll("[style]"))].forEach((element) => {
+      tasks.push(inlineRemoteStyleUrls(element, cache));
+    });
+
+    await Promise.all(tasks);
+  }
+
+  async function inlineRemoteElementAttribute(element, attribute, cache) {
+    const value = element && element.getAttribute(attribute);
+    if (!isRemoteImageUrl(value)) return;
+    const embedded = await dataUrlFromRemoteImage(value, cache);
+    element.setAttribute(attribute, embedded || EXPORT_TRANSPARENT_IMAGE_DATA_URL);
+  }
+
+  async function inlineSvgImageHref(element, cache) {
+    const xlinkNamespace = "http://www.w3.org/1999/xlink";
+    const value = element.getAttribute("href") || element.getAttributeNS(xlinkNamespace, "href");
+    if (!isRemoteImageUrl(value)) return;
+    const embedded = await dataUrlFromRemoteImage(value, cache) || EXPORT_TRANSPARENT_IMAGE_DATA_URL;
+    element.setAttribute("href", embedded);
+    element.setAttributeNS(xlinkNamespace, "xlink:href", embedded);
+  }
+
+  async function inlineRemoteStyleUrls(element, cache) {
+    const original = element && element.getAttribute("style");
+    if (!original || !/url\(\s*['"]?https?:\/\//i.test(original)) return;
+
+    const matches = [];
+    original.replace(/url\(\s*(['"]?)(https?:\/\/[^'")]+)\1\s*\)/gi, (match, _quote, url) => {
+      matches.push({ match, url });
+      return match;
+    });
+    if (!matches.length) return;
+
+    let next = original;
+    for (const entry of matches) {
+      const embedded = await dataUrlFromRemoteImage(entry.url, cache);
+      next = next.split(entry.match).join(`url("${embedded || EXPORT_TRANSPARENT_IMAGE_DATA_URL}")`);
+    }
+    element.setAttribute("style", next);
   }
 
   function inlineComputedStyles(source, clone) {
