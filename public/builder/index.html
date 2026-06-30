@@ -14,7 +14,7 @@
           <div class="brand-mark">LB</div>
           <div>
             <h1>Lesson Builder</h1>
-            <p>Local HTML lesson output</p>
+            <p id="current-user-email" class="current-user-email">Loading user...</p>
           </div>
         </div>
 
@@ -70,16 +70,8 @@
       </aside>
 
       <main class="workspace">
-        <div class="topbar">
-          <div>
-            <span class="eyebrow">Self-contained builder</span>
-            <h2 id="workspace-heading">Starter</h2>
-          </div>
-          <div class="topbar-side">
-            <div id="current-user-email" class="current-user-email">Loading user...</div>
-            <div id="status" class="status" role="status" aria-live="polite"></div>
-          </div>
-        </div>
+        <h2 id="workspace-heading" class="sr-only">Starter</h2>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
 
         <section id="panel-saved-lessons" class="tool-panel" aria-labelledby="workspace-heading">
           <div class="panel-head saved-lessons-panel-head">

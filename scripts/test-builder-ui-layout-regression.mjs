@@ -43,6 +43,19 @@ assert(
   "Preview pane should include a collapse toggle linked to the slide list."
 );
 
+assert(
+  /<div class="brand-block">[\s\S]*id="current-user-email"[\s\S]*<\/div>\s*<\/div>\s*<label class="field-label" for="lesson-title">/.test(indexHtml) &&
+    !indexHtml.includes("Local HTML lesson output"),
+  "The signed-in user email should appear in the left brand block instead of the old local HTML subtitle."
+);
+
+assert(
+  !indexHtml.includes('class="topbar"') &&
+    !indexHtml.includes("Self-contained builder") &&
+    /<h2 id="workspace-heading" class="sr-only">Starter<\/h2>/.test(indexHtml),
+  "The central workspace should not show the duplicated topbar heading, but should keep a hidden heading for panel labels."
+);
+
 const setStatus = extractFunction(appJs, "setStatus");
 assert(
   setStatus.includes("showNotification(") &&
@@ -79,8 +92,8 @@ assert(
   stylesCss.includes("height: 100dvh;") &&
     stylesCss.includes("overflow: hidden;") &&
     stylesCss.includes(".workspace {") &&
-    stylesCss.includes("grid-template-rows: auto minmax(0, 1fr);"),
-  "Builder layout should fit the viewport and keep the central workspace internally scrollable."
+    stylesCss.includes("grid-template-rows: minmax(0, 1fr);"),
+  "Builder layout should fit the viewport and give the central panel the full workspace height."
 );
 
 assert(
