@@ -80,6 +80,8 @@
   const CLOUD_SYNC_DEBOUNCE_MS = 2500;
   const TARGETED_SYNC_QUEUED_STATUS = "Retrieval bank change saved locally; Supabase sync is queued.";
   const TARGETED_SYNCED_STATUS = "Retrieval bank synced to Supabase.";
+  const NOTIFICATION_DURATION_MS = 10000;
+  const PREVIEW_COLLAPSED_KEY = "lesson-builder-preview-collapsed:v1";
 
   const panelNames = {
     starter: "Starter",
@@ -176,6 +178,8 @@
   let activeImageDropZone = null;
   let activeImagePasteHandler = null;
   let pdfJsPromise = null;
+  let notificationSequence = 0;
+  const notificationTimers = new Map();
 
   function uid(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -2417,8 +2421,38 @@
 
   function setStatus(message, type) {
     const el = $("status");
-    el.textContent = message || "";
-    el.className = `status${type ? ` ${type}` : ""}`;
+    if (el) {
+      el.textContent = "";
+      el.className = "status";
+    }
+    if (!message) return;
+    showNotification(message, type);
+  }
+
+  function showNotification(message, type) {
+    const stack = $("notification-stack");
+    if (!stack) return;
+    const id = `notification_${Date.now().toString(36)}_${notificationSequence += 1}`;
+    const toast = document.createElement("div");
+    const kind = ["success", "warn", "error"].includes(type) ? type : "";
+    toast.id = id;
+    toast.className = `notification-toast${kind ? ` ${kind}` : ""}`;
+    toast.setAttribute("role", kind === "error" ? "alert" : "status");
+    toast.textContent = String(message || "");
+    stack.appendChild(toast);
+
+    const timer = window.setTimeout(() => {
+      removeNotification(id);
+    }, NOTIFICATION_DURATION_MS);
+    notificationTimers.set(id, timer);
+  }
+
+  function removeNotification(id) {
+    const timer = notificationTimers.get(id);
+    if (timer) window.clearTimeout(timer);
+    notificationTimers.delete(id);
+    const toast = $(id);
+    if (toast) toast.remove();
   }
 
   function setSavedLessonBusy(isBusy) {
@@ -2561,6 +2595,10 @@
   }
 
   function wireInputs() {
+    syncPreviewCollapseState();
+    $("preview-collapse-toggle").addEventListener("click", togglePreviewPane);
+    window.addEventListener("resize", syncPreviewCollapseState);
+
     $("lesson-title").addEventListener("input", (event) => {
       state.title = event.target.value;
       persistLessonChange();
@@ -4216,6 +4254,44 @@
   function toggleSelectedPreviewSlide(id) {
     selectedPreviewSlideId = selectedPreviewSlideId === id ? "" : id;
     renderPreview();
+  }
+
+  function getPreviewCollapsePreference() {
+    try {
+      const value = localStorage.getItem(PREVIEW_COLLAPSED_KEY);
+      return value === "collapsed" || value === "expanded" ? value : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function isPreviewAutoCollapseActive() {
+    return window.matchMedia("(max-width: 1180px)").matches;
+  }
+
+  function syncPreviewCollapseState() {
+    const preference = getPreviewCollapsePreference();
+    const shouldCollapse = preference
+      ? preference === "collapsed"
+      : isPreviewAutoCollapseActive();
+    document.body.classList.toggle("preview-collapsed", shouldCollapse);
+    document.body.classList.toggle("preview-expanded", !shouldCollapse);
+
+    const button = $("preview-collapse-toggle");
+    if (button) {
+      button.textContent = shouldCollapse ? "Preview" : "Collapse";
+      button.setAttribute("aria-expanded", shouldCollapse ? "false" : "true");
+      button.setAttribute("title", shouldCollapse ? "Show lesson preview" : "Collapse lesson preview");
+      button.setAttribute("aria-label", shouldCollapse ? "Show lesson preview" : "Collapse lesson preview");
+    }
+  }
+
+  function togglePreviewPane() {
+    const nextCollapsed = !document.body.classList.contains("preview-collapsed");
+    try {
+      localStorage.setItem(PREVIEW_COLLAPSED_KEY, nextCollapsed ? "collapsed" : "expanded");
+    } catch (err) {}
+    syncPreviewCollapseState();
   }
 
   function renderPreview() {

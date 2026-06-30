@@ -555,11 +555,16 @@
             <span class="eyebrow">Deck preview</span>
             <h2 id="slide-count">0 slides</h2>
           </div>
-          <button id="reset-lesson" class="danger-button compact" type="button">Reset</button>
+          <div class="preview-head-actions">
+            <button id="preview-collapse-toggle" class="mini-button preview-collapse-toggle" type="button" aria-controls="slide-list" aria-expanded="true">Collapse</button>
+            <button id="reset-lesson" class="danger-button compact" type="button">Reset</button>
+          </div>
         </div>
         <div id="slide-list" class="slide-list"></div>
       </aside>
     </div>
+
+    <div id="notification-stack" class="notification-stack" role="region" aria-live="polite" aria-label="Notifications"></div>
 
     <div id="retrieval-editor" class="modal-backdrop" hidden>
       <section class="modal-panel retrieval-editor-panel" role="dialog" aria-modal="true" aria-labelledby="retrieval-editor-title">
