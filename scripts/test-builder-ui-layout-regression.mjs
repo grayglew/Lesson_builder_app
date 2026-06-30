@@ -99,4 +99,16 @@ assert(
   "Lesson preview should remain right-side and support a collapsed rail instead of dropping below the workspace."
 );
 
+assert(
+  /\.slide-list\s*{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*overflow-y:\s*auto;/s.test(stylesCss) &&
+    !/\.slide-list\s*{[^}]*display:\s*grid;/s.test(stylesCss),
+  "Lesson preview list should be a vertical scrolling stack, not a grid that can squeeze slide previews."
+);
+
+assert(
+  /\.slide-item\s*{[^}]*flex:\s*0 0 auto;/s.test(stylesCss) &&
+    /\.slide-item\s+\.lesson-slide\s*{[^}]*width:\s*100%;[^}]*flex:\s*0 0 auto;/s.test(stylesCss),
+  "Lesson preview cards and slide surfaces should keep their aspect-ratio height instead of shrinking to fit the panel."
+);
+
 console.log("Builder UI layout regression checks passed.");
