@@ -7595,7 +7595,7 @@ function standalonePresenterHtml(initialAnnotations) {
       '<h2>How confident do you feel?</h2>',
       '<div class="confidence-poll-buttons" aria-label="Confidence rating">',
       [1, 2, 3, 4, 5].map(function(score) {
-        return '<button class="confidence-poll-choice confidence-poll-choice-' + score + '" type="button" data-confidence-score="' + score + '" aria-label="Confidence ' + score + '">' + score + '<span data-confidence-count="' + score + '">0</span></button>';
+        return '<button class="confidence-poll-choice confidence-poll-choice-' + score + '" type="button" data-confidence-score="' + score + '" aria-label="Confidence ' + score + '">' + score + '</button>';
       }).join(""),
       '</div>',
       '<div class="confidence-poll-total" data-confidence-total>0 responses</div>',
@@ -7640,9 +7640,6 @@ function standalonePresenterHtml(initialAnnotations) {
     var total = [1, 2, 3, 4, 5].reduce(function(sum, score) {
       var key = String(score);
       var count = Math.max(0, Number(confidencePoll.counts[key]) || 0);
-      Array.prototype.slice.call(document.querySelectorAll('[data-confidence-count="' + key + '"]')).forEach(function(node) {
-        node.textContent = String(count);
-      });
       return sum + count;
     }, 0);
     Array.prototype.slice.call(document.querySelectorAll("[data-confidence-total]")).forEach(function(node) {
@@ -9038,7 +9035,6 @@ body{margin:0;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,s
 .confidence-poll-content h2{margin:0;font-size:clamp(34px,5vw,72px);line-height:1.05;color:#111827;}
 .confidence-poll-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;width:100%;}
 .confidence-poll-choice{min-height:220px;border:4px solid rgba(17,24,39,.28);border-radius:14px;color:#111827;font:900 clamp(54px,8vw,112px)/1 system-ui,sans-serif;display:grid;place-items:center;gap:8px;cursor:pointer;touch-action:manipulation;box-shadow:0 16px 28px rgba(17,24,39,.16);}
-.confidence-poll-choice span{display:block;font-size:clamp(22px,3vw,36px);font-weight:800;}
 .confidence-poll-choice-1{background:#fecaca;}
 .confidence-poll-choice-2{background:#fed7aa;}
 .confidence-poll-choice-3{background:#fef08a;}

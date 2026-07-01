@@ -85,6 +85,11 @@ assert(
   "Presenter save-back should not persist the temporary poll slide as lesson content.",
 );
 assert(
+  presenterScript.includes("data-confidence-total") &&
+    !presenterScript.includes("data-confidence-count"),
+  "Confidence poll choices should not show per-level counts; only the total response count should be visible.",
+);
+assert(
   presenterScript.includes("confidenceSummary: doc.metadata.confidencePoll"),
   "Presenter save-back should pass confidence summary to the saved lesson completion API.",
 );
