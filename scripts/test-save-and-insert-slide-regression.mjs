@@ -71,8 +71,9 @@ assert(
 );
 
 assert(
-  appJs.includes("let selectedPreviewSlideId = \"\";"),
-  "The deck preview should keep track of the selected insertion slide."
+  appJs.includes("let selectedPreviewSlideIds = new Set();") &&
+    appJs.includes("let previewInsertAnchorSlideId = \"\";"),
+  "The deck preview should keep track of selected slides and the selected insertion anchor."
 );
 assert(
   appJs.includes("function getSelectedSlideInsertIndex(") &&
@@ -104,19 +105,27 @@ assert(
 
 const deleteSlide = extractFunction(appJs, "deleteSlide");
 assert(
-  deleteSlide.includes("if (selectedPreviewSlideId === id) selectedPreviewSlideId = \"\";"),
-  "Deleting the selected preview slide should clear the insertion selection."
+  deleteSlide.includes("selectedPreviewSlideIds.delete(id)") &&
+    deleteSlide.includes("previewInsertAnchorSlideId === id"),
+  "Deleting a selected preview slide should update the multi-select insertion anchor."
+);
+
+const clearPreviewSelection = extractFunction(appJs, "clearPreviewSelection");
+assert(
+  clearPreviewSelection.includes("selectedPreviewSlideIds = new Set();") &&
+    clearPreviewSelection.includes('previewInsertAnchorSlideId = "";'),
+  "Preview selection clearing should reset the selected slide set and insertion anchor."
 );
 
 const newCurrentLesson = extractFunction(appJs, "newCurrentLesson");
 assert(
-  newCurrentLesson.includes("selectedPreviewSlideId = \"\";"),
+  newCurrentLesson.includes("clearPreviewSelection();"),
   "Starting a new lesson should clear the selected preview slide."
 );
 
 const applyLessonDocument = extractFunction(appJs, "applyLessonDocument");
 assert(
-  applyLessonDocument.includes("selectedPreviewSlideId = \"\";"),
+  applyLessonDocument.includes("clearPreviewSelection();"),
   "Opening a saved lesson should clear the selected preview slide."
 );
 

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const appJs = readFileSync(resolve(root, "public", "builder", "app.js"), "utf8");
+const indexHtml = readFileSync(resolve(root, "public", "builder", "index.html"), "utf8");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -46,9 +47,40 @@ const presentSavedLesson = extractFunction(appJs, "presentSavedLesson");
 assert(
   presentSavedLesson.includes("presenterConfig:") &&
     presentSavedLesson.includes("sourceLessonId: id") &&
+    presentSavedLesson.includes("options || {}") &&
+    presentSavedLesson.includes("settings.presenterWindow || window.open") &&
     presentSavedLesson.includes("pdfSnapshotUploadEndpoint: PRESENTER_PDF_SNAPSHOT_UPLOAD_URL") &&
     presentSavedLesson.includes("pdfEndpoint: PRESENTER_PDF_URL"),
   "Opening a hosted presenter should pass source lesson and PDF/save endpoints into the presenter config.",
+);
+
+const presentCurrentLesson = extractFunction(appJs, "presentCurrentLesson");
+assert(
+  indexHtml.includes('id="preview-present-lesson"') &&
+    indexHtml.indexOf('id="preview-present-lesson"') < indexHtml.indexOf('id="handout-lesson"'),
+  "Deck preview header should expose a Present button before Hand out.",
+);
+assert(
+  presentCurrentLesson.includes("window.open") &&
+    presentCurrentLesson.includes("await saveCurrentLesson({ copy: false") &&
+    presentCurrentLesson.includes("await presentSavedLesson(savedLesson.id") &&
+    presentCurrentLesson.includes("presenterWindow"),
+  "Preview Present should open a presenter tab immediately, save the current lesson, then reuse the saved-lesson presenter flow.",
+);
+
+const saveCurrentLesson = extractFunction(appJs, "saveCurrentLesson");
+assert(
+  saveCurrentLesson.includes("return completed.lesson"),
+  "Saving the current lesson should return the saved lesson metadata so Preview Present can open it.",
+);
+
+const wireInputs = extractFunction(appJs, "wireInputs");
+const setSavedLessonBusy = extractFunction(appJs, "setSavedLessonBusy");
+assert(
+  wireInputs.includes('preview-present-lesson")') &&
+    wireInputs.includes("presentCurrentLesson") &&
+    setSavedLessonBusy.includes('"preview-present-lesson"'),
+  "Preview Present should be wired and disabled with other saved-lesson actions.",
 );
 
 const presenterHtml = extractFunction(appJs, "standalonePresenterHtml");

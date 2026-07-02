@@ -1542,6 +1542,7 @@
       persist(SYNC_WORKSPACE);
       await loadSavedLessons();
       setStatus(`Saved "${completed.lesson.title}" (${formatBytes(completed.lesson.byteSize)}).`, "success");
+      return completed.lesson;
     } catch (err) {
       console.warn("Could not save lesson", err);
       setStatus(err.message || "Could not save this lesson.", "error");
@@ -1924,10 +1925,11 @@
     });
   }
 
-  async function presentSavedLesson(id) {
+  async function presentSavedLesson(id, options) {
+    const settings = options || {};
     const lesson = savedLessons.find((entry) => entry.id === id);
     const name = lesson ? lesson.title : "this saved lesson";
-    const presenterWindow = window.open("", "_blank");
+    const presenterWindow = settings.presenterWindow || window.open("", "_blank");
     if (!presenterWindow) {
       setStatus("The browser blocked the presenter window. Allow pop-ups for this site and try again.", "error");
       return;
@@ -1991,6 +1993,26 @@
       setSavedLessonBusy(false);
       renderSavedLessons();
     }
+  }
+
+  async function presentCurrentLesson() {
+    const presenterWindow = window.open("", "_blank");
+    if (!presenterWindow) {
+      setStatus("The browser blocked the presenter window. Allow pop-ups for this site and try again.", "error");
+      return;
+    }
+
+    presenterWindow.document.open();
+    presenterWindow.document.write("<!doctype html><title>Saving lesson...</title><p>Saving lesson before opening presenter...</p>");
+    presenterWindow.document.close();
+
+    const savedLesson = await saveCurrentLesson({ copy: false });
+    if (!savedLesson || !savedLesson.id) {
+      if (!presenterWindow.closed) presenterWindow.close();
+      return;
+    }
+
+    await presentSavedLesson(savedLesson.id, { presenterWindow });
   }
 
   function newCurrentLesson() {
@@ -2475,7 +2497,8 @@
       "saved-lesson-save-copy",
       "quick-lesson-new",
       "quick-lesson-save",
-      "quick-lesson-save-copy"
+      "quick-lesson-save-copy",
+      "preview-present-lesson"
     ].forEach((id) => {
       const button = $(id);
       if (button) button.disabled = !!isBusy;
@@ -2733,6 +2756,7 @@
   function wireInputs() {
     syncPreviewCollapseState();
     $("preview-collapse-toggle").addEventListener("click", togglePreviewPane);
+    $("preview-present-lesson").addEventListener("click", presentCurrentLesson);
     $("handout-lesson").addEventListener("click", openHandout);
     window.addEventListener("resize", syncPreviewCollapseState);
 
