@@ -108,7 +108,14 @@ assert(
   buildHandoutHtml.includes("@page { size: A4 portrait; margin: 8mm; }") &&
     buildHandoutHtml.includes("width: 194mm;") &&
     buildHandoutHtml.includes("height: 281mm;") &&
+    buildHandoutHtml.includes("min-height: 281mm;") &&
+    buildHandoutHtml.includes("max-height: 281mm;") &&
+    buildHandoutHtml.includes("overflow: hidden;") &&
+    buildHandoutHtml.includes("width: calc(210mm - 16mm);") &&
     buildHandoutHtml.includes("height: calc(297mm - 16mm);") &&
+    buildHandoutHtml.includes("min-height: calc(297mm - 16mm);") &&
+    buildHandoutHtml.includes("max-height: calc(297mm - 16mm);") &&
+    !buildHandoutHtml.includes("width: auto;") &&
     !buildHandoutHtml.includes("@page { size: A4 landscape; margin: 8mm; }") &&
     !buildHandoutHtml.includes("width: 281mm;") &&
     !buildHandoutHtml.includes("min-height: 194mm;") &&
@@ -125,6 +132,8 @@ assert(
   handoutStarterHtml.includes("handout-starter-number") &&
     handoutStarterHtml.includes("${index + 1}") &&
     buildHandoutHtml.includes("grid-template-rows: repeat(4, minmax(0, 1fr));") &&
+    buildHandoutHtml.includes(".handout-starter-column { display: grid; grid-template-rows: auto minmax(0, 1fr);") &&
+    buildHandoutHtml.includes(".handout-starter { height: 100%;") &&
     !buildHandoutHtml.includes("grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr"),
   "Handout starter questions should render as a numbered single column, not a 2x2 grid.",
 );
