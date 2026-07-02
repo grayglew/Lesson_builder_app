@@ -85,6 +85,7 @@ for (const functionName of [
   "getSelectedPreviewSlides",
   "validateHandoutSelection",
   "buildHandoutHtml",
+  "handoutImageHtml",
   "openHandout",
   "handoutStarterHtml",
   "handoutExampleQuestionsHtml",
@@ -139,6 +140,9 @@ assert(
 );
 
 const handoutStarterHtml = extractFunction(appJs, "handoutStarterHtml");
+const handoutImageHtml = extractFunction(appJs, "handoutImageHtml");
+const handoutExampleQuestionsHtml = extractFunction(appJs, "handoutExampleQuestionsHtml");
+const handoutExampleAnswersHtml = extractFunction(appJs, "handoutExampleAnswersHtml");
 assert(
   handoutStarterHtml.includes("handout-starter-number") &&
     handoutStarterHtml.includes("${index + 1}") &&
@@ -147,6 +151,15 @@ assert(
     buildHandoutHtml.includes(".handout-starter { height: 100%;") &&
     !buildHandoutHtml.includes("grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr"),
   "Handout starter questions should render as a numbered single column, not a 2x2 grid.",
+);
+
+assert(
+    !handoutImageHtml.includes("No image") &&
+    !handoutExampleQuestionsHtml.includes("Blank question space") &&
+    !handoutExampleAnswersHtml.includes("Your turn") &&
+    !handoutExampleAnswersHtml.includes("handout-answer-box handout-student-space") &&
+    !buildHandoutHtml.includes("repeating-linear-gradient"),
+  "Handout printouts should not show missing-image placeholders or a boxed/labelled Your turn area.",
 );
 
 assert(

@@ -6171,7 +6171,7 @@
 
   function handoutImageHtml(image, alt) {
     if (!image || !image.dataUrl) {
-      return `<div class="handout-empty">No image</div>`;
+      return `<div class="handout-empty" aria-hidden="true"></div>`;
     }
     return `<img class="handout-image" src="${escapeAttr(image.dataUrl)}" alt="${escapeAttr(alt || image.name || "Handout image")}" draggable="false">`;
   }
@@ -6198,7 +6198,7 @@
       <section class="handout-example-questions" aria-label="Worked example questions">
         ${[0, 1, 2, 3].map((index) => {
           const item = questionImages[index];
-          return `<div class="handout-question-box">${item ? handoutImageHtml(item.image, item.label) : `<div class="handout-empty">Blank question space</div>`}</div>`;
+          return `<div class="handout-question-box">${item ? handoutImageHtml(item.image, item.label) : `<div class="handout-empty" aria-hidden="true"></div>`}</div>`;
         }).join("")}
       </section>
     `;
@@ -6213,9 +6213,7 @@
               <span class="handout-mini-label">Example ${index + 1} answer</span>
               ${handoutImageHtml(example && example.answerImage1, `Worked example ${index + 1} answer 1`)}
             </div>
-            <div class="handout-answer-box handout-student-space">
-              <span class="handout-mini-label">Your turn</span>
-            </div>
+            <div class="handout-student-space" aria-label="Student working space"></div>
           </div>
         `).join("")}
       </section>
@@ -6255,7 +6253,7 @@
       .handout-example-answers { height: 100%; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 4mm; }
       .handout-answer-pair { min-height: 0; display: grid; grid-template-rows: 1fr 1fr; gap: 3mm; }
       .handout-answer-box { min-height: 0; border: 1px solid #111827; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
-      .handout-student-space { background: repeating-linear-gradient(0deg, #fff 0, #fff 10mm, #e5e7eb 10.25mm); }
+      .handout-student-space { min-height: 0; background: #fff; }
       .handout-mini-label { padding: 1.5mm 2mm; border-bottom: 1px solid #111827; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #374151; }
       .handout-image { width: 100%; height: 100%; min-height: 0; display: block; object-fit: contain; object-position: top center; }
       .handout-empty { display: grid; place-items: center; width: 100%; height: 100%; min-height: 20mm; color: #6b7280; font-size: 11px; text-align: center; }
