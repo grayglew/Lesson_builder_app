@@ -6235,18 +6235,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${escapeHtml(title)} handout</title>
     <style>
-      @page { size: A4 landscape; margin: 8mm; }
+      @page { size: A4 portrait; margin: 8mm; }
       * { box-sizing: border-box; }
       html, body { margin: 0; background: #f3f4f6; color: #111827; font-family: Arial, Helvetica, sans-serif; }
       .handout-document { display: grid; gap: 12px; padding: 12px; }
-      .handout-page { width: 281mm; min-height: 194mm; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-after: page; page-break-after: always; background: #fff; padding: 0; }
+      .handout-page { width: 194mm; height: 281mm; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6mm; break-after: page; page-break-after: always; background: #fff; padding: 0; }
       .handout-page:last-child { break-after: auto; page-break-after: auto; }
-      .handout-column { min-width: 0; min-height: 0; border: 1px solid #111827; padding: 5mm; overflow: hidden; }
+      .handout-column { min-width: 0; min-height: 0; border: 1px solid #111827; padding: 4mm; overflow: hidden; }
       .handout-glue { display: grid; place-items: center; font-size: 34px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
       .handout-heading { display: grid; gap: 2mm; margin-bottom: 4mm; }
       .handout-title { font-size: 13px; font-weight: 800; line-height: 1.2; }
       .handout-meta { display: grid; gap: 1mm; font-size: 10px; line-height: 1.25; }
-      .handout-starter { height: 156mm; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); border: 1px solid #111827; }
+      .handout-starter { height: calc(100% - 24mm); display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); border: 1px solid #111827; }
       .handout-starter-cell { position: relative; min-width: 0; min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
       .handout-starter-number { position: absolute; top: 2mm; left: 2mm; z-index: 2; display: grid; place-items: center; width: 7mm; height: 7mm; border: 1px solid rgba(17,24,39,.35); border-radius: 999px; background: rgba(255,255,255,.86); color: rgba(17,24,39,.72); font-size: 10px; font-weight: 800; line-height: 1; }
       .handout-example-questions { height: 100%; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 3mm; }
@@ -6261,7 +6261,7 @@
       @media print {
         html, body { background: #fff; }
         .handout-document { display: block; padding: 0; }
-        .handout-page { margin: 0; width: auto; min-height: calc(210mm - 16mm); }
+        .handout-page { margin: 0; width: auto; height: calc(297mm - 16mm); }
       }
     </style>
   </head>

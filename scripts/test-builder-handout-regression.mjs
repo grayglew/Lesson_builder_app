@@ -105,13 +105,19 @@ assert(
 
 const buildHandoutHtml = extractFunction(appJs, "buildHandoutHtml");
 assert(
-  buildHandoutHtml.includes("@page { size: A4 landscape; margin: 8mm; }") &&
+  buildHandoutHtml.includes("@page { size: A4 portrait; margin: 8mm; }") &&
+    buildHandoutHtml.includes("width: 194mm;") &&
+    buildHandoutHtml.includes("height: 281mm;") &&
+    buildHandoutHtml.includes("height: calc(297mm - 16mm);") &&
+    !buildHandoutHtml.includes("@page { size: A4 landscape; margin: 8mm; }") &&
+    !buildHandoutHtml.includes("width: 281mm;") &&
+    !buildHandoutHtml.includes("min-height: 194mm;") &&
     buildHandoutHtml.includes("handout-page") &&
     buildHandoutHtml.includes("handout-column") &&
     buildHandoutHtml.includes("glue") &&
     buildHandoutHtml.includes("overallLessonLo") &&
     buildHandoutHtml.includes("teachingDate"),
-  "Handout HTML should include A4 landscape print CSS, two-column pages, glue, date, and lesson LO.",
+  "Handout HTML should use A4 portrait print CSS, two-column pages, glue, date, and lesson LO.",
 );
 
 const handoutStarterHtml = extractFunction(appJs, "handoutStarterHtml");
