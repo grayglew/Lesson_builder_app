@@ -137,7 +137,7 @@ assert(
     buildHandoutHtml.includes("max-height: calc(297mm - 16mm);") &&
     !buildHandoutHtml.includes("width: auto;") &&
     !buildHandoutHtml.includes("@page { size: A4 landscape; margin: 8mm; }") &&
-    !buildHandoutHtml.includes("width: 281mm;") &&
+    !buildHandoutHtml.includes(".handout-page { width: 281mm;") &&
     !buildHandoutHtml.includes("min-height: 194mm;") &&
     buildHandoutHtml.includes("handout-page") &&
     buildHandoutHtml.includes("handout-column") &&
@@ -152,6 +152,7 @@ assert(
     buildHandoutHtml.includes(".handout-retrieval-grid") &&
     buildHandoutHtml.includes(".handout-retrieval-cell") &&
     buildHandoutHtml.includes(".handout-pdf-page-image") &&
+    buildHandoutHtml.includes(".handout-pdf-page-image.is-rotated-landscape") &&
     buildHandoutHtml.includes("overallLessonLo") &&
     buildHandoutHtml.includes("teachingDate"),
   "Handout HTML should use A4 portrait print CSS, core pages, extra pages, glue, date, and lesson LO.",
@@ -189,13 +190,17 @@ assert(
     retrievalQuestionsFromSlide.includes("slide.los") &&
     handoutFullA4ImagePage.includes("handout-full-page-content") &&
     handoutFullA4ImagePage.includes("handout-pdf-page-image") &&
+    handoutFullA4ImagePage.includes("options") &&
+    handoutFullA4ImagePage.includes("is-rotated-landscape") &&
     handoutHalfA4Pages.includes("slice(index, index + 2)") &&
     handoutHalfA4Pages.includes("handout-half-page-stack") &&
     renderWorksheetPdfPages.includes("loadPdfJs") &&
+    renderWorksheetPdfPages.includes("viewport.width > viewport.height") &&
+    renderWorksheetPdfPages.includes("rotateLandscape") &&
     isWorksheetPdfFile.includes("application/pdf") &&
     openHandout.includes("await buildHandoutHtml") &&
     openHandout.includes("selection.warnings"),
-  "Handout extras should support 8-up retrieval, full-page PDF/worksheet pages, half-page content slides, and non-blocking warnings.",
+  "Handout extras should support 8-up retrieval, full-page PDF/worksheet pages including rotated landscape worksheets, half-page content slides, and non-blocking warnings.",
 );
 
 const handoutStarterHtml = extractFunction(appJs, "handoutStarterHtml");

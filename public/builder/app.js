@@ -6340,11 +6340,14 @@
     return pages.join("");
   }
 
-  function handoutFullA4ImagePage(image, label) {
+  function handoutFullA4ImagePage(image, label, options) {
+    const imageClass = options && options.rotateLandscape
+      ? "handout-pdf-page-image is-rotated-landscape"
+      : "handout-pdf-page-image";
     return `
       <section class="handout-page handout-page-full" aria-label="${escapeAttr(label || "Full page handout slide")}">
         <div class="handout-full-page-content">
-          ${handoutImageHtml(image, label || "Handout page", "handout-pdf-page-image")}
+          ${handoutImageHtml(image, label || "Handout page", imageClass)}
         </div>
       </section>
     `;
@@ -6429,6 +6432,7 @@
       const baseViewport = page.getViewport({ scale: 1 });
       const scale = 1800 / Math.max(1, baseViewport.width);
       const viewport = page.getViewport({ scale });
+      const rotateLandscape = viewport.width > viewport.height;
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.ceil(viewport.width));
       canvas.height = Math.max(1, Math.ceil(viewport.height));
@@ -6440,7 +6444,7 @@
         name: `${file.name || "worksheet"} page ${pageNumber}`,
         type: "image/png",
         dataUrl: canvas.toDataURL("image/png")
-      }, `${file.name || "Worksheet"} page ${pageNumber}`));
+      }, `${file.name || "Worksheet"} page ${pageNumber}`, { rotateLandscape }));
     }
     return { pages: pages.join(""), warning: "" };
   }
@@ -6543,6 +6547,7 @@
       .handout-page-full { display: block; padding: 0; }
       .handout-full-page-content { width: 100%; height: 100%; display: grid; place-items: center; overflow: hidden; }
       .handout-pdf-page-image { width: 100%; height: 100%; object-fit: contain; object-position: center center; }
+      .handout-pdf-page-image.is-rotated-landscape { width: 281mm; height: 194mm; max-width: none; max-height: none; transform: rotate(90deg); transform-origin: center center; }
       .handout-retrieval-grid { width: 100%; height: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 3mm; padding: 4mm; }
       .handout-retrieval-cell { position: relative; min-width: 0; min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
       .handout-retrieval-number { position: absolute; top: 2mm; left: 2mm; z-index: 2; display: grid; place-items: center; width: 7mm; height: 7mm; border: 1px solid rgba(17,24,39,.35); border-radius: 999px; background: rgba(255,255,255,.86); color: rgba(17,24,39,.72); font-size: 10px; font-weight: 800; line-height: 1; }
