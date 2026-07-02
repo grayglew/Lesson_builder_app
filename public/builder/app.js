@@ -6283,10 +6283,10 @@
       </section>
       <section class="handout-page" aria-label="Handout page 2">
         <div class="handout-column">
-          ${handoutExampleAnswersHtml(examples)}
+          ${handoutExampleQuestionsHtml(examples)}
         </div>
         <div class="handout-column">
-          ${handoutExampleQuestionsHtml(examples)}
+          ${handoutExampleAnswersHtml(examples)}
         </div>
       </section>
     </main>

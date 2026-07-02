@@ -104,6 +104,9 @@ assert(
 );
 
 const buildHandoutHtml = extractFunction(appJs, "buildHandoutHtml");
+const handoutPage2Index = buildHandoutHtml.indexOf('aria-label="Handout page 2"');
+const handoutPage2QuestionsIndex = buildHandoutHtml.indexOf("${handoutExampleQuestionsHtml(examples)}", handoutPage2Index);
+const handoutPage2AnswersIndex = buildHandoutHtml.indexOf("${handoutExampleAnswersHtml(examples)}", handoutPage2Index);
 assert(
   buildHandoutHtml.includes("@page { size: A4 portrait; margin: 8mm; }") &&
     buildHandoutHtml.includes("width: 194mm;") &&
@@ -125,6 +128,14 @@ assert(
     buildHandoutHtml.includes("overallLessonLo") &&
     buildHandoutHtml.includes("teachingDate"),
   "Handout HTML should use A4 portrait print CSS, two-column pages, glue, date, and lesson LO.",
+);
+
+assert(
+  handoutPage2Index >= 0 &&
+    handoutPage2QuestionsIndex > handoutPage2Index &&
+    handoutPage2AnswersIndex > handoutPage2Index &&
+    handoutPage2QuestionsIndex < handoutPage2AnswersIndex,
+  "Handout page 2 should put worked example questions in the left column and answer prompts in the right column.",
 );
 
 const handoutStarterHtml = extractFunction(appJs, "handoutStarterHtml");
