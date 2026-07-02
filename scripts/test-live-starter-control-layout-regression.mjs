@@ -14,6 +14,13 @@ assert(
     appJs.includes(">&#8635;</button>"),
   "Live starter controls should show only compact -1, +1, and loop-arrow labels.",
 );
+assert(
+  appJs.includes('class="starter-question-number"') &&
+    appJs.includes('aria-hidden="true">${index + 1}</span>') &&
+    appJs.includes(".starter-question-number{position:absolute;") &&
+    appJs.includes(".starter-cell:nth-child(4) .starter-question-number{right:8px;bottom:8px;left:auto;top:auto;}"),
+  "Starter slides should show subtle 1-4 question numbers in both builder and standalone presenter output.",
+);
 const plusButtonIndex = appJs.indexOf(">+1</button>");
 const minusButtonIndex = appJs.indexOf(">-1</button>");
 const loopButtonIndex = appJs.indexOf(">&#8635;</button>");

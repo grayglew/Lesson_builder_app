@@ -4547,6 +4547,7 @@
             const revealKey = `starter-answer-${index}`;
             return `
               <div class="starter-cell">
+                <span class="starter-question-number" aria-hidden="true">${index + 1}</span>
                 <div class="live-starter-image-host" data-live-image-host>
                   ${toggleableImageTag(
                     slot.image,
@@ -6181,7 +6182,7 @@
       <section class="handout-starter" aria-label="Starter">
         ${[0, 1, 2, 3].map((index) => {
           const slot = slots[index] || {};
-          return `<div class="handout-starter-cell">${handoutImageHtml(slot.image, `Starter question ${index + 1}`)}</div>`;
+          return `<div class="handout-starter-cell"><span class="handout-starter-number">${index + 1}</span>${handoutImageHtml(slot.image, `Starter question ${index + 1}`)}</div>`;
         }).join("")}
       </section>
     `;
@@ -6245,8 +6246,9 @@
       .handout-heading { display: grid; gap: 2mm; margin-bottom: 4mm; }
       .handout-title { font-size: 13px; font-weight: 800; line-height: 1.2; }
       .handout-meta { display: grid; gap: 1mm; font-size: 10px; line-height: 1.25; }
-      .handout-starter { height: 156mm; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; border: 1px solid #111827; }
-      .handout-starter-cell { min-width: 0; min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
+      .handout-starter { height: 156mm; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); border: 1px solid #111827; }
+      .handout-starter-cell { position: relative; min-width: 0; min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
+      .handout-starter-number { position: absolute; top: 2mm; left: 2mm; z-index: 2; display: grid; place-items: center; width: 7mm; height: 7mm; border: 1px solid rgba(17,24,39,.35); border-radius: 999px; background: rgba(255,255,255,.86); color: rgba(17,24,39,.72); font-size: 10px; font-weight: 800; line-height: 1; }
       .handout-example-questions { height: 100%; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 3mm; }
       .handout-question-box { min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
       .handout-example-answers { height: 100%; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 4mm; }
@@ -9200,6 +9202,10 @@ body{margin:0;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,s
 .camera-slide-image{display:block;width:100%;height:100%;object-fit:contain;object-position:center;background:#fff;}
 .starter-slide-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:100%;min-height:0;}
 .starter-cell{border:1px solid #111827;display:grid;grid-template-rows:1fr;min-width:0;min-height:0;overflow:hidden;padding:0;position:relative;}
+.starter-question-number{position:absolute;top:8px;left:8px;z-index:6;display:grid;place-items:center;width:26px;height:26px;border:1px solid rgba(17,24,39,.28);border-radius:999px;background:rgba(255,255,255,.78);color:rgba(17,24,39,.7);font-size:13px;font-weight:800;line-height:1;pointer-events:none;}
+.starter-cell:nth-child(2) .starter-question-number{right:8px;left:auto;}
+.starter-cell:nth-child(3) .starter-question-number{top:auto;bottom:8px;}
+.starter-cell:nth-child(4) .starter-question-number{right:8px;bottom:8px;left:auto;top:auto;}
 .live-starter-image-host{display:grid;min-width:0;min-height:0;width:100%;height:100%;}
 .live-retrieval-controls{position:absolute;z-index:9;display:grid;grid-template-columns:repeat(3,28px);gap:5px;align-items:center;}
 .starter-cell:nth-child(1) .live-retrieval-controls{left:8px;top:8px;right:auto;bottom:auto;}

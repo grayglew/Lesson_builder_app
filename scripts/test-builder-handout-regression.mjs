@@ -114,6 +114,15 @@ assert(
   "Handout HTML should include A4 landscape print CSS, two-column pages, glue, date, and lesson LO.",
 );
 
+const handoutStarterHtml = extractFunction(appJs, "handoutStarterHtml");
+assert(
+  handoutStarterHtml.includes("handout-starter-number") &&
+    handoutStarterHtml.includes("${index + 1}") &&
+    buildHandoutHtml.includes("grid-template-rows: repeat(4, minmax(0, 1fr));") &&
+    !buildHandoutHtml.includes("grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr"),
+  "Handout starter questions should render as a numbered single column, not a 2x2 grid.",
+);
+
 assert(
   stylesCss.includes(".slide-item.is-selected") &&
     stylesCss.includes(".preview-head-actions"),
