@@ -6141,17 +6141,46 @@
     };
   }
 
-  function validateHandoutSelection(slides) {
+  function isRetrievalStarterSlide(slide) {
+    return !!(
+      slide &&
+      slide.type === "starter" &&
+      String(slide.title || "").trim().toLowerCase() === "retrieval"
+    );
+  }
+
+  function isCoreStarterSlide(slide) {
+    return !!(slide && slide.type === "starter" && !isRetrievalStarterSlide(slide));
+  }
+
+  function classifyHandoutSelection(slides) {
     const selectedSlides = Array.isArray(slides) ? slides : [];
-    const starters = selectedSlides.filter((slide) => slide && slide.type === "starter");
-    const examples = selectedSlides.filter((slide) => slide && slide.type === "example");
-    const unsupported = selectedSlides.filter((slide) => slide && slide.type !== "starter" && slide.type !== "example");
+    const starters = [];
+    const examples = [];
+    const extraSlides = [];
+    const warnings = [];
+
+    selectedSlides.forEach((slide) => {
+      if (isCoreStarterSlide(slide)) {
+        starters.push(slide);
+      } else if (isRetrievalStarterSlide(slide)) {
+        extraSlides.push(slide);
+      } else if (slide && slide.type === "example") {
+        examples.push(slide);
+      } else if (slide) {
+        extraSlides.push(slide);
+      }
+    });
+
+    return { selectedSlides, starters, examples, extraSlides, warnings };
+  }
+
+  function validateHandoutSelection(slides) {
+    const selection = classifyHandoutSelection(slides);
+    const { selectedSlides, starters, examples } = selection;
 
     if (!selectedSlides.length) {
       return { ok: false, error: "Select one starter slide and one or two example slides for the handout." };
-    }
-    if (unsupported.length) {
-      return { ok: false, error: "Handouts currently support starter and example slides only." };
     }
     if (starters.length !== 1) {
       return { ok: false, error: "Select exactly one starter slide for the handout." };
@@ -6160,7 +6189,7 @@
       return { ok: false, error: "Select one or two worked example slides for the handout." };
     }
 
-    return { ok: true, starter: starters[0], examples };
+    return { ok: true, starter: starters[0], examples, extraSlides: selection.extraSlides, warnings: selection.warnings };
   }
 
   function formatHandoutDate(value) {
@@ -6169,11 +6198,12 @@
     return `${day}/${month}/${year}`;
   }
 
-  function handoutImageHtml(image, alt) {
+  function handoutImageHtml(image, alt, extraClass) {
     if (!image || !image.dataUrl) {
       return `<div class="handout-empty" aria-hidden="true"></div>`;
     }
-    return `<img class="handout-image" src="${escapeAttr(image.dataUrl)}" alt="${escapeAttr(alt || image.name || "Handout image")}" draggable="false">`;
+    const className = extraClass ? `handout-image ${extraClass}` : "handout-image";
+    return `<img class="${escapeAttr(className)}" src="${escapeAttr(image.dataUrl)}" alt="${escapeAttr(alt || image.name || "Handout image")}" draggable="false">`;
   }
 
   function handoutStarterHtml(starter) {
@@ -6220,12 +6250,265 @@
     `;
   }
 
-  function buildHandoutHtml(selection) {
+  function buildCoreHandoutPages(selection, title, teachingDate, overallLessonLo) {
     const starter = selection.starter;
     const examples = selection.examples || [];
+    return `
+      <section class="handout-page" aria-label="Handout page 1">
+        <div class="handout-column handout-glue">glue</div>
+        <div class="handout-column handout-starter-column">
+          <header class="handout-heading">
+            <div class="handout-title">${escapeHtml(title)}</div>
+            <div class="handout-meta">
+              <div><strong>Date:</strong> ${escapeHtml(teachingDate)}</div>
+              <div><strong>LO:</strong> ${escapeHtml(overallLessonLo || " ")}</div>
+            </div>
+          </header>
+          ${handoutStarterHtml(starter)}
+        </div>
+      </section>
+      <section class="handout-page" aria-label="Handout page 2">
+        <div class="handout-column">
+          ${handoutExampleQuestionsHtml(examples)}
+        </div>
+        <div class="handout-column">
+          ${handoutExampleAnswersHtml(examples)}
+        </div>
+      </section>
+    `;
+  }
+
+  function isRetrievalHandoutSlide(slide) {
+    return !!(isRetrievalStarterSlide(slide) || (slide && (slide.type === "revision" || slide.type === "retrieval")));
+  }
+
+  function retrievalQuestionsFromSlide(slide) {
+    if (!slide) return [];
+    if (isRetrievalStarterSlide(slide)) {
+      return (Array.isArray(slide.slots) ? slide.slots : [])
+        .filter((slot) => slot && (slot.image || slot.lo))
+        .map((slot) => ({
+          image: slot.image,
+          text: slot.lo || "",
+          label: slot.lo || "Retrieval question"
+        }));
+    }
+    if (slide.type === "revision") {
+      return (Array.isArray(slide.items) ? slide.items : [])
+        .filter((item) => item && (item.image || item.lo))
+        .map((item) => ({
+          image: item.image,
+          text: item.lo || "",
+          label: item.lo || "Revision question"
+        }));
+    }
+    if (slide.type === "retrieval") {
+      return (Array.isArray(slide.los) ? slide.los : [])
+        .filter(Boolean)
+        .map((lo) => ({ image: null, text: lo, label: lo }));
+    }
+    return [];
+  }
+
+  function handoutRetrievalQuestionHtml(item, index) {
+    const content = item && item.image
+      ? handoutImageHtml(item.image, item.label || `Retrieval question ${index + 1}`)
+      : `<div class="handout-retrieval-text">${escapeHtml(item && item.text || "")}</div>`;
+    return `<div class="handout-retrieval-cell"><span class="handout-retrieval-number">${index + 1}</span>${content}</div>`;
+  }
+
+  function handoutRetrievalPages(slides) {
+    const questions = [];
+    (Array.isArray(slides) ? slides : []).forEach((slide) => {
+      questions.push(...retrievalQuestionsFromSlide(slide));
+    });
+    if (!questions.length) return "";
+    const pages = [];
+    for (let index = 0; index < questions.length; index += 8) {
+      const pageQuestions = questions.slice(index, index + 8);
+      pages.push(`
+        <section class="handout-page handout-page-full" aria-label="Retrieval handout page">
+          <div class="handout-retrieval-grid">
+            ${Array.from({ length: 8 }, (_, offset) => {
+              const item = pageQuestions[offset];
+              return item ? handoutRetrievalQuestionHtml(item, index + offset) : `<div class="handout-retrieval-cell"><div class="handout-empty" aria-hidden="true"></div></div>`;
+            }).join("")}
+          </div>
+        </section>
+      `);
+    }
+    return pages.join("");
+  }
+
+  function handoutFullA4ImagePage(image, label) {
+    return `
+      <section class="handout-page handout-page-full" aria-label="${escapeAttr(label || "Full page handout slide")}">
+        <div class="handout-full-page-content">
+          ${handoutImageHtml(image, label || "Handout page", "handout-pdf-page-image")}
+        </div>
+      </section>
+    `;
+  }
+
+  function handoutHalfSlideHtml(slide) {
+    if (!slide) return `<div class="handout-empty" aria-hidden="true"></div>`;
+    if (slide.type === "drawing") {
+      return handoutImageHtml(slide.image, slide.title || "Drawing");
+    }
+    if (slide.type === "template") {
+      const bullets = Array.isArray(slide.bullets) ? slide.bullets : [];
+      return `
+        <div class="handout-text-panel">
+          <h2>${escapeHtml(slide.title || "Template")}</h2>
+          <ul>${bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}</ul>
+        </div>
+      `;
+    }
+    if (slide.type === "placeholder") {
+      return `<div class="handout-text-panel"><p>${escapeHtml(slide.text || "")}</p></div>`;
+    }
+    if (slide.type === "blank") {
+      return `<div class="handout-empty" aria-hidden="true"></div>`;
+    }
+    if (slide.type === "math") {
+      return `
+        <div class="handout-text-panel handout-math-panel">
+          <h2>${escapeHtml(slide.mode || slide.title || "LaTeX")}</h2>
+          <div class="latex-rendered">${renderLatexDocument(String(slide.latex || "").trim())}</div>
+        </div>
+      `;
+    }
+    return `<div class="handout-empty" aria-hidden="true"></div>`;
+  }
+
+  function handoutHalfA4Pages(slides, renderer) {
+    const sourceSlides = Array.isArray(slides) ? slides : [];
+    if (!sourceSlides.length) return "";
+    const renderPanel = renderer || handoutHalfSlideHtml;
+    const pages = [];
+    for (let index = 0; index < sourceSlides.length; index += 2) {
+      const pageSlides = sourceSlides.slice(index, index + 2);
+      pages.push(`
+        <section class="handout-page handout-page-full" aria-label="Half-page handout slides">
+          <div class="handout-half-page-stack">
+            ${[0, 1].map((offset) => {
+              const slide = pageSlides[offset];
+              return `<section class="handout-half-panel">${slide ? renderPanel(slide) : `<div class="handout-empty" aria-hidden="true"></div>`}</section>`;
+            }).join("")}
+          </div>
+        </section>
+      `);
+    }
+    return pages.join("");
+  }
+
+  function isWorksheetPdfFile(file) {
+    if (!file) return false;
+    const type = String(file.type || file.mimeType || mimeFromDataUrl(file.dataUrl) || "").toLowerCase();
+    const name = String(file.name || "").toLowerCase();
+    return type === "application/pdf" || name.endsWith(".pdf");
+  }
+
+  async function fileToArrayBuffer(file) {
+    const source = file && (file.dataUrl || file.url || file.path);
+    if (!source) throw new Error("Worksheet PDF has no readable file data.");
+    const response = await fetch(source);
+    if (!response.ok) throw new Error(`Could not read worksheet PDF (${response.status}).`);
+    return response.arrayBuffer();
+  }
+
+  async function renderWorksheetPdfPages(file) {
+    if (!isWorksheetPdfFile(file)) {
+      return { pages: "", warning: file ? `Skipped non-PDF worksheet "${file.name || "worksheet"}".` : "Skipped worksheet slide without a question PDF." };
+    }
+    const pdfjs = await loadPdfJs();
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(await fileToArrayBuffer(file)) }).promise;
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = 1800 / Math.max(1, baseViewport.width);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.ceil(viewport.width));
+      canvas.height = Math.max(1, Math.ceil(viewport.height));
+      const ctx = canvas.getContext("2d", { alpha: false });
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pages.push(handoutFullA4ImagePage({
+        name: `${file.name || "worksheet"} page ${pageNumber}`,
+        type: "image/png",
+        dataUrl: canvas.toDataURL("image/png")
+      }, `${file.name || "Worksheet"} page ${pageNumber}`));
+    }
+    return { pages: pages.join(""), warning: "" };
+  }
+
+  async function buildExtraHandoutPages(extraSlides, warnings) {
+    const slides = Array.isArray(extraSlides) ? extraSlides : [];
+    const pageWarnings = Array.isArray(warnings) ? warnings : [];
+    const pages = [];
+    let retrievalSlides = [];
+    let halfSlides = [];
+
+    const flushRetrieval = () => {
+      if (!retrievalSlides.length) return;
+      pages.push(handoutRetrievalPages(retrievalSlides));
+      retrievalSlides = [];
+    };
+    const flushHalf = () => {
+      if (!halfSlides.length) return;
+      pages.push(handoutHalfA4Pages(halfSlides));
+      halfSlides = [];
+    };
+
+    for (const slide of slides) {
+      if (isRetrievalHandoutSlide(slide)) {
+        flushHalf();
+        retrievalSlides.push(slide);
+        continue;
+      }
+
+      flushRetrieval();
+      if (slide && slide.type === "worksheet") {
+        flushHalf();
+        try {
+          const rendered = await renderWorksheetPdfPages(slide.worksheet);
+          if (rendered.warning) pageWarnings.push(rendered.warning);
+          if (rendered.pages) pages.push(rendered.pages);
+        } catch (err) {
+          console.warn("Could not render worksheet PDF for handout", err);
+          pageWarnings.push(`Skipped worksheet "${slide.title || "Worksheet"}" because its PDF could not be rendered.`);
+        }
+        continue;
+      }
+
+      if (slide && slide.type === "pdf-page") {
+        flushHalf();
+        pages.push(handoutFullA4ImagePage(slide.image, slide.title || slide.sourceName || "PDF page"));
+        continue;
+      }
+
+      if (slide && ["drawing", "template", "placeholder", "blank", "math"].includes(slide.type)) {
+        halfSlides.push(slide);
+        continue;
+      }
+
+      flushHalf();
+      pageWarnings.push(`Skipped unsupported handout slide "${slide && (slide.title || slide.type) || "Untitled"}".`);
+    }
+
+    flushRetrieval();
+    flushHalf();
+    return pages.join("");
+  }
+
+  async function buildHandoutHtml(selection) {
     const title = String(state.title || "Lesson handout").trim() || "Lesson handout";
     const teachingDate = formatHandoutDate(state.teachingDate);
     const overallLessonLo = String(state.overallLessonLo || "").trim();
+    const extraPages = await buildExtraHandoutPages(selection.extraSlides || [], selection.warnings || []);
     return `<!doctype html>
 <html lang="en">
   <head>
@@ -6257,6 +6540,20 @@
       .handout-mini-label { padding: 1.5mm 2mm; border-bottom: 1px solid #111827; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #374151; }
       .handout-image { width: 100%; height: 100%; min-height: 0; display: block; object-fit: contain; object-position: top center; }
       .handout-empty { display: grid; place-items: center; width: 100%; height: 100%; min-height: 20mm; color: #6b7280; font-size: 11px; text-align: center; }
+      .handout-page-full { display: block; padding: 0; }
+      .handout-full-page-content { width: 100%; height: 100%; display: grid; place-items: center; overflow: hidden; }
+      .handout-pdf-page-image { width: 100%; height: 100%; object-fit: contain; object-position: center center; }
+      .handout-retrieval-grid { width: 100%; height: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 3mm; padding: 4mm; }
+      .handout-retrieval-cell { position: relative; min-width: 0; min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
+      .handout-retrieval-number { position: absolute; top: 2mm; left: 2mm; z-index: 2; display: grid; place-items: center; width: 7mm; height: 7mm; border: 1px solid rgba(17,24,39,.35); border-radius: 999px; background: rgba(255,255,255,.86); color: rgba(17,24,39,.72); font-size: 10px; font-weight: 800; line-height: 1; }
+      .handout-retrieval-text { align-self: center; justify-self: stretch; padding: 8mm 5mm 5mm; font-size: 13px; line-height: 1.35; }
+      .handout-half-page-stack { width: 100%; height: 100%; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 4mm; padding: 4mm; }
+      .handout-half-panel { min-height: 0; border: 1px solid #111827; padding: 4mm; overflow: hidden; }
+      .handout-text-panel { width: 100%; height: 100%; overflow: hidden; font-size: 15px; line-height: 1.35; }
+      .handout-text-panel h2 { margin: 0 0 4mm; font-size: 18px; line-height: 1.2; }
+      .handout-text-panel p { margin: 0; white-space: pre-wrap; }
+      .handout-text-panel ul { margin: 0; padding-left: 6mm; }
+      .handout-math-panel .latex-rendered { font-size: 16px; }
       @media print {
         html, body { background: #fff; }
         .handout-document { display: block; padding: 0; }
@@ -6266,33 +6563,14 @@
   </head>
   <body>
     <main class="handout-document">
-      <section class="handout-page" aria-label="Handout page 1">
-        <div class="handout-column handout-glue">glue</div>
-        <div class="handout-column handout-starter-column">
-          <header class="handout-heading">
-            <div class="handout-title">${escapeHtml(title)}</div>
-            <div class="handout-meta">
-              <div><strong>Date:</strong> ${escapeHtml(teachingDate)}</div>
-              <div><strong>LO:</strong> ${escapeHtml(overallLessonLo || " ")}</div>
-            </div>
-          </header>
-          ${handoutStarterHtml(starter)}
-        </div>
-      </section>
-      <section class="handout-page" aria-label="Handout page 2">
-        <div class="handout-column">
-          ${handoutExampleQuestionsHtml(examples)}
-        </div>
-        <div class="handout-column">
-          ${handoutExampleAnswersHtml(examples)}
-        </div>
-      </section>
+      ${buildCoreHandoutPages(selection, title, teachingDate, overallLessonLo)}
+      ${extraPages}
     </main>
   </body>
 </html>`;
   }
 
-  function openHandout() {
+  async function openHandout() {
     const selection = validateHandoutSelection(getSelectedPreviewSlides());
     if (!selection.ok) {
       setStatus(selection.error, "error");
@@ -6305,10 +6583,24 @@
     }
     handoutWindow.opener = null;
     handoutWindow.document.open();
-    handoutWindow.document.write(buildHandoutHtml(selection));
+    handoutWindow.document.write("<!doctype html><title>Preparing handout</title><p>Preparing handout...</p>");
     handoutWindow.document.close();
-    handoutWindow.focus();
-    setStatus("Opened handout print page.", "success");
+    try {
+      setStatus("Preparing handout print page...", "warn");
+      const html = await buildHandoutHtml(selection);
+      handoutWindow.document.open();
+      handoutWindow.document.write(html);
+      handoutWindow.document.close();
+      handoutWindow.focus();
+      const warningText = selection.warnings.length ? ` ${selection.warnings.join(" ")}` : "";
+      setStatus(`Opened handout print page.${warningText}`, selection.warnings.length ? "warn" : "success");
+    } catch (err) {
+      console.error("Could not build handout", err);
+      handoutWindow.document.open();
+      handoutWindow.document.write("<!doctype html><title>Handout error</title><p>Could not build the handout. Return to Lesson Builder and try again.</p>");
+      handoutWindow.document.close();
+      setStatus(err.message || "Could not build the handout.", "error");
+    }
   }
 
   async function exportHtml() {

@@ -84,30 +84,46 @@ assert(
 for (const functionName of [
   "getSelectedPreviewSlides",
   "validateHandoutSelection",
+  "classifyHandoutSelection",
   "buildHandoutHtml",
+  "buildCoreHandoutPages",
+  "buildExtraHandoutPages",
   "handoutImageHtml",
   "openHandout",
   "handoutStarterHtml",
   "handoutExampleQuestionsHtml",
   "handoutExampleAnswersHtml",
+  "isRetrievalHandoutSlide",
+  "retrievalQuestionsFromSlide",
+  "handoutRetrievalPages",
+  "handoutFullA4ImagePage",
+  "handoutHalfA4Pages",
+  "isWorksheetPdfFile",
+  "renderWorksheetPdfPages",
 ]) {
   extractFunction(appJs, functionName);
 }
 
 const validateHandoutSelection = extractFunction(appJs, "validateHandoutSelection");
+const classifyHandoutSelection = extractFunction(appJs, "classifyHandoutSelection");
 assert(
-  validateHandoutSelection.includes('slide.type === "starter"') &&
-    validateHandoutSelection.includes('slide.type === "example"') &&
+  validateHandoutSelection.includes("classifyHandoutSelection") &&
+    classifyHandoutSelection.includes("extraSlides") &&
+    classifyHandoutSelection.includes("isCoreStarterSlide") &&
+    classifyHandoutSelection.includes("isRetrievalStarterSlide") &&
     validateHandoutSelection.includes("starters.length !== 1") &&
     validateHandoutSelection.includes("examples.length < 1") &&
-    validateHandoutSelection.includes("examples.length > 2"),
-  "Handout validation should require exactly one starter and one or two example slides.",
+    validateHandoutSelection.includes("examples.length > 2") &&
+    !validateHandoutSelection.includes("unsupported"),
+  "Handout validation should classify selections, require one core starter and one or two examples, and allow extra slides.",
 );
 
 const buildHandoutHtml = extractFunction(appJs, "buildHandoutHtml");
-const handoutPage2Index = buildHandoutHtml.indexOf('aria-label="Handout page 2"');
-const handoutPage2QuestionsIndex = buildHandoutHtml.indexOf("${handoutExampleQuestionsHtml(examples)}", handoutPage2Index);
-const handoutPage2AnswersIndex = buildHandoutHtml.indexOf("${handoutExampleAnswersHtml(examples)}", handoutPage2Index);
+const buildCoreHandoutPages = extractFunction(appJs, "buildCoreHandoutPages");
+const buildExtraHandoutPages = extractFunction(appJs, "buildExtraHandoutPages");
+const handoutPage2Index = buildCoreHandoutPages.indexOf('aria-label="Handout page 2"');
+const handoutPage2QuestionsIndex = buildCoreHandoutPages.indexOf("${handoutExampleQuestionsHtml(examples)}", handoutPage2Index);
+const handoutPage2AnswersIndex = buildCoreHandoutPages.indexOf("${handoutExampleAnswersHtml(examples)}", handoutPage2Index);
 assert(
   buildHandoutHtml.includes("@page { size: A4 portrait; margin: 8mm; }") &&
     buildHandoutHtml.includes("width: 194mm;") &&
@@ -126,9 +142,19 @@ assert(
     buildHandoutHtml.includes("handout-page") &&
     buildHandoutHtml.includes("handout-column") &&
     buildHandoutHtml.includes("glue") &&
+    buildCoreHandoutPages.includes("overallLessonLo") &&
+    buildCoreHandoutPages.includes("teachingDate") &&
+    buildHandoutHtml.includes("buildCoreHandoutPages") &&
+    buildHandoutHtml.includes("buildExtraHandoutPages") &&
+    buildHandoutHtml.includes(".handout-full-page-content") &&
+    buildHandoutHtml.includes(".handout-half-page-stack") &&
+    buildHandoutHtml.includes(".handout-half-panel") &&
+    buildHandoutHtml.includes(".handout-retrieval-grid") &&
+    buildHandoutHtml.includes(".handout-retrieval-cell") &&
+    buildHandoutHtml.includes(".handout-pdf-page-image") &&
     buildHandoutHtml.includes("overallLessonLo") &&
     buildHandoutHtml.includes("teachingDate"),
-  "Handout HTML should use A4 portrait print CSS, two-column pages, glue, date, and lesson LO.",
+  "Handout HTML should use A4 portrait print CSS, core pages, extra pages, glue, date, and lesson LO.",
 );
 
 assert(
@@ -137,6 +163,39 @@ assert(
     handoutPage2AnswersIndex > handoutPage2Index &&
     handoutPage2QuestionsIndex < handoutPage2AnswersIndex,
   "Handout page 2 should put worked example questions in the left column and answer prompts in the right column.",
+);
+
+const handoutRetrievalPages = extractFunction(appJs, "handoutRetrievalPages");
+const isRetrievalHandoutSlide = extractFunction(appJs, "isRetrievalHandoutSlide");
+const retrievalQuestionsFromSlide = extractFunction(appJs, "retrievalQuestionsFromSlide");
+const handoutFullA4ImagePage = extractFunction(appJs, "handoutFullA4ImagePage");
+const handoutHalfA4Pages = extractFunction(appJs, "handoutHalfA4Pages");
+const isWorksheetPdfFile = extractFunction(appJs, "isWorksheetPdfFile");
+const renderWorksheetPdfPages = extractFunction(appJs, "renderWorksheetPdfPages");
+const openHandout = extractFunction(appJs, "openHandout");
+assert(
+  buildExtraHandoutPages.includes("handoutRetrievalPages") &&
+    buildExtraHandoutPages.includes("handoutFullA4ImagePage") &&
+    buildExtraHandoutPages.includes("handoutHalfA4Pages") &&
+    buildExtraHandoutPages.includes("renderWorksheetPdfPages") &&
+    buildExtraHandoutPages.includes("warnings") &&
+    handoutRetrievalPages.includes("slice(index, index + 8)") &&
+    handoutRetrievalPages.includes("handout-retrieval-grid") &&
+    isRetrievalHandoutSlide.includes("isRetrievalStarterSlide") &&
+    isRetrievalHandoutSlide.includes('slide.type === "revision"') &&
+    isRetrievalHandoutSlide.includes('slide.type === "retrieval"') &&
+    retrievalQuestionsFromSlide.includes("slide.slots") &&
+    retrievalQuestionsFromSlide.includes("slide.items") &&
+    retrievalQuestionsFromSlide.includes("slide.los") &&
+    handoutFullA4ImagePage.includes("handout-full-page-content") &&
+    handoutFullA4ImagePage.includes("handout-pdf-page-image") &&
+    handoutHalfA4Pages.includes("slice(index, index + 2)") &&
+    handoutHalfA4Pages.includes("handout-half-page-stack") &&
+    renderWorksheetPdfPages.includes("loadPdfJs") &&
+    isWorksheetPdfFile.includes("application/pdf") &&
+    openHandout.includes("await buildHandoutHtml") &&
+    openHandout.includes("selection.warnings"),
+  "Handout extras should support 8-up retrieval, full-page PDF/worksheet pages, half-page content slides, and non-blocking warnings.",
 );
 
 const handoutStarterHtml = extractFunction(appJs, "handoutStarterHtml");
