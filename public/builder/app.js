@@ -174,7 +174,8 @@
     dateFrom: "",
     dateTo: ""
   };
-  let selectedPreviewSlideId = "";
+  let selectedPreviewSlideIds = new Set();
+  let previewInsertAnchorSlideId = "";
   let activeImageDropZone = null;
   let activeImagePasteHandler = null;
   let pdfJsPromise = null;
@@ -199,6 +200,7 @@
       title: "Untitled lesson",
       className: "",
       teachingDate: todayIso(),
+      overallLessonLo: "",
       activeLessonId: "",
       activeLessonSavedAt: "",
       lessonUpdatedAt: new Date().toISOString(),
@@ -431,6 +433,7 @@
       title: workspace.title,
       className: workspace.className,
       teachingDate: workspace.teachingDate,
+      overallLessonLo: workspace.overallLessonLo,
       activeLessonId: workspace.activeLessonId,
       activeLessonSavedAt: workspace.activeLessonSavedAt,
       lessonUpdatedAt: workspace.lessonUpdatedAt,
@@ -517,6 +520,7 @@
       title: String(src.title || base.title),
       className: String(src.className || ""),
       teachingDate: isIsoDate(src.teachingDate) ? src.teachingDate : base.teachingDate,
+      overallLessonLo: String(src.overallLessonLo || ""),
       activeLessonId: String(src.activeLessonId || ""),
       activeLessonSavedAt: String(src.activeLessonSavedAt || ""),
       lessonUpdatedAt: String(src.lessonUpdatedAt || src.activeLessonSavedAt || src.updatedAt || base.lessonUpdatedAt),
@@ -1315,6 +1319,7 @@
       title: String(nextState.title || "Untitled lesson"),
       className: String(nextState.className || ""),
       teachingDate: isIsoDate(nextState.teachingDate) ? nextState.teachingDate : todayIso(),
+      overallLessonLo: String(nextState.overallLessonLo || ""),
       activeLessonId: String(nextState.activeLessonId || ""),
       activeLessonSavedAt: String(nextState.activeLessonSavedAt || ""),
       lessonUpdatedAt: String(nextState.lessonUpdatedAt || nextState.updatedAt || new Date().toISOString()),
@@ -1343,6 +1348,7 @@
       title: String(state.title || "Untitled lesson").trim() || "Untitled lesson",
       className: String(state.className || "").trim(),
       teachingDate: isIsoDate(state.teachingDate) ? state.teachingDate : todayIso(),
+      overallLessonLo: String(state.overallLessonLo || "").trim(),
       slides: clonePlain(state.slides || []),
       savedAt: new Date().toISOString()
     };
@@ -1362,6 +1368,7 @@
       title,
       className,
       teachingDate,
+      overallLessonLo: String(source.overallLessonLo || "").trim(),
       slides: Array.isArray(source.slides) ? clonePlain(source.slides) : []
     };
   }
@@ -1373,6 +1380,7 @@
       title: lesson.title,
       className: lesson.className,
       teachingDate: lesson.teachingDate,
+      overallLessonLo: lesson.overallLessonLo,
       classNames: uniqueStrings([lesson.className, ...DEFAULT_CLASSES]),
       slides: clonePlain(lesson.slides || []),
       retrievalItems: [],
@@ -1588,8 +1596,9 @@
     state.title = lesson.title;
     state.className = lesson.className;
     state.teachingDate = lesson.teachingDate;
+    state.overallLessonLo = lesson.overallLessonLo;
     state.slides = lesson.slides;
-    selectedPreviewSlideId = "";
+    clearPreviewSelection();
     state.classNames = uniqueStrings([state.className, ...(state.classNames || []), ...DEFAULT_CLASSES]);
     if (metadata && metadata.id) {
       setActiveLessonSaved(metadata.id, metadata.updatedAt);
@@ -1992,8 +2001,9 @@
     state.title = "Untitled lesson";
     state.className = "";
     state.teachingDate = todayIso();
+    state.overallLessonLo = "";
     state.slides = [];
-    selectedPreviewSlideId = "";
+    clearPreviewSelection();
     clearActiveLessonTracking();
     resetLessonDrafts();
     persist(SYNC_WORKSPACE);
@@ -2723,6 +2733,7 @@
   function wireInputs() {
     syncPreviewCollapseState();
     $("preview-collapse-toggle").addEventListener("click", togglePreviewPane);
+    $("handout-lesson").addEventListener("click", openHandout);
     window.addEventListener("resize", syncPreviewCollapseState);
 
     $("lesson-title").addEventListener("input", (event) => {
@@ -2746,6 +2757,11 @@
       state.teachingDate = event.target.value || todayIso();
       persistLessonChange();
       renderRetrievalRows();
+    });
+
+    $("overall-lesson-lo").addEventListener("input", (event) => {
+      state.overallLessonLo = event.target.value;
+      persistLessonChange();
     });
 
     $("saved-lessons-refresh").addEventListener("click", () => loadSavedLessons({ showStatus: true }));
@@ -3882,8 +3898,8 @@
   }
 
   function getSelectedSlideInsertIndex() {
-    if (!selectedPreviewSlideId) return state.slides.length;
-    const selectedIndex = state.slides.findIndex((slide) => slide.id === selectedPreviewSlideId);
+    if (!previewInsertAnchorSlideId) return state.slides.length;
+    const selectedIndex = state.slides.findIndex((slide) => slide.id === previewInsertAnchorSlideId);
     return selectedIndex >= 0 ? selectedIndex + 1 : state.slides.length;
   }
 
@@ -3897,7 +3913,8 @@
       ...slide
     }));
     state.slides.splice(getSelectedSlideInsertIndex(), 0, ...preparedSlides);
-    selectedPreviewSlideId = preparedSlides[preparedSlides.length - 1].id;
+    selectedPreviewSlideIds = new Set([preparedSlides[preparedSlides.length - 1].id]);
+    previewInsertAnchorSlideId = preparedSlides[preparedSlides.length - 1].id;
     return preparedSlides;
   }
 
@@ -4370,15 +4387,44 @@
   }
 
   function deleteSlide(id) {
-    if (selectedPreviewSlideId === id) selectedPreviewSlideId = "";
+    selectedPreviewSlideIds.delete(id);
+    if (previewInsertAnchorSlideId === id) {
+      previewInsertAnchorSlideId = Array.from(selectedPreviewSlideIds).pop() || "";
+    }
     state.slides = state.slides.filter((slide) => slide.id !== id);
     persistLessonChange();
     renderPreview();
     setStatus("Slide removed.", "success");
   }
 
+  function clearPreviewSelection() {
+    selectedPreviewSlideIds = new Set();
+    previewInsertAnchorSlideId = "";
+  }
+
+  function prunePreviewSelection() {
+    const validIds = new Set(state.slides.map((slide) => slide.id));
+    selectedPreviewSlideIds = new Set(Array.from(selectedPreviewSlideIds).filter((id) => validIds.has(id)));
+    if (previewInsertAnchorSlideId && !validIds.has(previewInsertAnchorSlideId)) {
+      previewInsertAnchorSlideId = Array.from(selectedPreviewSlideIds).pop() || "";
+    }
+  }
+
+  function getSelectedPreviewSlides() {
+    prunePreviewSelection();
+    return state.slides.filter((slide) => selectedPreviewSlideIds.has(slide.id));
+  }
+
   function toggleSelectedPreviewSlide(id) {
-    selectedPreviewSlideId = selectedPreviewSlideId === id ? "" : id;
+    if (selectedPreviewSlideIds.has(id)) {
+      selectedPreviewSlideIds.delete(id);
+      if (previewInsertAnchorSlideId === id) {
+        previewInsertAnchorSlideId = Array.from(selectedPreviewSlideIds).pop() || "";
+      }
+    } else {
+      selectedPreviewSlideIds.add(id);
+      previewInsertAnchorSlideId = id;
+    }
     renderPreview();
   }
 
@@ -4423,9 +4469,7 @@
   function renderPreview() {
     const list = $("slide-list");
     $("slide-count").textContent = `${state.slides.length} slide${state.slides.length === 1 ? "" : "s"}`;
-    if (selectedPreviewSlideId && !state.slides.some((slide) => slide.id === selectedPreviewSlideId)) {
-      selectedPreviewSlideId = "";
-    }
+    prunePreviewSelection();
 
     if (!state.slides.length) {
       list.innerHTML = `<div class="empty-state">No local lesson slides yet.</div>`;
@@ -4434,7 +4478,7 @@
 
     list.innerHTML = state.slides
       .map((slide, index) => {
-        const isSelected = slide.id === selectedPreviewSlideId;
+        const isSelected = selectedPreviewSlideIds.has(slide.id);
         return `
         <article class="slide-item${isSelected ? " is-selected" : ""}" data-id="${escapeAttr(slide.id)}" role="button" tabindex="0" aria-selected="${isSelected ? "true" : "false"}">
           <div class="slide-toolbar">
@@ -6085,6 +6129,7 @@
       title: lessonState.title,
       className: lessonState.className,
       teachingDate: lessonState.teachingDate,
+      overallLessonLo: lessonState.overallLessonLo,
       classNames: lessonState.classNames || [],
       slides: clonePlain(lessonState.slides || []),
       retrievalItems: [],
@@ -6093,6 +6138,176 @@
       exportScope: "lesson-only",
       updatedAt: lessonState.updatedAt || new Date().toISOString()
     };
+  }
+
+  function validateHandoutSelection(slides) {
+    const selectedSlides = Array.isArray(slides) ? slides : [];
+    const starters = selectedSlides.filter((slide) => slide && slide.type === "starter");
+    const examples = selectedSlides.filter((slide) => slide && slide.type === "example");
+    const unsupported = selectedSlides.filter((slide) => slide && slide.type !== "starter" && slide.type !== "example");
+
+    if (!selectedSlides.length) {
+      return { ok: false, error: "Select one starter slide and one or two example slides for the handout." };
+    }
+    if (unsupported.length) {
+      return { ok: false, error: "Handouts currently support starter and example slides only." };
+    }
+    if (starters.length !== 1) {
+      return { ok: false, error: "Select exactly one starter slide for the handout." };
+    }
+    if (examples.length < 1 || examples.length > 2) {
+      return { ok: false, error: "Select one or two worked example slides for the handout." };
+    }
+
+    return { ok: true, starter: starters[0], examples };
+  }
+
+  function formatHandoutDate(value) {
+    if (!isIsoDate(value)) return String(value || "");
+    const [year, month, day] = String(value).split("-");
+    return `${day}/${month}/${year}`;
+  }
+
+  function handoutImageHtml(image, alt) {
+    if (!image || !image.dataUrl) {
+      return `<div class="handout-empty">No image</div>`;
+    }
+    return `<img class="handout-image" src="${escapeAttr(image.dataUrl)}" alt="${escapeAttr(alt || image.name || "Handout image")}" draggable="false">`;
+  }
+
+  function handoutStarterHtml(starter) {
+    const slots = Array.isArray(starter && starter.slots) ? starter.slots : [];
+    return `
+      <section class="handout-starter" aria-label="Starter">
+        ${[0, 1, 2, 3].map((index) => {
+          const slot = slots[index] || {};
+          return `<div class="handout-starter-cell">${handoutImageHtml(slot.image, `Starter question ${index + 1}`)}</div>`;
+        }).join("")}
+      </section>
+    `;
+  }
+
+  function handoutExampleQuestionsHtml(examples) {
+    const questionImages = [];
+    (Array.isArray(examples) ? examples : []).forEach((example) => {
+      if (example && example.image1) questionImages.push({ image: example.image1, label: `${example.lo || "Worked example"} question 1` });
+      if (example && example.image2) questionImages.push({ image: example.image2, label: `${example.lo || "Worked example"} question 2` });
+    });
+    return `
+      <section class="handout-example-questions" aria-label="Worked example questions">
+        ${[0, 1, 2, 3].map((index) => {
+          const item = questionImages[index];
+          return `<div class="handout-question-box">${item ? handoutImageHtml(item.image, item.label) : `<div class="handout-empty">Blank question space</div>`}</div>`;
+        }).join("")}
+      </section>
+    `;
+  }
+
+  function handoutExampleAnswersHtml(examples) {
+    return `
+      <section class="handout-example-answers" aria-label="Worked example answer prompts">
+        ${(Array.isArray(examples) ? examples : []).slice(0, 2).map((example, index) => `
+          <div class="handout-answer-pair">
+            <div class="handout-answer-box">
+              <span class="handout-mini-label">Example ${index + 1} answer</span>
+              ${handoutImageHtml(example && example.answerImage1, `Worked example ${index + 1} answer 1`)}
+            </div>
+            <div class="handout-answer-box handout-student-space">
+              <span class="handout-mini-label">Your turn</span>
+            </div>
+          </div>
+        `).join("")}
+      </section>
+    `;
+  }
+
+  function buildHandoutHtml(selection) {
+    const starter = selection.starter;
+    const examples = selection.examples || [];
+    const title = String(state.title || "Lesson handout").trim() || "Lesson handout";
+    const teachingDate = formatHandoutDate(state.teachingDate);
+    const overallLessonLo = String(state.overallLessonLo || "").trim();
+    return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${escapeHtml(title)} handout</title>
+    <style>
+      @page { size: A4 landscape; margin: 8mm; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: #f3f4f6; color: #111827; font-family: Arial, Helvetica, sans-serif; }
+      .handout-document { display: grid; gap: 12px; padding: 12px; }
+      .handout-page { width: 281mm; min-height: 194mm; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-after: page; page-break-after: always; background: #fff; padding: 0; }
+      .handout-page:last-child { break-after: auto; page-break-after: auto; }
+      .handout-column { min-width: 0; min-height: 0; border: 1px solid #111827; padding: 5mm; overflow: hidden; }
+      .handout-glue { display: grid; place-items: center; font-size: 34px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+      .handout-heading { display: grid; gap: 2mm; margin-bottom: 4mm; }
+      .handout-title { font-size: 13px; font-weight: 800; line-height: 1.2; }
+      .handout-meta { display: grid; gap: 1mm; font-size: 10px; line-height: 1.25; }
+      .handout-starter { height: 156mm; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; border: 1px solid #111827; }
+      .handout-starter-cell { min-width: 0; min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
+      .handout-example-questions { height: 100%; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 3mm; }
+      .handout-question-box { min-height: 0; border: 1px solid #111827; display: grid; place-items: stretch; overflow: hidden; }
+      .handout-example-answers { height: 100%; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 4mm; }
+      .handout-answer-pair { min-height: 0; display: grid; grid-template-rows: 1fr 1fr; gap: 3mm; }
+      .handout-answer-box { min-height: 0; border: 1px solid #111827; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+      .handout-student-space { background: repeating-linear-gradient(0deg, #fff 0, #fff 10mm, #e5e7eb 10.25mm); }
+      .handout-mini-label { padding: 1.5mm 2mm; border-bottom: 1px solid #111827; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #374151; }
+      .handout-image { width: 100%; height: 100%; min-height: 0; display: block; object-fit: contain; object-position: top center; }
+      .handout-empty { display: grid; place-items: center; width: 100%; height: 100%; min-height: 20mm; color: #6b7280; font-size: 11px; text-align: center; }
+      @media print {
+        html, body { background: #fff; }
+        .handout-document { display: block; padding: 0; }
+        .handout-page { margin: 0; width: auto; min-height: calc(210mm - 16mm); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="handout-document">
+      <section class="handout-page" aria-label="Handout page 1">
+        <div class="handout-column handout-glue">glue</div>
+        <div class="handout-column">
+          <header class="handout-heading">
+            <div class="handout-title">${escapeHtml(title)}</div>
+            <div class="handout-meta">
+              <div><strong>Date:</strong> ${escapeHtml(teachingDate)}</div>
+              <div><strong>LO:</strong> ${escapeHtml(overallLessonLo || " ")}</div>
+            </div>
+          </header>
+          ${handoutStarterHtml(starter)}
+        </div>
+      </section>
+      <section class="handout-page" aria-label="Handout page 2">
+        <div class="handout-column">
+          ${handoutExampleAnswersHtml(examples)}
+        </div>
+        <div class="handout-column">
+          ${handoutExampleQuestionsHtml(examples)}
+        </div>
+      </section>
+    </main>
+  </body>
+</html>`;
+  }
+
+  function openHandout() {
+    const selection = validateHandoutSelection(getSelectedPreviewSlides());
+    if (!selection.ok) {
+      setStatus(selection.error, "error");
+      return;
+    }
+    const handoutWindow = window.open("", "_blank");
+    if (!handoutWindow) {
+      setStatus("Allow pop-ups for Lesson Builder to open the handout.", "error");
+      return;
+    }
+    handoutWindow.opener = null;
+    handoutWindow.document.open();
+    handoutWindow.document.write(buildHandoutHtml(selection));
+    handoutWindow.document.close();
+    handoutWindow.focus();
+    setStatus("Opened handout print page.", "success");
   }
 
   async function exportHtml() {
@@ -9578,6 +9793,7 @@ body.presenter-zoom-mode.focus-mode .lesson-slide,body.presenter-zoom-mode.fulls
     renderClassOptions();
     $("class-name").value = state.className || "";
     $("teaching-date").value = state.teachingDate || todayIso();
+    $("overall-lesson-lo").value = state.overallLessonLo || "";
   }
 
   function syncDraftFields() {

@@ -638,6 +638,10 @@ button {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.overall-lesson-lo {
+  margin-bottom: 16px;
+}
+
 .draw-toolbar {
   grid-template-columns: minmax(120px, 1fr) minmax(180px, 1.2fr) minmax(170px, 1.2fr) minmax(150px, 1fr);
   align-items: end;
@@ -1008,6 +1012,7 @@ body.preview-collapsed .preview-head {
 }
 
 body.preview-collapsed .preview-head .eyebrow,
+body.preview-collapsed #handout-lesson,
 body.preview-collapsed #reset-lesson,
 body.preview-collapsed .slide-list {
   display: none;
