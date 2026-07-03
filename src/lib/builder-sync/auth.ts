@@ -11,6 +11,7 @@ export const BUILDER_SYNC_BUCKET = "lesson-assets";
 export const BUILDER_SYNC_FOLDER = "builder-state";
 export const BUILDER_LESSONS_FOLDER = "lessons";
 export const PRESENTER_PDF_FOLDER = "presenter-pdf";
+export const PRESENTER_STUDENT_SESSION_FOLDER = "student-sessions";
 
 export async function getAuthorizedBuilderSyncClient() {
   const supabase = await createClient();
@@ -58,4 +59,12 @@ export function presenterPdfSnapshotStoragePath(userId: string, lessonId: string
 
 export function isPresenterPdfSnapshotPath(userId: string, lessonId: string, path: string) {
   return path === presenterPdfSnapshotStoragePath(userId, lessonId);
+}
+
+export function studentSessionSnapshotStoragePath(userId: string, sessionId: string) {
+  return `${userId}/${PRESENTER_STUDENT_SESSION_FOLDER}/${sessionId}/snapshot.json`;
+}
+
+export function isStudentSessionSnapshotPath(userId: string, sessionId: string, path: string) {
+  return path === studentSessionSnapshotStoragePath(userId, sessionId);
 }

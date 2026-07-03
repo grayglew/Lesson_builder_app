@@ -77,6 +77,9 @@
   const PRESENTER_RETRIEVAL_NEXT_URL = "/api/presenter/retrieval-next";
   const PRESENTER_PDF_SNAPSHOT_UPLOAD_URL = "/api/presenter/pdf-snapshot/upload-url";
   const PRESENTER_PDF_URL = "/api/presenter/pdf";
+  const PRESENTER_STUDENT_SESSION_URL = "/api/presenter/student-session";
+  const PRESENTER_STUDENT_SESSION_UPLOAD_URL = "/api/presenter/student-session/upload-url";
+  const PRESENTER_STUDENT_SESSION_COMPLETE_URL = "/api/presenter/student-session/complete";
   const CLOUD_SYNC_DEBOUNCE_MS = 2500;
   const TARGETED_SYNC_QUEUED_STATUS = "Retrieval bank change saved locally; Supabase sync is queued.";
   const TARGETED_SYNCED_STATUS = "Retrieval bank synced to Supabase.";
@@ -1958,6 +1961,13 @@
 
       let exportState = lessonExportStateFromDocument(await lessonResponse.json(), openData.lesson || lesson);
       exportState = await hydrateLiveStarterSlots(exportState);
+      let studentSession = null;
+      try {
+        studentSession = await createPresenterStudentSession(id);
+      } catch (sessionError) {
+        console.warn("Could not create student sharing session", sessionError);
+        setStatus("Presenter opened, but student sharing is not available yet.", "warn");
+      }
       const html = buildStandaloneHtml(exportState, {
         liveRetrieval: {
           enabled: true,
@@ -1977,7 +1987,10 @@
           completeEndpoint: SAVED_LESSON_COMPLETE_URL,
           taughtEndpoint: SAVED_LESSON_TAUGHT_URL,
           pdfSnapshotUploadEndpoint: PRESENTER_PDF_SNAPSHOT_UPLOAD_URL,
-          pdfEndpoint: PRESENTER_PDF_URL
+          pdfEndpoint: PRESENTER_PDF_URL,
+          studentSession: studentSession,
+          studentSessionUploadEndpoint: PRESENTER_STUDENT_SESSION_UPLOAD_URL,
+          studentSessionCompleteEndpoint: PRESENTER_STUDENT_SESSION_COMPLETE_URL
         }
       });
 
@@ -1993,6 +2006,25 @@
       setSavedLessonBusy(false);
       renderSavedLessons();
     }
+  }
+
+  async function createPresenterStudentSession(lessonId) {
+    const response = await fetch(PRESENTER_STUDENT_SESSION_URL, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lessonId })
+    });
+    const data = await readApiJson(response, "Could not create student sharing code.");
+    if (!data || !data.sessionId || !data.code) {
+      throw new Error("Lesson Builder did not return a student sharing code.");
+    }
+    return {
+      sessionId: String(data.sessionId || ""),
+      code: String(data.code || ""),
+      viewerUrl: String(data.viewerUrl || "/student"),
+      expiresAt: String(data.expiresAt || "")
+    };
   }
 
   async function presentCurrentLesson() {
@@ -7012,7 +7044,17 @@
           completeEndpoint: String(htmlOptions.presenterConfig.completeEndpoint || SAVED_LESSON_COMPLETE_URL),
           taughtEndpoint: String(htmlOptions.presenterConfig.taughtEndpoint || SAVED_LESSON_TAUGHT_URL),
           pdfSnapshotUploadEndpoint: String(htmlOptions.presenterConfig.pdfSnapshotUploadEndpoint || PRESENTER_PDF_SNAPSHOT_UPLOAD_URL),
-          pdfEndpoint: String(htmlOptions.presenterConfig.pdfEndpoint || PRESENTER_PDF_URL)
+          pdfEndpoint: String(htmlOptions.presenterConfig.pdfEndpoint || PRESENTER_PDF_URL),
+          studentSession: htmlOptions.presenterConfig.studentSession && htmlOptions.presenterConfig.studentSession.sessionId
+            ? {
+                sessionId: String(htmlOptions.presenterConfig.studentSession.sessionId || ""),
+                code: String(htmlOptions.presenterConfig.studentSession.code || ""),
+                viewerUrl: String(htmlOptions.presenterConfig.studentSession.viewerUrl || "/student"),
+                expiresAt: String(htmlOptions.presenterConfig.studentSession.expiresAt || "")
+              }
+            : null,
+          studentSessionUploadEndpoint: String(htmlOptions.presenterConfig.studentSessionUploadEndpoint || PRESENTER_STUDENT_SESSION_UPLOAD_URL),
+          studentSessionCompleteEndpoint: String(htmlOptions.presenterConfig.studentSessionCompleteEndpoint || PRESENTER_STUDENT_SESSION_COMPLETE_URL)
         }
       : null;
     const lessonSlides = Array.isArray(lessonState.slides) ? lessonState.slides : [];
@@ -7106,9 +7148,11 @@ function standalonePresenterHtml(initialAnnotations) {
   <button id="presenter-undo" class="presenter-tool" type="button">Undo</button>
   <button id="presenter-clear" class="presenter-tool" type="button">Clear</button>
   <button id="presenter-save-builder" class="presenter-tool primary" type="button" hidden>Save to Builder</button>
+  <button id="presenter-student-upload" class="presenter-tool primary" type="button" hidden>Upload</button>
   <button id="presenter-download" class="presenter-tool primary" type="button" aria-label="Download annotated HTML" title="Download annotated HTML">&#x2B07;</button>
   <button id="presenter-pdf" class="presenter-tool primary" type="button" aria-label="Open print view" title="Open print view"><span class="presenter-tool-icon presenter-print-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/></svg></span></button>
 </div>
+<div id="presenter-student-code" class="presenter-student-code" hidden></div>
 <script type="application/json" id="lesson-annotations-data">${annotationsJson}</script>`;
   }
 
@@ -7136,6 +7180,8 @@ function standalonePresenterHtml(initialAnnotations) {
   var undoBtn = document.getElementById("presenter-undo");
   var clearBtn = document.getElementById("presenter-clear");
   var saveBuilderBtn = document.getElementById("presenter-save-builder");
+  var studentUploadBtn = document.getElementById("presenter-student-upload");
+  var studentCodeBadge = document.getElementById("presenter-student-code");
   var downloadBtn = document.getElementById("presenter-download");
   var pdfBtn = document.getElementById("presenter-pdf");
   var slides = Array.prototype.slice.call(document.querySelectorAll(".lesson-slide"));
@@ -7182,6 +7228,16 @@ function standalonePresenterHtml(initialAnnotations) {
   }
   if (presenterConfig && presenterConfig.enabled && pollBtn) {
     pollBtn.hidden = false;
+  }
+  if (presenterConfig && presenterConfig.enabled && presenterConfig.studentSession && presenterConfig.studentSession.sessionId) {
+    if (studentUploadBtn) studentUploadBtn.hidden = false;
+    if (studentCodeBadge) {
+      studentCodeBadge.hidden = false;
+      studentCodeBadge.textContent = "Student code: " + (presenterConfig.studentSession.code || "");
+      if (presenterConfig.studentSession.viewerUrl) {
+        studentCodeBadge.title = presenterConfig.studentSession.viewerUrl;
+      }
+    }
   }
 
   try {
@@ -8528,6 +8584,17 @@ function standalonePresenterHtml(initialAnnotations) {
     );
   }
 
+  function hasStudentSessionConfig() {
+    return !!(
+      presenterConfig &&
+      presenterConfig.enabled &&
+      presenterConfig.studentSession &&
+      presenterConfig.studentSession.sessionId &&
+      presenterConfig.studentSessionUploadEndpoint &&
+      presenterConfig.studentSessionCompleteEndpoint
+    );
+  }
+
   function downloadAnnotatedHtml() {
     syncBuilderStateForSave();
     dataEl.textContent = JSON.stringify(strokesBySlide).replace(/</g, "\\\\u003c");
@@ -8580,6 +8647,73 @@ function standalonePresenterHtml(initialAnnotations) {
     };
   }
 
+  function studentSnapshotDocument() {
+    var builderState = syncBuilderStateForSave();
+    var now = new Date().toISOString();
+    return {
+      schemaVersion: 1,
+      snapshotKind: "student-presentation-snapshot",
+      sourceLessonId: presenterConfig && presenterConfig.sourceLessonId || "",
+      sessionId: presenterConfig && presenterConfig.studentSession && presenterConfig.studentSession.sessionId || "",
+      title: builderState.title || presenterConfig && presenterConfig.originalTitle || document.title || "Lesson",
+      className: builderState.className || presenterConfig && presenterConfig.className || "",
+      teachingDate: builderState.teachingDate || presenterConfig && presenterConfig.teachingDate || "",
+      uploadedAt: now,
+      html: buildStudentSnapshotHtml()
+    };
+  }
+
+  function buildStudentSnapshotHtml() {
+    var snapshot = document.implementation.createHTMLDocument(document.title || "Lesson");
+    var viewport = snapshot.createElement("meta");
+    viewport.setAttribute("name", "viewport");
+    viewport.setAttribute("content", "width=device-width, initial-scale=1");
+    snapshot.head.appendChild(viewport);
+    Array.prototype.slice.call(document.querySelectorAll("style")).forEach(function(sourceStyle) {
+      var style = snapshot.createElement("style");
+      style.textContent = sourceStyle.textContent || "";
+      snapshot.head.appendChild(style);
+    });
+
+    var studentStyle = snapshot.createElement("style");
+    studentStyle.textContent = studentSnapshotCss();
+    snapshot.head.appendChild(studentStyle);
+
+    var header = document.querySelector(".lesson-header");
+    var deck = document.querySelector(".lesson-deck");
+    if (header) snapshot.body.appendChild(header.cloneNode(true));
+    if (deck) snapshot.body.appendChild(deck.cloneNode(true));
+
+    Array.prototype.slice.call(snapshot.querySelectorAll(".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation],button")).forEach(function(node) {
+      node.remove();
+    });
+    Array.prototype.slice.call(snapshot.querySelectorAll("[data-bound],[data-pointer-input-bound],[contenteditable]")).forEach(function(node) {
+      node.removeAttribute("data-bound");
+      node.removeAttribute("data-pointer-input-bound");
+      node.removeAttribute("contenteditable");
+    });
+    Array.prototype.slice.call(snapshot.querySelectorAll(".annotation-svg")).forEach(function(svg) {
+      svg.setAttribute("pointer-events", "none");
+    });
+
+    snapshot.body.className = "student-shared-view";
+    return "<!doctype html>\\n" + snapshot.documentElement.outerHTML;
+  }
+
+  function studentSnapshotCss() {
+    return [
+      "html,body{margin:0;padding:0;min-height:100%;background:#eef5f3;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
+      "body.student-shared-view .lesson-header{position:static;display:flex;justify-content:space-between;gap:18px;max-width:1120px;margin:12px auto 0;padding:10px 14px;box-sizing:border-box;background:#fff;border:1px solid #cad7d7;border-radius:8px;box-shadow:0 4px 14px rgba(19,37,42,.08);}",
+      "body.student-shared-view .lesson-header h1{margin:2px 0 0;font-size:22px;line-height:1.1;}",
+      "body.student-shared-view .lesson-header span{font-size:12px;font-weight:800;text-transform:uppercase;color:#5f6f72;}",
+      "body.student-shared-view .lesson-deck{display:grid;gap:16px;place-items:center;margin:0;padding:16px;box-sizing:border-box;}",
+      "body.student-shared-view .lesson-slide{width:min(1120px,calc(100vw - 32px));height:auto;aspect-ratio:16/10;margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);zoom:1!important;}",
+      "body.student-shared-view .annotation-svg{pointer-events:none!important;}",
+      "body.student-shared-view button,body.student-shared-view input,body.student-shared-view select,body.student-shared-view textarea{display:none!important;}",
+      "@media (max-width:760px){body.student-shared-view .lesson-header{margin:8px 8px 0;}body.student-shared-view .lesson-deck{padding:8px;}body.student-shared-view .lesson-slide{width:calc(100vw - 16px);}}"
+    ].join("\\n");
+  }
+
   function formatPresentedTimestamp(date) {
     var value = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
     var year = value.getFullYear();
@@ -8588,6 +8722,55 @@ function standalonePresenterHtml(initialAnnotations) {
     var hours = String(value.getHours()).padStart(2, "0");
     var minutes = String(value.getMinutes()).padStart(2, "0");
     return year + "-" + month + "-" + day + " " + hours + minutes;
+  }
+
+  async function uploadStudentSnapshot() {
+    if (!hasStudentSessionConfig()) {
+      alert("This presenter does not have a student sharing session.");
+      return null;
+    }
+    if (studentUploadBtn) {
+      studentUploadBtn.disabled = true;
+      studentUploadBtn.textContent = "Uploading...";
+    }
+    try {
+      var doc = studentSnapshotDocument();
+      var blob = new Blob([JSON.stringify(doc)], { type: "application/json" });
+      var uploadResponse = await fetch(presenterConfig.studentSessionUploadEndpoint, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: presenterConfig.studentSession.sessionId,
+          byteSize: blob.size
+        })
+      });
+      var upload = await readPresenterApiJson(uploadResponse, "Could not create a student upload URL.");
+      await uploadBlobToSignedUrl(upload.signedUrl, blob, "snapshot.json");
+
+      var completeResponse = await fetch(presenterConfig.studentSessionCompleteEndpoint, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: presenterConfig.studentSession.sessionId,
+          path: upload.path,
+          byteSize: blob.size
+        })
+      });
+      var completed = await readPresenterApiJson(completeResponse, "Could not publish the student view.");
+      alert("Student view uploaded. Code: " + (presenterConfig.studentSession.code || ""));
+      return completed;
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Could not upload the student view.");
+      throw error;
+    } finally {
+      if (studentUploadBtn) {
+        studentUploadBtn.disabled = false;
+        studentUploadBtn.textContent = "Upload";
+      }
+    }
   }
 
   async function savePresentedLessonToBuilder(options) {
@@ -9275,6 +9458,7 @@ function standalonePresenterHtml(initialAnnotations) {
     slides.forEach(function(_, index) { renderSlide(index); });
   });
   if (saveBuilderBtn) saveBuilderBtn.addEventListener("click", savePresentedLessonToBuilder);
+  if (studentUploadBtn) studentUploadBtn.addEventListener("click", uploadStudentSnapshot);
   if (downloadBtn) downloadBtn.addEventListener("click", downloadAnnotatedHtml);
   if (pdfBtn) pdfBtn.addEventListener("click", openPrintView);
 
@@ -9629,6 +9813,7 @@ body{margin:0;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,s
 .empty-state{border:1px dashed #8ba3a0;border-radius:8px;background:rgba(255,255,255,.7);color:#5b6a70;padding:18px;text-align:center;}
 .presenter-tools{position:fixed;left:50%;top:4px;top:max(4px,env(safe-area-inset-top));transform:translateX(-50%);z-index:20;display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:5px;max-width:calc(100vw - 8px);overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;touch-action:pan-x;padding:5px;border:1px solid #cad7d7;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 6px 16px rgba(19,37,42,.16);}
 .presenter-tools::-webkit-scrollbar{display:none;}
+.presenter-student-code{position:fixed;right:10px;bottom:10px;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));z-index:24;border:1px solid #0f766e;border-radius:8px;background:rgba(255,255,255,.95);box-shadow:0 8px 18px rgba(19,37,42,.16);padding:8px 10px;color:#0f3d3b;font:900 16px/1.1 system-ui,sans-serif;letter-spacing:.02em;}
 .presenter-tool{min-height:36px;border:1px solid #cad7d7;border-radius:7px;background:#fff;color:#172124;padding:5px 8px;font:inherit;font-size:15px;font-weight:750;cursor:pointer;white-space:nowrap;flex:0 0 auto;}
 .presenter-tool:hover{border-color:#8ba3a0;}
 .presenter-tool.is-active,.presenter-tool.primary{background:#0f766e;border-color:#0f766e;color:#fff;}

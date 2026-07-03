@@ -25,7 +25,7 @@ assert(
   "Saved lessons list should include a Present action separate from Download."
 );
 assert(
-  appJs.includes("async function presentSavedLesson(id)") && appJs.includes("buildStandaloneHtml(exportState,"),
+  appJs.includes("async function presentSavedLesson(id, options)") && appJs.includes("buildStandaloneHtml(exportState,"),
   "Builder should open a hosted presenter window from saved lesson JSON using the existing presenter HTML builder."
 );
 assert(
