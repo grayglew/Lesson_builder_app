@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isAllowedUser } from "@/lib/auth/primary-user";
+import { getAppUserProfile, isActiveProfile } from "@/lib/auth/app-users";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -10,7 +10,8 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isBuilder = pathname === "/builder" || pathname === "/builder/" || pathname === "/builder/index.html";
   const isLegacyLessonsRoute = pathname.startsWith("/lessons");
-  const isProtected = isBuilder || isLegacyLessonsRoute;
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isProtected = isBuilder || isLegacyLessonsRoute || isAdminRoute;
 
   if (!isProtected) {
     return supabaseResponse;
@@ -51,11 +52,19 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (!isAllowedUser(user)) {
+  const { profile, error: profileError } = await getAppUserProfile(supabase, user.id);
+  if (profileError || !isActiveProfile(profile)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.delete("next");
-    url.searchParams.set("message", "This Lesson Builder workspace is restricted to approved teacher accounts.");
+    url.searchParams.set("message", "This Lesson Builder account is not active.");
+    return NextResponse.redirect(url);
+  }
+
+  if (isAdminRoute && profile.role !== "admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/builder/index.html";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

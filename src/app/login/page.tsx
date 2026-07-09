@@ -1,5 +1,4 @@
 import { BookOpen, LogIn } from "lucide-react";
-import { ALLOWED_USER_EMAILS_LABEL } from "@/lib/auth/primary-user";
 import { signIn } from "./actions";
 
 type LoginPageProps = {
@@ -49,7 +48,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
           <h2 className="text-2xl font-semibold tracking-normal">Sign in</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            This private workspace is restricted to {ALLOWED_USER_EMAILS_LABEL}.
+            This private workspace is restricted to active teacher accounts.
           </p>
 
           {params.message ? (

@@ -1,6 +1,9 @@
-import { NextResponse } from "next/server";
-import { isAllowedUser } from "@/lib/auth/primary-user";
-import { createClient } from "@/lib/supabase/server";
+import {
+  getAuthorizedAppContext,
+  resolveEffectiveUser,
+  type AppUserProfile,
+  type EffectiveUser,
+} from "@/lib/auth/app-users";
 import {
   BuilderSyncDocumentKind,
   builderSyncDocumentFolder,
@@ -14,25 +17,21 @@ export const PRESENTER_PDF_FOLDER = "presenter-pdf";
 export const PRESENTER_STUDENT_SESSION_FOLDER = "student-sessions";
 
 export async function getAuthorizedBuilderSyncClient() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const context = await getAuthorizedAppContext();
+  if ("response" in context) return context;
 
-  if (error || !user) {
-    return {
-      response: NextResponse.json({ ok: false, error: "Authentication required." }, { status: 401 }),
-    };
-  }
+  const effective = await resolveEffectiveUser(context);
 
-  if (!isAllowedUser(user)) {
-    return {
-      response: NextResponse.json({ ok: false, error: "This workspace is restricted." }, { status: 403 }),
-    };
-  }
-
-  return { supabase, user };
+  return {
+    supabase: effective.effectiveSupabase,
+    sessionSupabase: effective.supabase,
+    user: effective.effectiveUser as EffectiveUser,
+    actorUser: effective.actorUser,
+    actorProfile: effective.actorProfile as AppUserProfile,
+    effectiveProfile: effective.effectiveProfile as AppUserProfile,
+    isImpersonating: effective.isImpersonating,
+    impersonationSessionId: effective.impersonationSessionId,
+  };
 }
 
 export function isBuilderSyncPath(userId: string, path: string) {

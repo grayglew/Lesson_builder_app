@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { isAllowedUser } from "@/lib/auth/primary-user";
+import { getAppUserProfile, isActiveProfile } from "@/lib/auth/app-users";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signIn(formData: FormData) {
@@ -19,9 +19,10 @@ export async function signIn(formData: FormData) {
     redirect(`/login?message=${encodeURIComponent(error.message)}`);
   }
 
-  if (!isAllowedUser(data.user)) {
+  const { profile, error: profileError } = await getAppUserProfile(supabase, data.user.id);
+  if (profileError || !isActiveProfile(profile)) {
     await supabase.auth.signOut();
-    redirect("/login?message=This Lesson Builder workspace is restricted to approved teacher accounts.");
+    redirect("/login?message=This Lesson Builder account is not active.");
   }
 
   redirect(next.startsWith("/") ? next : "/builder/index.html");

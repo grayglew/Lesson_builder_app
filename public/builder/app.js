@@ -277,6 +277,8 @@
   async function loadCurrentUser() {
     const el = $("current-user-email");
     if (!el) return;
+    const stopImpersonationButton = $("stop-impersonation");
+    const adminDashboardLink = $("admin-dashboard-link");
 
     try {
       const response = await fetch("/api/me", {
@@ -295,12 +297,24 @@
 
       const data = await response.json();
       const email = String(data.email || "").trim();
-      el.textContent = email || "Signed in";
-      el.title = email || "";
+      if (data.isImpersonating) {
+        const actorEmail = String(data.actorEmail || "").trim();
+        const effectiveEmail = String(data.effectiveEmail || email).trim();
+        el.textContent = effectiveEmail ? `Acting as ${effectiveEmail}` : "Acting as teacher";
+        el.title = actorEmail ? `Signed in as ${actorEmail}` : "Admin view-as mode";
+        if (stopImpersonationButton) stopImpersonationButton.hidden = false;
+      } else {
+        el.textContent = email || "Signed in";
+        el.title = email || "";
+        if (stopImpersonationButton) stopImpersonationButton.hidden = true;
+      }
+      if (adminDashboardLink) adminDashboardLink.hidden = !data.isAdmin;
     } catch (err) {
       console.warn("Could not load current user details", err);
       el.textContent = "User unavailable";
       el.title = "";
+      if (stopImpersonationButton) stopImpersonationButton.hidden = true;
+      if (adminDashboardLink) adminDashboardLink.hidden = true;
     }
   }
 
@@ -2930,6 +2944,19 @@
     $("log-out").addEventListener("click", () => {
       window.location.href = "/auth/logout";
     });
+    const stopImpersonationButton = $("stop-impersonation");
+    if (stopImpersonationButton) {
+      stopImpersonationButton.addEventListener("click", async () => {
+        try {
+          await fetch("/api/admin/impersonation/stop", {
+            method: "POST",
+            credentials: "same-origin"
+          });
+        } finally {
+          window.location.href = "/builder/index.html";
+        }
+      });
+    }
     $("legacy-tracker-trigger").addEventListener("click", () => $("legacy-tracker-file").click());
     $("legacy-tracker-file").addEventListener("change", handleLegacyTrackerChoice);
     $("legacy-images-trigger").addEventListener("click", () => $("legacy-images-folder").click());

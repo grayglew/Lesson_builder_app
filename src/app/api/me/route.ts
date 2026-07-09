@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
-import { isAllowedUser } from "@/lib/auth/primary-user";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthorizedAppContext, resolveEffectiveUser } from "@/lib/auth/app-users";
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const context = await getAuthorizedAppContext();
+  if ("response" in context) return context.response;
 
-  if (error || !user) {
-    return NextResponse.json({ ok: false, error: "Authentication required." }, { status: 401 });
-  }
-
-  if (!isAllowedUser(user)) {
-    return NextResponse.json({ ok: false, error: "This workspace is restricted." }, { status: 403 });
-  }
+  const effective = await resolveEffectiveUser(context);
+  const actorEmail = context.actorUser.email || "";
+  const effectiveEmail = effective.effectiveUser.email || "";
 
   return NextResponse.json({
     ok: true,
-    id: user.id,
-    email: user.email || "",
+    id: effective.effectiveUser.id,
+    email: effectiveEmail,
+    actorId: context.actorUser.id,
+    actorEmail,
+    effectiveId: effective.effectiveUser.id,
+    effectiveEmail,
+    role: context.actorProfile.role,
+    isAdmin: context.actorProfile.role === "admin",
+    isImpersonating: effective.isImpersonating,
   });
 }
