@@ -948,6 +948,12 @@ body.image-drawing-open {
   box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.16);
 }
 
+.image-drawing-controls .secondary-button.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .image-drawing-size-label {
   font-size: 12px;
   font-weight: 800;

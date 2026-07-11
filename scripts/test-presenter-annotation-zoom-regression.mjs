@@ -16,7 +16,7 @@ function assertExcludes(needle, message) {
 }
 
 assertIncludes(
-  "return Math.max(0.5, inputSize / Math.max(1, rect.width) * VIEWBOX_W);",
+  "var baseWidth = Math.max(0.5, inputSize / Math.max(1, rect.width) * VIEWBOX_W);",
   "Presenter pen widths must be converted from screen pixels into slide viewBox units when the stroke begins."
 );
 

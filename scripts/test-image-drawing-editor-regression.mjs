@@ -15,10 +15,13 @@ function assert(condition, message) {
 assert(index.includes('id="image-drawing-overlay"'), "Image drawing overlay is missing from builder HTML.");
 assert(index.includes('id="image-drawing-svg"'), "Image drawing SVG surface is missing.");
 assert(index.includes('id="image-drawing-done"'), "Image drawing Done button is missing.");
+assert(index.includes('id="image-drawing-highlighter"'), "Image drawing highlighter toggle is missing.");
+assert(index.includes('data-image-drawing-color="#2563eb"'), "Image drawing should reuse the existing colour controls.");
 
 assert(styles.includes(".image-draw-button"), "Image drop pen button styles are missing.");
 assert(styles.includes(".image-drawing-overlay"), "Image drawing overlay styles are missing.");
 assert(styles.includes("body.image-drawing-open"), "Image drawing body lock style is missing.");
+assert(styles.includes(".image-drawing-controls .secondary-button.is-active"), "Image drawing active tool styling is missing.");
 
 const drawButtonCount = (app.match(/data-draw-image/g) || []).length;
 assert(drawButtonCount >= 4, "Image zones should render and handle data-draw-image controls.");
@@ -29,5 +32,8 @@ assert(app.includes("currentImage: retrievalEditor.draft"), "Retrieval editor dr
 assert(app.includes("function rasterizeImageDrawing()"), "Drawing must rasterize into a normal image payload.");
 assert(app.includes("function drawingDataUrlToImagePayload"), "Drawing output must use the normal image payload shape.");
 assert(app.includes("imageDataUrlForDrawing"), "Existing images should be prepared as drawing backgrounds.");
+assert(app.includes('imageDrawingState.mode = mode === "highlighter" ? "highlighter" : "pen";'), "Image drawing should track highlighter mode.");
+assert(app.includes('mode: imageDrawingState.mode === "highlighter" ? "highlighter" : "pen"'), "Image drawing strokes should serialize highlighter mode.");
+assert(app.includes('ctx.globalCompositeOperation = "multiply";'), "Image drawing highlighter should rasterize with multiply blending.");
 
 console.log("Image drawing editor regression checks passed.");

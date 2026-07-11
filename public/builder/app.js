@@ -141,6 +141,7 @@
     backgroundDataUrl: "",
     strokes: [],
     activeStroke: null,
+    mode: "pen",
     color: DEFAULT_PEN_COLOR,
     size: 8,
     pointerId: null,
@@ -3285,6 +3286,8 @@
     $("image-drawing-size").addEventListener("input", (event) => {
       imageDrawingState.size = Number(event.target.value) || 8;
     });
+    $("image-drawing-pen").addEventListener("click", () => setImageDrawingMode("pen"));
+    $("image-drawing-highlighter").addEventListener("click", () => setImageDrawingMode("highlighter"));
     $("image-drawing-undo").addEventListener("click", undoImageDrawingStroke);
     $("image-drawing-clear").addEventListener("click", clearImageDrawingStrokes);
     $("image-drawing-done").addEventListener("click", finishImageDrawing);
@@ -3308,10 +3311,12 @@
       const point = imageDrawingPoint(event);
       imageDrawingState.pointerId = event.pointerId;
       imageDrawingState.activeStroke = {
+        mode: imageDrawingState.mode === "highlighter" ? "highlighter" : "pen",
         color: imageDrawingState.color || DEFAULT_PEN_COLOR,
-        size: imageDrawingState.size || 8,
+        size: imageDrawingStrokeSize(),
+        opacity: imageDrawingState.mode === "highlighter" ? 0.35 : 1,
         points: [point],
-        path: createImageDrawingPath(imageDrawingState.color || DEFAULT_PEN_COLOR, imageDrawingState.size || 8)
+        path: createImageDrawingPath(imageDrawingState.mode, imageDrawingState.color || DEFAULT_PEN_COLOR, imageDrawingStrokeSize())
       };
       imageDrawingState.activeStroke.path.setAttribute("d", imageDrawingPathData(imageDrawingState.activeStroke.points));
       $("image-drawing-strokes").appendChild(imageDrawingState.activeStroke.path);
@@ -3327,8 +3332,10 @@
         if (!imageDrawingState.activeStroke || imageDrawingState.pointerId !== event.pointerId) return;
         event.preventDefault();
         imageDrawingState.strokes.push({
+          mode: imageDrawingState.activeStroke.mode,
           color: imageDrawingState.activeStroke.color,
           size: imageDrawingState.activeStroke.size,
+          opacity: imageDrawingState.activeStroke.opacity,
           points: imageDrawingState.activeStroke.points
         });
         imageDrawingState.activeStroke = null;
@@ -3358,6 +3365,7 @@
     $("image-drawing-title").textContent = `Draw ${options && options.label ? options.label : "image"}`;
     $("image-drawing-strokes").innerHTML = "";
     setImageDrawingColor(imageDrawingState.color || DEFAULT_PEN_COLOR);
+    setImageDrawingMode(imageDrawingState.mode || "pen");
     $("image-drawing-size").value = String(imageDrawingState.size || 8);
     setImageDrawingBackground("");
     overlay.hidden = false;
@@ -3403,6 +3411,19 @@
     document.querySelectorAll("[data-image-drawing-color]").forEach((button) => {
       button.classList.toggle("is-active", button.getAttribute("data-image-drawing-color") === imageDrawingState.color);
     });
+  }
+
+  function setImageDrawingMode(mode) {
+    imageDrawingState.mode = mode === "highlighter" ? "highlighter" : "pen";
+    $("image-drawing-pen").classList.toggle("is-active", imageDrawingState.mode === "pen");
+    $("image-drawing-highlighter").classList.toggle("is-active", imageDrawingState.mode === "highlighter");
+    $("image-drawing-pen").setAttribute("aria-pressed", imageDrawingState.mode === "pen" ? "true" : "false");
+    $("image-drawing-highlighter").setAttribute("aria-pressed", imageDrawingState.mode === "highlighter" ? "true" : "false");
+  }
+
+  function imageDrawingStrokeSize() {
+    const size = Number(imageDrawingState.size) || 8;
+    return imageDrawingState.mode === "highlighter" ? Math.max(18, size * 4) : size;
   }
 
   function undoImageDrawingStroke() {
@@ -3451,13 +3472,18 @@
     };
   }
 
-  function createImageDrawingPath(color, size) {
+  function createImageDrawingPath(mode, color, size) {
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const isHighlighter = mode === "highlighter";
     path.setAttribute("fill", "none");
     path.setAttribute("stroke", color || DEFAULT_PEN_COLOR);
     path.setAttribute("stroke-width", String(size || 8));
     path.setAttribute("stroke-linecap", "round");
     path.setAttribute("stroke-linejoin", "round");
+    if (isHighlighter) {
+      path.setAttribute("stroke-opacity", "0.35");
+      path.style.mixBlendMode = "multiply";
+    }
     return path;
   }
 
@@ -3535,6 +3561,10 @@
     ctx.strokeStyle = stroke.color || DEFAULT_PEN_COLOR;
     ctx.fillStyle = stroke.color || DEFAULT_PEN_COLOR;
     ctx.lineWidth = Number(stroke.size) || 8;
+    if (stroke.mode === "highlighter") {
+      ctx.globalAlpha = Math.max(0.1, Math.min(1, Number(stroke.opacity) || 0.35));
+      ctx.globalCompositeOperation = "multiply";
+    }
     if (stroke.points.length === 1) {
       const point = stroke.points[0];
       ctx.beginPath();
@@ -5290,7 +5320,11 @@
   }
 
   function renderAnnotationPath(stroke) {
-    return `<path d="${escapeAttr(annotationPathFromPoints(stroke.points))}" fill="none" stroke="${escapeAttr(stroke.color || "#2563eb")}" stroke-width="${escapeAttr(stroke.width || 6)}" stroke-linecap="round" stroke-linejoin="round"></path>`;
+    const isHighlighter = stroke.mode === "highlighter";
+    const opacity = isHighlighter ? Math.max(0.1, Math.min(1, Number(stroke.opacity) || 0.35)) : 1;
+    const blend = isHighlighter ? ` style="mix-blend-mode:multiply"` : "";
+    const opacityAttr = isHighlighter ? ` stroke-opacity="${escapeAttr(opacity)}"` : "";
+    return `<path d="${escapeAttr(annotationPathFromPoints(stroke.points))}" fill="none" stroke="${escapeAttr(stroke.color || "#2563eb")}" stroke-width="${escapeAttr(stroke.width || 6)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}${blend}></path>`;
   }
 
   function annotationPathFromPoints(points) {
@@ -5333,10 +5367,14 @@
               .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
           : [];
         if (!points.length) return null;
+        const mode = stroke.mode === "highlighter" ? "highlighter" : "pen";
+        const opacity = mode === "highlighter" ? Math.max(0.1, Math.min(1, Number(stroke.opacity) || 0.35)) : undefined;
         return {
           id: String(stroke.id || uid("stroke")),
+          mode,
           color: /^#[0-9a-f]{3,8}$/i.test(String(stroke.color || "")) ? stroke.color : "#2563eb",
           width: Math.max(1, Math.min(120, Number(stroke.width) || 6)),
+          ...(opacity ? { opacity } : {}),
           createdAt: Number(stroke.createdAt) || Date.now(),
           points
         };
@@ -7509,6 +7547,7 @@ function standalonePresenterHtml(initialAnnotations) {
   return `<div class="presenter-tools" aria-label="Presenter drawing tools">
   <button id="presenter-pan" class="presenter-tool is-active" type="button" aria-pressed="true">Pan</button>
   <button id="presenter-pen" class="presenter-tool" type="button" aria-pressed="false">Pen</button>
+  <button id="presenter-highlighter" class="presenter-tool" type="button" aria-pressed="false">Highlighter</button>
   <button id="presenter-eraser" class="presenter-tool" type="button" aria-pressed="false">Erase</button>
   <button id="presenter-blank-slide" class="presenter-tool" type="button" aria-label="Add blank slide">+</button>
   <button id="presenter-camera" class="presenter-tool" type="button" aria-label="Take a photo and add it as a slide">Camera</button>
@@ -7546,6 +7585,7 @@ function standalonePresenterHtml(initialAnnotations) {
   var presenterConfig = null;
   var panBtn = document.getElementById("presenter-pan");
   var penBtn = document.getElementById("presenter-pen");
+  var highlighterBtn = document.getElementById("presenter-highlighter");
   var eraserBtn = document.getElementById("presenter-eraser");
   var blankSlideBtn = document.getElementById("presenter-blank-slide");
   var cameraBtn = document.getElementById("presenter-camera");
@@ -7679,8 +7719,10 @@ function standalonePresenterHtml(initialAnnotations) {
 
       activeStroke = {
         id: "stroke_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+        mode: mode === "highlighter" ? "highlighter" : "pen",
         color: colorInput.value || "#2563eb",
-        width: strokeWidthFromInput(svg),
+        width: strokeWidthFromInput(svg, mode),
+        opacity: mode === "highlighter" ? 0.35 : 1,
         createdAt: Date.now(),
         points: [point]
       };
@@ -7809,9 +7851,9 @@ function standalonePresenterHtml(initialAnnotations) {
     var pointerType = event.pointerType || "mouse";
     if (pointerType === "touch") return null;
     if (event.button != null && event.button !== 0) return null;
-    if (pointerType === "pen") return mode === "eraser" ? "eraser" : "pen";
+    if (pointerType === "pen") return mode === "eraser" ? "eraser" : (mode === "highlighter" ? "highlighter" : "pen");
     if (mode === "pan") return null;
-    return mode === "eraser" ? "eraser" : "pen";
+    return mode === "eraser" ? "eraser" : (mode === "highlighter" ? "highlighter" : "pen");
   }
 
   function touchPointKey(pointerId) {
@@ -8060,8 +8102,10 @@ function standalonePresenterHtml(initialAnnotations) {
 
     activeStroke = {
       id: "stroke_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+      mode: inputMode === "highlighter" ? "highlighter" : "pen",
       color: colorInput.value || "#2563eb",
-      width: strokeWidthFromInput(svg),
+      width: strokeWidthFromInput(svg, inputMode),
+      opacity: inputMode === "highlighter" ? 0.35 : 1,
       createdAt: Date.now(),
       points: [point]
     };
@@ -8098,7 +8142,7 @@ function standalonePresenterHtml(initialAnnotations) {
 
     var pointerInput = activePointerInput;
 
-    if (pointerInput.mode === "pen" && activeStroke) {
+    if (pointerInput.mode !== "eraser" && activeStroke) {
       if (activeStroke.points.length) {
         getSlideStrokes(pointerInput.slideIndex).push(activeStroke);
         history.push({ type: "add", slideIndex: pointerInput.slideIndex, stroke: activeStroke });
@@ -8148,22 +8192,26 @@ function standalonePresenterHtml(initialAnnotations) {
   }
 
   function setMode(nextMode) {
-    mode = nextMode === "eraser" ? "eraser" : (nextMode === "pan" ? "pan" : "pen");
+    mode = nextMode === "eraser" ? "eraser" : (nextMode === "pan" ? "pan" : (nextMode === "highlighter" ? "highlighter" : "pen"));
     panBtn.classList.toggle("is-active", mode === "pan");
     penBtn.classList.toggle("is-active", mode === "pen");
+    highlighterBtn.classList.toggle("is-active", mode === "highlighter");
     eraserBtn.classList.toggle("is-active", mode === "eraser");
     panBtn.setAttribute("aria-pressed", mode === "pan" ? "true" : "false");
     penBtn.setAttribute("aria-pressed", mode === "pen" ? "true" : "false");
+    highlighterBtn.setAttribute("aria-pressed", mode === "highlighter" ? "true" : "false");
     eraserBtn.setAttribute("aria-pressed", mode === "eraser" ? "true" : "false");
     document.body.classList.toggle("annotation-pan", mode === "pan");
     document.body.classList.toggle("annotation-eraser", mode === "eraser");
+    document.body.classList.toggle("annotation-highlighter", mode === "highlighter");
   }
 
-  function strokeWidthFromInput(svg) {
+  function strokeWidthFromInput(svg, strokeMode) {
     var inputSize = Number(sizeInput.value);
     if (!Number.isFinite(inputSize)) inputSize = 2;
     var rect = svg.getBoundingClientRect();
-    return Math.max(0.5, inputSize / Math.max(1, rect.width) * VIEWBOX_W);
+    var baseWidth = Math.max(0.5, inputSize / Math.max(1, rect.width) * VIEWBOX_W);
+    return strokeMode === "highlighter" ? Math.max(18, baseWidth * 4) : baseWidth;
   }
 
   function eraserThresholdFromInput(svg) {
@@ -8888,6 +8936,10 @@ function standalonePresenterHtml(initialAnnotations) {
     path.setAttribute("stroke-width", String(stroke.width || 6));
     path.setAttribute("stroke-linecap", "round");
     path.setAttribute("stroke-linejoin", "round");
+    if (stroke.mode === "highlighter") {
+      path.setAttribute("stroke-opacity", String(Math.max(0.1, Math.min(1, Number(stroke.opacity) || 0.35))));
+      path.style.mixBlendMode = "multiply";
+    }
     return path;
   }
 
@@ -9784,6 +9836,7 @@ function standalonePresenterHtml(initialAnnotations) {
 
   panBtn.addEventListener("click", function() { setMode("pan"); });
   penBtn.addEventListener("click", function() { setMode("pen"); });
+  highlighterBtn.addEventListener("click", function() { setMode("highlighter"); });
   eraserBtn.addEventListener("click", function() { setMode("eraser"); });
   blankSlideBtn.addEventListener("click", addBlankSlide);
   if (cameraBtn) cameraBtn.addEventListener("click", requestCameraCapture);
@@ -10212,6 +10265,7 @@ body:not(.annotation-pan) .lesson-slide{cursor:crosshair;}
 body.annotation-eraser .lesson-slide{cursor:cell;}
 body.annotation-pan .annotation-svg{pointer-events:none;}
 body.annotation-eraser .annotation-svg{cursor:cell;}
+body.annotation-highlighter .lesson-slide{cursor:crosshair;}
 body.focus-mode .lesson-header,body.fullscreen-mode .lesson-header{display:none;}
 body.focus-mode,body.fullscreen-mode{overflow:hidden;}
 body.focus-mode .lesson-deck,body.fullscreen-mode .lesson-deck{max-width:none;box-sizing:border-box;height:100vh;height:100dvh;min-height:0;padding:var(--presenter-toolbar-space) var(--presenter-edge-space) var(--presenter-edge-space);gap:0;place-items:center;overflow:auto;scroll-padding-top:var(--presenter-toolbar-space);}
