@@ -564,6 +564,36 @@
 
     <div id="notification-stack" class="notification-stack" role="region" aria-live="polite" aria-label="Notifications"></div>
 
+    <div id="image-drawing-overlay" class="image-drawing-overlay" hidden>
+      <section class="image-drawing-panel" role="dialog" aria-modal="true" aria-labelledby="image-drawing-title">
+        <header class="image-drawing-toolbar">
+          <div>
+            <span class="eyebrow">Pen image</span>
+            <h2 id="image-drawing-title">Draw image</h2>
+          </div>
+          <div class="image-drawing-controls" aria-label="Drawing controls">
+            <button id="image-drawing-pen-black" class="image-drawing-swatch" type="button" style="--swatch-color:#111827" aria-label="Black pen" data-image-drawing-color="#111827"></button>
+            <button id="image-drawing-pen-blue" class="image-drawing-swatch is-active" type="button" style="--swatch-color:#2563eb" aria-label="Blue pen" data-image-drawing-color="#2563eb"></button>
+            <button id="image-drawing-pen-red" class="image-drawing-swatch" type="button" style="--swatch-color:#dc2626" aria-label="Red pen" data-image-drawing-color="#dc2626"></button>
+            <button id="image-drawing-pen-green" class="image-drawing-swatch" type="button" style="--swatch-color:#16a34a" aria-label="Green pen" data-image-drawing-color="#16a34a"></button>
+            <label class="image-drawing-size-label" for="image-drawing-size">Size</label>
+            <input id="image-drawing-size" class="image-drawing-size" type="range" min="2" max="24" step="1" value="8">
+            <button id="image-drawing-undo" class="secondary-button compact" type="button">Undo</button>
+            <button id="image-drawing-clear" class="secondary-button compact" type="button">Clear</button>
+            <button id="image-drawing-done" class="primary-button compact" type="button">Done</button>
+            <button id="image-drawing-cancel" class="secondary-button compact image-drawing-close" type="button" aria-label="Cancel drawing">X</button>
+          </div>
+        </header>
+        <div class="image-drawing-stage">
+          <svg id="image-drawing-svg" class="image-drawing-svg" viewBox="0 0 1600 1000" role="img" aria-label="Drawing canvas">
+            <rect width="1600" height="1000" fill="#ffffff"></rect>
+            <image id="image-drawing-background" width="1600" height="1000" preserveAspectRatio="xMidYMid meet"></image>
+            <g id="image-drawing-strokes"></g>
+          </svg>
+        </div>
+      </section>
+    </div>
+
     <div id="retrieval-editor" class="modal-backdrop" hidden>
       <section class="modal-panel retrieval-editor-panel" role="dialog" aria-modal="true" aria-labelledby="retrieval-editor-title">
         <div class="modal-head">

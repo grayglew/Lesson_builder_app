@@ -8,6 +8,8 @@
   const CURRENT_STATE_KEY = "current";
   const SLIDE_VIEWBOX_WIDTH = 1600;
   const SLIDE_VIEWBOX_HEIGHT = 1000;
+  const IMAGE_DRAWING_WIDTH = 1600;
+  const IMAGE_DRAWING_HEIGHT = 1000;
   const PDF_EXPORT_WIDTH = 1280;
   const PDF_EXPORT_WIDTHS = [1280, 1024, 800];
   const PDF_JPEG_QUALITY = 0.86;
@@ -131,6 +133,18 @@
     height: DEFAULT_DRAWING_SIZE.height,
     strokes: [],
     activeStroke: null
+  };
+
+  const imageDrawingState = {
+    onImage: null,
+    currentImage: null,
+    backgroundDataUrl: "",
+    strokes: [],
+    activeStroke: null,
+    color: DEFAULT_PEN_COLOR,
+    size: 8,
+    pointerId: null,
+    sessionId: 0
   };
 
   const legacyImport = {
@@ -2922,6 +2936,7 @@
       input.addEventListener("input", () => setDrawingColor(input.value, input));
       input.addEventListener("click", () => setDrawingColor(input.value, input));
     });
+    bindImageDrawingEditor();
     $("template-select").addEventListener("change", () => {
       templateEditor.activeId = $("template-select").value;
       syncTemplateFields();
@@ -2987,7 +3002,7 @@
         draft.starter[index].answerImage = null;
         draft.starter[index].retrievalItemId = "";
         draft.starter[index].currentImageSlot = 1;
-      });
+      }, () => draft.starter[index].image);
     });
 
     $("example-lo").addEventListener("input", (event) => {
@@ -2999,23 +3014,23 @@
     });
     bindImageDropZone("example-image-1", (image) => {
       draft.example.image1 = image;
-    });
+    }, () => draft.example.image1);
     bindImageDropZone("example-image-2", (image) => {
       draft.example.image2 = image;
-    });
+    }, () => draft.example.image2);
     bindImageDropZone("example-answer-image-1", (image) => {
       draft.example.answerImage1 = image;
-    });
+    }, () => draft.example.answerImage1);
     bindImageDropZone("example-answer-image-2", (image) => {
       draft.example.answerImage2 = image;
-    });
+    }, () => draft.example.answerImage2);
     Array.from({ length: 8 }, (_, index) => index).forEach((index) => {
       bindImageDropZone(`example-retrieval-image-${index}`, (image) => {
         draft.example.retrievalImages[index] = image;
-      });
+      }, () => draft.example.retrievalImages[index]);
       bindImageDropZone(`example-retrieval-answer-image-${index}`, (image) => {
         draft.example.retrievalAnswerImages[index] = image;
-      });
+      }, () => draft.example.retrievalAnswerImages[index]);
     });
 
     $("worksheet-title").addEventListener("input", (event) => {
@@ -3033,7 +3048,7 @@
     });
     bindImageDropZone("cfu-image", (image) => {
       draft.cfu.image = image;
-    });
+    }, () => draft.cfu.image);
 
     $("placeholder-text").addEventListener("input", (event) => {
       draft.placeholder.text = event.target.value;
@@ -3060,7 +3075,7 @@
     setStatus("", "");
   }
 
-  function bindImageDropZone(id, onImage) {
+  function bindImageDropZone(id, onImage, getImage) {
     const zone = $(id);
     const input = document.createElement("input");
     input.type = "file";
@@ -3080,13 +3095,31 @@
       setStatus(`Loaded ${file.name}.`, "success");
     };
 
+    const openDrawing = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openImageDrawingEditor({
+        currentImage: typeof getImage === "function" ? getImage() : null,
+        label: zone.getAttribute("aria-label") || "image",
+        onImage: (image) => {
+          onImage(image);
+          renderImageZone(zone, image);
+        }
+      });
+    };
+
     const activate = () => activateImageDropZone(zone, handleFile);
 
     zone.addEventListener("pointerdown", (event) => {
+      if (event.target instanceof Element && event.target.closest("[data-draw-image]")) return;
       if (event.target instanceof Element && event.target.closest("[data-choose-image]")) return;
       activate();
     });
     zone.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("[data-draw-image]")) {
+        openDrawing(event);
+        return;
+      }
       activate();
       if (event.target instanceof Element && event.target.closest("[data-choose-image]")) {
         input.click();
@@ -3222,16 +3255,318 @@
       zone.innerHTML = `
         <span>
           <strong>Paste or drop image</strong>
-          <small>Click here, then paste. Use the button for file picker.</small>
-          <button class="drop-action-button" type="button" data-choose-image>Choose image</button>
+          <small>Click here, then paste. Use the buttons to choose or draw.</small>
         </span>
+        <div class="image-drop-actions">
+          <button class="drop-action-button image-draw-button" type="button" data-draw-image aria-label="Draw image" title="Draw image">&#9998;</button>
+          <button class="drop-action-button" type="button" data-choose-image>Choose image</button>
+        </div>
       `;
       return;
     }
     zone.innerHTML = `
       <img src="${escapeAttr(image.dataUrl)}" alt="${escapeAttr(image.name || "Selected image")}">
-      <button class="drop-action-button image-change-button" type="button" data-choose-image>Replace</button>
+      <div class="image-drop-actions">
+        <button class="drop-action-button image-draw-button" type="button" data-draw-image aria-label="Draw over image" title="Draw over image">&#9998;</button>
+        <button class="drop-action-button image-change-button" type="button" data-choose-image>Replace</button>
+      </div>
     `;
+  }
+
+  function bindImageDrawingEditor() {
+    const overlay = $("image-drawing-overlay");
+    const svg = $("image-drawing-svg");
+    if (!overlay || !svg || svg.dataset.bound === "true") return;
+    svg.dataset.bound = "true";
+
+    document.querySelectorAll("[data-image-drawing-color]").forEach((button) => {
+      button.addEventListener("click", () => setImageDrawingColor(button.getAttribute("data-image-drawing-color") || DEFAULT_PEN_COLOR));
+    });
+    $("image-drawing-size").addEventListener("input", (event) => {
+      imageDrawingState.size = Number(event.target.value) || 8;
+    });
+    $("image-drawing-undo").addEventListener("click", undoImageDrawingStroke);
+    $("image-drawing-clear").addEventListener("click", clearImageDrawingStrokes);
+    $("image-drawing-done").addEventListener("click", finishImageDrawing);
+    $("image-drawing-cancel").addEventListener("click", closeImageDrawingEditor);
+    document.addEventListener("keydown", (event) => {
+      if (overlay.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeImageDrawingEditor();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undoImageDrawingStroke();
+      }
+    });
+
+    svg.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "touch") return;
+      event.preventDefault();
+      svg.setPointerCapture(event.pointerId);
+      const point = imageDrawingPoint(event);
+      imageDrawingState.pointerId = event.pointerId;
+      imageDrawingState.activeStroke = {
+        color: imageDrawingState.color || DEFAULT_PEN_COLOR,
+        size: imageDrawingState.size || 8,
+        points: [point],
+        path: createImageDrawingPath(imageDrawingState.color || DEFAULT_PEN_COLOR, imageDrawingState.size || 8)
+      };
+      imageDrawingState.activeStroke.path.setAttribute("d", imageDrawingPathData(imageDrawingState.activeStroke.points));
+      $("image-drawing-strokes").appendChild(imageDrawingState.activeStroke.path);
+    });
+    svg.addEventListener("pointermove", (event) => {
+      if (!imageDrawingState.activeStroke || imageDrawingState.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      imageDrawingState.activeStroke.points.push(imageDrawingPoint(event));
+      imageDrawingState.activeStroke.path.setAttribute("d", imageDrawingPathData(imageDrawingState.activeStroke.points));
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+      svg.addEventListener(eventName, (event) => {
+        if (!imageDrawingState.activeStroke || imageDrawingState.pointerId !== event.pointerId) return;
+        event.preventDefault();
+        imageDrawingState.strokes.push({
+          color: imageDrawingState.activeStroke.color,
+          size: imageDrawingState.activeStroke.size,
+          points: imageDrawingState.activeStroke.points
+        });
+        imageDrawingState.activeStroke = null;
+        imageDrawingState.pointerId = null;
+        if (svg.releasePointerCapture) {
+          try {
+            svg.releasePointerCapture(event.pointerId);
+          } catch {
+            // Pointer capture can already be released by the browser.
+          }
+        }
+      });
+    });
+  }
+
+  async function openImageDrawingEditor(options) {
+    const overlay = $("image-drawing-overlay");
+    if (!overlay) return;
+    imageDrawingState.onImage = options && typeof options.onImage === "function" ? options.onImage : null;
+    imageDrawingState.currentImage = options && options.currentImage ? options.currentImage : null;
+    imageDrawingState.backgroundDataUrl = "";
+    imageDrawingState.strokes = [];
+    imageDrawingState.activeStroke = null;
+    imageDrawingState.pointerId = null;
+    imageDrawingState.sessionId += 1;
+    const sessionId = imageDrawingState.sessionId;
+    $("image-drawing-title").textContent = `Draw ${options && options.label ? options.label : "image"}`;
+    $("image-drawing-strokes").innerHTML = "";
+    setImageDrawingColor(imageDrawingState.color || DEFAULT_PEN_COLOR);
+    $("image-drawing-size").value = String(imageDrawingState.size || 8);
+    setImageDrawingBackground("");
+    overlay.hidden = false;
+    document.body.classList.add("image-drawing-open");
+    try {
+      const background = await imageDataUrlForDrawing(imageDrawingState.currentImage);
+      if (imageDrawingState.sessionId !== sessionId || overlay.hidden) return;
+      imageDrawingState.backgroundDataUrl = background;
+      setImageDrawingBackground(background);
+    } catch (err) {
+      console.warn("Could not load drawing background", err);
+      setStatus("Could not load the existing image as a drawing background. Starting blank.", "warn");
+    }
+  }
+
+  function closeImageDrawingEditor() {
+    const overlay = $("image-drawing-overlay");
+    if (overlay) overlay.hidden = true;
+    document.body.classList.remove("image-drawing-open");
+    imageDrawingState.onImage = null;
+    imageDrawingState.currentImage = null;
+    imageDrawingState.backgroundDataUrl = "";
+    imageDrawingState.strokes = [];
+    imageDrawingState.activeStroke = null;
+    imageDrawingState.pointerId = null;
+    imageDrawingState.sessionId += 1;
+    $("image-drawing-strokes").innerHTML = "";
+    setImageDrawingBackground("");
+  }
+
+  function setImageDrawingBackground(dataUrl) {
+    const background = $("image-drawing-background");
+    if (!background) return;
+    if (dataUrl) {
+      background.setAttribute("href", dataUrl);
+    } else {
+      background.removeAttribute("href");
+    }
+  }
+
+  function setImageDrawingColor(color) {
+    imageDrawingState.color = color || DEFAULT_PEN_COLOR;
+    document.querySelectorAll("[data-image-drawing-color]").forEach((button) => {
+      button.classList.toggle("is-active", button.getAttribute("data-image-drawing-color") === imageDrawingState.color);
+    });
+  }
+
+  function undoImageDrawingStroke() {
+    if (imageDrawingState.activeStroke && imageDrawingState.activeStroke.path) {
+      imageDrawingState.activeStroke.path.remove();
+      imageDrawingState.activeStroke = null;
+      imageDrawingState.pointerId = null;
+      return;
+    }
+    if (!imageDrawingState.strokes.length) return;
+    imageDrawingState.strokes.pop();
+    const group = $("image-drawing-strokes");
+    if (group && group.lastElementChild) group.lastElementChild.remove();
+  }
+
+  function clearImageDrawingStrokes() {
+    imageDrawingState.strokes = [];
+    imageDrawingState.activeStroke = null;
+    imageDrawingState.pointerId = null;
+    $("image-drawing-strokes").innerHTML = "";
+  }
+
+  async function finishImageDrawing() {
+    const onImage = imageDrawingState.onImage;
+    if (!onImage) {
+      closeImageDrawingEditor();
+      return;
+    }
+    try {
+      const dataUrl = await rasterizeImageDrawing();
+      const image = await drawingDataUrlToImagePayload(dataUrl, imageDrawingState.currentImage);
+      onImage(image);
+      closeImageDrawingEditor();
+      setStatus("Drawing pasted into the image box.", "success");
+    } catch (err) {
+      console.warn("Could not finish drawing image", err);
+      setStatus(err.message || "Could not paste the drawing into the image box.", "error");
+    }
+  }
+
+  function imageDrawingPoint(event) {
+    const rect = $("image-drawing-svg").getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(IMAGE_DRAWING_WIDTH, ((event.clientX - rect.left) / rect.width) * IMAGE_DRAWING_WIDTH)),
+      y: Math.max(0, Math.min(IMAGE_DRAWING_HEIGHT, ((event.clientY - rect.top) / rect.height) * IMAGE_DRAWING_HEIGHT))
+    };
+  }
+
+  function createImageDrawingPath(color, size) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", color || DEFAULT_PEN_COLOR);
+    path.setAttribute("stroke-width", String(size || 8));
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    return path;
+  }
+
+  function imageDrawingPathData(points) {
+    if (!points || !points.length) return "";
+    if (points.length === 1) {
+      const point = points[0];
+      return `M ${point.x} ${point.y} l 0.01 0`;
+    }
+    return points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+  }
+
+  async function imageDataUrlForDrawing(image) {
+    const source = image && image.dataUrl ? String(image.dataUrl) : "";
+    if (!source) return "";
+    if (source.startsWith("data:")) return source;
+    const response = await fetch(source, { cache: "no-store" });
+    if (!response.ok) throw new Error("Could not fetch the existing image.");
+    return blobToDataUrl(await response.blob());
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error || new Error("Could not read image data."));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function rasterizeImageDrawing() {
+    const canvas = document.createElement("canvas");
+    canvas.width = IMAGE_DRAWING_WIDTH;
+    canvas.height = IMAGE_DRAWING_HEIGHT;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (imageDrawingState.backgroundDataUrl) {
+      const background = await loadImageElement(imageDrawingState.backgroundDataUrl);
+      const rect = containedImageRect(background.naturalWidth || background.width, background.naturalHeight || background.height, canvas.width, canvas.height);
+      ctx.drawImage(background, rect.x, rect.y, rect.width, rect.height);
+    }
+    imageDrawingState.strokes.forEach((stroke) => drawImageDrawingStroke(ctx, stroke));
+    return canvas.toDataURL("image/png");
+  }
+
+  function loadImageElement(src) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Could not load drawing image."));
+      image.src = src;
+    });
+  }
+
+  function containedImageRect(sourceWidth, sourceHeight, targetWidth, targetHeight) {
+    const width = Math.max(1, Number(sourceWidth) || targetWidth);
+    const height = Math.max(1, Number(sourceHeight) || targetHeight);
+    const scale = Math.min(targetWidth / width, targetHeight / height);
+    const drawWidth = width * scale;
+    const drawHeight = height * scale;
+    return {
+      x: (targetWidth - drawWidth) / 2,
+      y: (targetHeight - drawHeight) / 2,
+      width: drawWidth,
+      height: drawHeight
+    };
+  }
+
+  function drawImageDrawingStroke(ctx, stroke) {
+    if (!stroke || !stroke.points || !stroke.points.length) return;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = stroke.color || DEFAULT_PEN_COLOR;
+    ctx.fillStyle = stroke.color || DEFAULT_PEN_COLOR;
+    ctx.lineWidth = Number(stroke.size) || 8;
+    if (stroke.points.length === 1) {
+      const point = stroke.points[0];
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, Math.max(1, ctx.lineWidth / 2), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      stroke.points.forEach((point, index) => {
+        if (index) ctx.lineTo(point.x, point.y);
+        else ctx.moveTo(point.x, point.y);
+      });
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  async function drawingDataUrlToImagePayload(dataUrl, sourceImage) {
+    const blob = await dataUrlToBlob(dataUrl);
+    let checksum = "";
+    try {
+      checksum = await sha256Blob(blob);
+    } catch (err) {
+      console.warn("Could not checksum drawing image", err);
+    }
+    const baseName = sourceImage && sourceImage.name ? String(sourceImage.name).replace(/\.[^.]+$/, "") : "pen-drawing";
+    return {
+      name: `${baseName || "pen-drawing"}-drawing.png`,
+      type: "image/png",
+      size: blob.size || 0,
+      dataUrl,
+      checksum
+    };
   }
 
   function renderFileZone(zone, file) {
@@ -3827,13 +4162,32 @@
       setStatus(`Loaded ${file.name}.`, "success");
     };
 
+    const openDrawing = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openImageDrawingEditor({
+        currentImage: retrievalEditor.draft && retrievalEditor.draft[field] ? retrievalEditor.draft[field][index] : null,
+        label: zone.getAttribute("aria-label") || "retrieval image",
+        onImage: (image) => {
+          if (!retrievalEditor.draft) return;
+          retrievalEditor.draft[field][index] = image;
+          renderRetrievalEditorImages();
+        }
+      });
+    };
+
     const activate = () => activateImageDropZone(zone, handleFile);
 
     zone.addEventListener("pointerdown", (event) => {
+      if (event.target instanceof Element && event.target.closest("[data-draw-image]")) return;
       if (event.target instanceof Element && event.target.closest("[data-choose-image]")) return;
       activate();
     });
     zone.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("[data-draw-image]")) {
+        openDrawing(event);
+        return;
+      }
       activate();
       if (event.target instanceof Element && event.target.closest("[data-choose-image]")) {
         input.click();

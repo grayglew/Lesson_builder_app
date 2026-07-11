@@ -832,6 +832,29 @@ button {
   user-select: none;
 }
 
+.image-drop-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
+.image-draw-button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+}
+
 .image-drop span,
 .file-drop span {
   display: grid;
@@ -857,6 +880,111 @@ button {
   cursor: pointer;
   font-size: 12px;
   font-weight: 750;
+}
+
+.image-drawing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 12px;
+}
+
+body.image-drawing-open {
+  overflow: hidden;
+}
+
+.image-drawing-overlay[hidden] {
+  display: none;
+}
+
+.image-drawing-panel {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: #f8fafc;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+
+.image-drawing-toolbar {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.image-drawing-toolbar h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.image-drawing-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.image-drawing-swatch {
+  width: 34px;
+  height: 34px;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  background: var(--swatch-color);
+  cursor: pointer;
+}
+
+.image-drawing-swatch.is-active {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.16);
+}
+
+.image-drawing-size-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.image-drawing-size {
+  width: 120px;
+}
+
+.image-drawing-close {
+  min-width: 38px;
+}
+
+.image-drawing-stage {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.image-drawing-svg {
+  display: block;
+  width: min(100%, calc((100vh - 112px) * 1.6));
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 16 / 10;
+  border: 1px solid #111827;
+  background: #fff;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.image-drawing-svg path {
+  vector-effect: non-scaling-stroke;
 }
 
 .drop-action-button:hover {
