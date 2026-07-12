@@ -8,8 +8,8 @@
   const CURRENT_STATE_KEY = "current";
   const SLIDE_VIEWBOX_WIDTH = 1600;
   const SLIDE_VIEWBOX_HEIGHT = 1000;
-  const IMAGE_DRAWING_WIDTH = 1600;
-  const IMAGE_DRAWING_HEIGHT = 1000;
+  const IMAGE_DRAWING_WIDTH = 2048;
+  const IMAGE_DRAWING_HEIGHT = 1536;
   const PDF_EXPORT_WIDTH = 1280;
   const PDF_EXPORT_WIDTHS = [1280, 1024, 800];
   const PDF_JPEG_QUALITY = 0.86;
@@ -3308,23 +3308,25 @@
       if (event.pointerType === "touch") return;
       event.preventDefault();
       svg.setPointerCapture(event.pointerId);
-      const point = imageDrawingPoint(event);
+      const points = imageDrawingPoints(event);
+      const strokeSize = imageDrawingStrokeSize();
       imageDrawingState.pointerId = event.pointerId;
       imageDrawingState.activeStroke = {
         mode: imageDrawingState.mode === "highlighter" ? "highlighter" : "pen",
         color: imageDrawingState.color || DEFAULT_PEN_COLOR,
-        size: imageDrawingStrokeSize(),
+        size: strokeSize,
         opacity: imageDrawingState.mode === "highlighter" ? 0.35 : 1,
-        points: [point],
-        path: createImageDrawingPath(imageDrawingState.mode, imageDrawingState.color || DEFAULT_PEN_COLOR, imageDrawingStrokeSize())
+        points: [],
+        path: createImageDrawingPath(imageDrawingState.mode, imageDrawingState.color || DEFAULT_PEN_COLOR, strokeSize)
       };
+      points.forEach((point) => appendImageDrawingPoint(imageDrawingState.activeStroke, point));
       imageDrawingState.activeStroke.path.setAttribute("d", imageDrawingPathData(imageDrawingState.activeStroke.points));
       $("image-drawing-strokes").appendChild(imageDrawingState.activeStroke.path);
     });
     svg.addEventListener("pointermove", (event) => {
       if (!imageDrawingState.activeStroke || imageDrawingState.pointerId !== event.pointerId) return;
       event.preventDefault();
-      imageDrawingState.activeStroke.points.push(imageDrawingPoint(event));
+      imageDrawingPoints(event).forEach((point) => appendImageDrawingPoint(imageDrawingState.activeStroke, point));
       imageDrawingState.activeStroke.path.setAttribute("d", imageDrawingPathData(imageDrawingState.activeStroke.points));
     });
     ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
@@ -3423,7 +3425,10 @@
 
   function imageDrawingStrokeSize() {
     const size = Number(imageDrawingState.size) || 8;
-    return imageDrawingState.mode === "highlighter" ? Math.max(18, size * 4) : size;
+    const svg = $("image-drawing-svg");
+    const rect = svg ? svg.getBoundingClientRect() : { width: IMAGE_DRAWING_WIDTH };
+    const baseWidth = Math.max(1, (size / Math.max(1, rect.width)) * IMAGE_DRAWING_WIDTH);
+    return imageDrawingState.mode === "highlighter" ? Math.max(18, baseWidth * 4) : baseWidth;
   }
 
   function undoImageDrawingStroke() {
@@ -3464,12 +3469,37 @@
     }
   }
 
-  function imageDrawingPoint(event) {
+  function imageDrawingPoints(event) {
+    let sourceEvents = [];
+    if (typeof event.getCoalescedEvents === "function") {
+      sourceEvents = event.getCoalescedEvents();
+    }
+    if (!sourceEvents || !sourceEvents.length) sourceEvents = [event];
+    return sourceEvents.map((sourceEvent) => imageDrawingPointFromClient(sourceEvent.clientX, sourceEvent.clientY));
+  }
+
+  function imageDrawingPointFromClient(clientX, clientY) {
     const viewport = imageDrawingViewportRect();
     return {
-      x: Math.max(0, Math.min(IMAGE_DRAWING_WIDTH, (event.clientX - viewport.left) / viewport.scale)),
-      y: Math.max(0, Math.min(IMAGE_DRAWING_HEIGHT, (event.clientY - viewport.top) / viewport.scale))
+      x: Math.max(0, Math.min(IMAGE_DRAWING_WIDTH, (clientX - viewport.left) / viewport.scale)),
+      y: Math.max(0, Math.min(IMAGE_DRAWING_HEIGHT, (clientY - viewport.top) / viewport.scale))
     };
+  }
+
+  function appendImageDrawingPoint(stroke, point) {
+    if (!stroke || !point) return;
+    const points = stroke.points || [];
+    const previous = points[points.length - 1];
+    if (!previous || imageDrawingDistance(previous, point) >= 0.5) {
+      points.push(point);
+      stroke.points = points;
+    }
+  }
+
+  function imageDrawingDistance(a, b) {
+    const dx = (a && a.x ? a.x : 0) - (b && b.x ? b.x : 0);
+    const dy = (a && a.y ? a.y : 0) - (b && b.y ? b.y : 0);
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   function imageDrawingViewportRect() {
@@ -3508,7 +3538,28 @@
       const point = points[0];
       return `M ${point.x} ${point.y} l 0.01 0`;
     }
-    return points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+    if (points.length === 2) {
+      return `M ${imageDrawingRound(points[0].x)} ${imageDrawingRound(points[0].y)} L ${imageDrawingRound(points[1].x)} ${imageDrawingRound(points[1].y)}`;
+    }
+    let path = `M ${imageDrawingRound(points[0].x)} ${imageDrawingRound(points[0].y)}`;
+    for (let index = 1; index < points.length - 1; index += 1) {
+      const mid = imageDrawingMidpoint(points[index], points[index + 1]);
+      path += ` Q ${imageDrawingRound(points[index].x)} ${imageDrawingRound(points[index].y)} ${imageDrawingRound(mid.x)} ${imageDrawingRound(mid.y)}`;
+    }
+    const last = points[points.length - 1];
+    path += ` L ${imageDrawingRound(last.x)} ${imageDrawingRound(last.y)}`;
+    return path;
+  }
+
+  function imageDrawingMidpoint(a, b) {
+    return {
+      x: ((a && a.x) || 0) / 2 + ((b && b.x) || 0) / 2,
+      y: ((a && a.y) || 0) / 2 + ((b && b.y) || 0) / 2
+    };
+  }
+
+  function imageDrawingRound(value) {
+    return Math.round(Number(value || 0) * 10) / 10;
   }
 
   async function imageDataUrlForDrawing(image) {
@@ -3534,6 +3585,8 @@
     canvas.width = IMAGE_DRAWING_WIDTH;
     canvas.height = IMAGE_DRAWING_HEIGHT;
     const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (imageDrawingState.backgroundDataUrl) {
@@ -3585,12 +3638,20 @@
       ctx.beginPath();
       ctx.arc(point.x, point.y, Math.max(1, ctx.lineWidth / 2), 0, Math.PI * 2);
       ctx.fill();
+    } else if (stroke.points.length === 2) {
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      ctx.lineTo(stroke.points[1].x, stroke.points[1].y);
+      ctx.stroke();
     } else {
       ctx.beginPath();
-      stroke.points.forEach((point, index) => {
-        if (index) ctx.lineTo(point.x, point.y);
-        else ctx.moveTo(point.x, point.y);
-      });
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let index = 1; index < stroke.points.length - 1; index += 1) {
+        const mid = imageDrawingMidpoint(stroke.points[index], stroke.points[index + 1]);
+        ctx.quadraticCurveTo(stroke.points[index].x, stroke.points[index].y, mid.x, mid.y);
+      }
+      const last = stroke.points[stroke.points.length - 1];
+      ctx.lineTo(last.x, last.y);
       ctx.stroke();
     }
     ctx.restore();
