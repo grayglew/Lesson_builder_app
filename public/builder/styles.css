@@ -998,9 +998,6 @@ body.image-drawing-open {
 }
 
 .image-change-button {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
   box-shadow: 0 8px 18px rgba(19, 37, 42, 0.16);
   pointer-events: auto;
 }

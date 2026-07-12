@@ -3465,10 +3465,25 @@
   }
 
   function imageDrawingPoint(event) {
-    const rect = $("image-drawing-svg").getBoundingClientRect();
+    const viewport = imageDrawingViewportRect();
     return {
-      x: Math.max(0, Math.min(IMAGE_DRAWING_WIDTH, ((event.clientX - rect.left) / rect.width) * IMAGE_DRAWING_WIDTH)),
-      y: Math.max(0, Math.min(IMAGE_DRAWING_HEIGHT, ((event.clientY - rect.top) / rect.height) * IMAGE_DRAWING_HEIGHT))
+      x: Math.max(0, Math.min(IMAGE_DRAWING_WIDTH, (event.clientX - viewport.left) / viewport.scale)),
+      y: Math.max(0, Math.min(IMAGE_DRAWING_HEIGHT, (event.clientY - viewport.top) / viewport.scale))
+    };
+  }
+
+  function imageDrawingViewportRect() {
+    const svg = $("image-drawing-svg");
+    const rect = svg ? svg.getBoundingClientRect() : { left: 0, top: 0, width: IMAGE_DRAWING_WIDTH, height: IMAGE_DRAWING_HEIGHT };
+    const scale = Math.max(0.0001, Math.min(rect.width / IMAGE_DRAWING_WIDTH, rect.height / IMAGE_DRAWING_HEIGHT));
+    const width = IMAGE_DRAWING_WIDTH * scale;
+    const height = IMAGE_DRAWING_HEIGHT * scale;
+    return {
+      left: rect.left + (rect.width - width) / 2,
+      top: rect.top + (rect.height - height) / 2,
+      width,
+      height,
+      scale
     };
   }
 
