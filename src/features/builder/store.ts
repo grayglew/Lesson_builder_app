@@ -7,6 +7,7 @@ import {
   type BuilderSlide,
   type RetrievalItem,
   type SlideTemplate,
+  type StarterSlot,
   createBuilderId,
   createInitialBuilderDocument,
   normalizeBuilderDocument,
@@ -52,6 +53,8 @@ export type BuilderStore = {
   selectSlide: (slideId: string | null) => void;
   addBlankSlide: () => void;
   addPlaceholderSlide: (text?: string) => void;
+  addStarterSlide: (slots: StarterSlot[]) => void;
+  insertTemplateSlide: (template: SlideTemplate) => void;
   duplicateSlide: (slideId: string) => void;
   moveSlide: (slideId: string, direction: -1 | 1) => void;
   removeSlide: (slideId: string) => void;
@@ -202,6 +205,30 @@ export const useBuilderStore = create<BuilderStore>()(
           type: "placeholder",
           title: "Placeholder",
           text,
+          createdAt: new Date().toISOString(),
+        };
+        insertAfterSelection(state, slide);
+      }),
+
+    addStarterSlide: (slots) =>
+      set((state) => {
+        const slide: BuilderSlide = {
+          id: createBuilderId("slide"),
+          type: "starter",
+          title: "Starter",
+          slots: clonePlain(slots).slice(0, 4),
+          createdAt: new Date().toISOString(),
+        };
+        insertAfterSelection(state, slide);
+      }),
+
+    insertTemplateSlide: (template) =>
+      set((state) => {
+        const slide: BuilderSlide = {
+          id: createBuilderId("slide"),
+          type: "template",
+          title: template.title.trim() || "Template",
+          bullets: clonePlain(template.bullets),
           createdAt: new Date().toISOString(),
         };
         insertAfterSelection(state, slide);

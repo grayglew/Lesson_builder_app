@@ -39,24 +39,21 @@ const imagePairShape = {
   answerImage: builderAssetSchema.nullable().optional(),
 };
 
+export const starterSlotSchema = z
+  .object({
+    lo: z.string().default(""),
+    retrievalItemId: z.string().optional(),
+    currentImageSlot: z.number().int().min(1).max(8).optional(),
+    lockImageSlot: z.boolean().optional(),
+    ...imagePairShape,
+  })
+  .passthrough();
+
 const starterSlideSchema = z
   .object({
     ...slideBaseShape,
     type: z.literal("starter"),
-    slots: z
-      .array(
-        z
-          .object({
-            lo: z.string().default(""),
-            retrievalItemId: z.string().optional(),
-            currentImageSlot: z.number().int().min(1).max(4).optional(),
-            lockImageSlot: z.boolean().optional(),
-            ...imagePairShape,
-          })
-          .passthrough(),
-      )
-      .max(4)
-      .default([]),
+    slots: z.array(starterSlotSchema).max(4).default([]),
   })
   .passthrough();
 
@@ -252,6 +249,7 @@ export const workspaceDocumentSchema = z
   .passthrough();
 
 export type BuilderAsset = z.infer<typeof builderAssetSchema>;
+export type StarterSlot = z.infer<typeof starterSlotSchema>;
 export type BuilderSlide = z.infer<typeof builderSlideSchema>;
 export type BuilderDocument = z.infer<typeof builderDocumentSchema>;
 export type WorkspaceDocument = z.infer<typeof workspaceDocumentSchema>;

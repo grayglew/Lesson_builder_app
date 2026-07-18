@@ -41,6 +41,9 @@ type RetrievalDraft = {
 export function GlobalDataEditor({ onBack }: { onBack: () => void }) {
   const document = useBuilderStore(selectDocument);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
+  const insertTemplateSlide = useBuilderStore(
+    (state) => state.insertTemplateSlide,
+  );
   const setStatus = useBuilderStore((state) => state.setStatus);
   const [view, setView] = useState<DataView>("retrieval");
   const [busy, setBusy] = useState(false);
@@ -307,7 +310,7 @@ export function GlobalDataEditor({ onBack }: { onBack: () => void }) {
                   <input className={inputClass} type="date" value={retrievalDraft.lastTaught} onChange={(event) => setRetrievalDraft((draft) => ({ ...draft, lastTaught: event.target.value }))} />
                 </label>
                 <NumberField label="Seen count" min={0} value={retrievalDraft.seenCount} onChange={(seenCount) => setRetrievalDraft((draft) => ({ ...draft, seenCount }))} />
-                <NumberField label="Current image slot" min={1} max={4} value={retrievalDraft.currentImageSlot} onChange={(currentImageSlot) => setRetrievalDraft((draft) => ({ ...draft, currentImageSlot }))} />
+                <NumberField label="Current image slot" min={1} max={8} value={retrievalDraft.currentImageSlot} onChange={(currentImageSlot) => setRetrievalDraft((draft) => ({ ...draft, currentImageSlot }))} />
                 <NumberField label="Image spacing" min={0.5} max={3} step={0.1} value={retrievalDraft.spacingFactor} onChange={(spacingFactor) => setRetrievalDraft((draft) => ({ ...draft, spacingFactor }))} />
               </div>
               <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -378,10 +381,27 @@ export function GlobalDataEditor({ onBack }: { onBack: () => void }) {
                       <Trash2 className="size-4" aria-hidden />
                       Remove from draft
                     </button>
-                    <button className="primary-action" type="button" disabled={busy} onClick={() => void persistTemplates()}>
-                      {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Save className="size-4" aria-hidden />}
-                      Save all templates
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => {
+                          insertTemplateSlide(activeTemplate);
+                          setStatus({
+                            tone: "success",
+                            message: `Inserted "${activeTemplate.title || "Template"}" after the selected slide.`,
+                          });
+                          onBack();
+                        }}
+                      >
+                        <Plus className="size-4" aria-hidden />
+                        Insert into lesson
+                      </button>
+                      <button className="primary-action" type="button" disabled={busy} onClick={() => void persistTemplates()}>
+                        {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Save className="size-4" aria-hidden />}
+                        Save all templates
+                      </button>
+                    </div>
                   </div>
                 </>
               ) : (

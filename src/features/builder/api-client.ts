@@ -3,6 +3,7 @@ import {
   type BuilderDocument,
   type RetrievalItem,
   type SlideTemplate,
+  builderAssetSchema,
   mergeWorkspaceAndGlobal,
   normalizeBuilderDocument,
   retrievalItemSchema,
@@ -48,6 +49,15 @@ const lessonListSchema = z.object({
   lessons: z.array(lessonSummarySchema),
   totalByteSize: z.number(),
 });
+
+const resolvedRetrievalImageSchema = z
+  .object({
+    itemId: z.string(),
+    currentImageSlot: z.number().int().min(1).max(8),
+    questionImage: builderAssetSchema.nullable(),
+    answerImage: builderAssetSchema.nullable(),
+  })
+  .passthrough();
 
 export type SavedLessonSummary = z.infer<typeof lessonSummarySchema>;
 
@@ -266,6 +276,27 @@ export async function archiveRetrievalItem(id: string) {
     { id },
     z.object({ ok: z.literal(true), id: z.string() }),
   );
+}
+
+export async function resolveStarterImages(items: RetrievalItem[]) {
+  const result = await postJson(
+    "/api/builder-global/retrieval-images/resolve",
+    {
+      requests: items.map((item) => ({
+        itemId: item.id,
+        lo: item.lo,
+        className: item.className,
+        mode: "current",
+        currentImageSlot: item.currentImageSlot,
+        seenCount: item.seenCount,
+      })),
+    },
+    z.object({
+      ok: z.literal(true),
+      items: z.array(resolvedRetrievalImageSchema),
+    }),
+  );
+  return result.items;
 }
 
 async function loadWorkspaceDocument() {

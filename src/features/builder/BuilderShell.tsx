@@ -19,6 +19,7 @@ import { loadBuilderDocument, syncBuilderDocument } from "./api-client";
 import { GlobalDataEditor } from "./GlobalDataEditor";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
+import { StarterComposer } from "./StarterComposer";
 import { type BuilderSlide } from "./schema";
 import {
   selectDocument,
@@ -50,6 +51,7 @@ export function BuilderShell({ userEmail, accessMode }: BuilderShellProps) {
   const setStatus = useBuilderStore((state) => state.setStatus);
   const [isSyncing, setIsSyncing] = useState(false);
   const [activeView, setActiveView] = useState<"lesson" | "library" | "data">("lesson");
+  const [showStarterComposer, setShowStarterComposer] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -235,7 +237,9 @@ export function BuilderShell({ userEmail, accessMode }: BuilderShellProps) {
       </header>
 
       {activeView === "lesson" ? (
-      <div className="mx-auto grid max-w-[1800px] gap-4 p-4 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
+      <div className="mx-auto max-w-[1800px] space-y-4 p-4">
+        {showStarterComposer ? <StarterComposer /> : null}
+      <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
         <aside className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-4">
             <h2 className="text-sm font-semibold">Lesson details</h2>
@@ -293,6 +297,15 @@ export function BuilderShell({ userEmail, accessMode }: BuilderShellProps) {
               </p>
             </div>
             <div className="flex gap-2">
+              <button
+                className={showStarterComposer ? "primary-action" : "secondary-action"}
+                type="button"
+                aria-pressed={showStarterComposer}
+                onClick={() => setShowStarterComposer((current) => !current)}
+              >
+                <Plus className="size-4" aria-hidden />
+                Starter
+              </button>
               <button className="secondary-action" type="button" onClick={addBlankSlide}>
                 <Plus className="size-4" aria-hidden />
                 Blank
@@ -434,6 +447,7 @@ export function BuilderShell({ userEmail, accessMode }: BuilderShellProps) {
           )}
         </aside>
       </div>
+      </div>
       ) : activeView === "library" ? (
         <SavedLessonLibrary onBack={() => setActiveView("lesson")} />
       ) : (
@@ -480,9 +494,16 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
     return (
       <SlideFrame label={label}>
         <div className="grid h-full grid-cols-2 grid-rows-2 gap-2 p-3">
-          {slots.map((slot, index) => (
+          {Array.from({ length: 4 }, (_, index) => slots[index] ?? {}).map((slot, index) => (
             <div key={index} className="overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-2">
-              <p className="line-clamp-2 text-[10px] font-semibold">{stringValue(slot.lo)}</p>
+              <div className="flex items-start justify-between gap-1">
+                <p className="line-clamp-2 text-[10px] font-semibold">{stringValue(slot.lo)}</p>
+                {slot.answerImage ? (
+                  <span className="shrink-0 rounded bg-emerald-100 px-1 text-[8px] font-bold text-emerald-800">
+                    A
+                  </span>
+                ) : null}
+              </div>
               <AssetImage asset={slot.image} alt="" />
             </div>
           ))}
