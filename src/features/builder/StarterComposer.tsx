@@ -3,6 +3,7 @@
 import { ImagePlus, LoaderCircle, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { resolveStarterImages } from "./api-client";
+import styles from "./BuilderShell.module.css";
 import {
   type BuilderAsset,
   type StarterSlot,
@@ -24,6 +25,7 @@ const emptySlot = (): StarterSlot => ({
 export function StarterComposer() {
   const document = useBuilderStore(selectDocument);
   const addStarterSlide = useBuilderStore((state) => state.addStarterSlide);
+  const updateMetadata = useBuilderStore((state) => state.updateMetadata);
   const setStatus = useBuilderStore((state) => state.setStatus);
   const [slots, setSlots] = useState<StarterSlot[]>(() =>
     Array.from({ length: 4 }, emptySlot),
@@ -113,16 +115,11 @@ export function StarterComposer() {
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
-        <div>
-          <h2 className="text-sm font-semibold">Starter composer</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Add up to four learning objectives with optional question and answer images.
-          </p>
-        </div>
+    <section className={styles.toolPanel}>
+      <div className={styles.panelHead}>
+        <h3>Starter slide</h3>
         <button
-          className="secondary-action"
+          className={`${styles.secondaryButton} ${styles.compactButton}`}
           type="button"
           disabled={isSuggesting}
           onClick={() => void suggestDueItems()}
@@ -132,33 +129,45 @@ export function StarterComposer() {
           ) : (
             <Sparkles className="size-4" aria-hidden />
           )}
-          Suggest due items
+          Suggest due LOs
         </button>
       </div>
 
-      <div className="grid gap-4 p-4 md:grid-cols-2">
+      <label className={styles.fieldLabel} htmlFor="v2-overall-lesson-lo">
+        Overall lesson LO
+      </label>
+      <textarea
+        id="v2-overall-lesson-lo"
+        className={`${styles.textArea} ${styles.overallLessonLo}`}
+        rows={2}
+        placeholder="Enter the main learning objective for the lesson"
+        value={document.overallLessonLo}
+        onChange={(event) =>
+          updateMetadata({ overallLessonLo: event.target.value })
+        }
+      />
+
+      <div className={styles.starterEditorGrid}>
         {slots.map((slot, index) => (
           <article
             key={index}
-            className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+            className={styles.slotEditor}
           >
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-600">
-                Starter {index + 1}
-              </h3>
+            <div className={styles.slotEditorHead}>
+              <span className={styles.fieldLabel}>LO {index + 1}</span>
               <button
-                className="mini-action text-red-700"
+                className={`${styles.miniButton} ${styles.clearSlotButton}`}
                 type="button"
+                aria-label={`Clear LO ${index + 1}`}
                 onClick={() => updateSlot(index, emptySlot())}
               >
                 <Trash2 className="size-3.5" aria-hidden />
-                Clear
               </button>
             </div>
             <label className="block">
-              <span className="field-title mb-1.5">Learning objective</span>
+              <span className={styles.srOnly}>Learning objective</span>
               <textarea
-                className={`${inputClass} min-h-20 resize-y`}
+                className={`${styles.textArea} ${styles.starterLo}`}
                 value={slot.lo}
                 onChange={(event) =>
                   updateSlot(index, {
@@ -168,16 +177,16 @@ export function StarterComposer() {
                 }
               />
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className={styles.assetPairGrid}>
               <StarterAssetInput
                 asset={slot.image}
-                label="Question"
+                label={`Question ${index + 1}`}
                 onChange={(asset) => updateSlot(index, { image: asset })}
                 onError={(message) => setStatus({ tone: "error", message })}
               />
               <StarterAssetInput
                 asset={slot.answerImage}
-                label="Answer"
+                label={`Answer ${index + 1}`}
                 onChange={(asset) => updateSlot(index, { answerImage: asset })}
                 onError={(message) => setStatus({ tone: "error", message })}
               />
@@ -186,10 +195,13 @@ export function StarterComposer() {
         ))}
       </div>
 
-      <div className="flex justify-end border-t border-slate-200 p-4">
-        <button className="primary-action" type="button" onClick={addToLesson}>
+      <div className={styles.actionRow}>
+        <button className={styles.primaryButton} type="button" onClick={addToLesson}>
           <Plus className="size-4" aria-hidden />
           Add starter slide
+        </button>
+        <button className={styles.secondaryButton} type="button" disabled>
+          Log retrieval
         </button>
       </div>
     </section>
@@ -230,10 +242,10 @@ function StarterAssetInput({
   }
 
   return (
-    <div className="min-w-0">
-      <span className="field-title mb-1.5">{label} image</span>
+    <div className={styles.assetEditor}>
+      <span className={styles.assetLabel}>{label} image</span>
       <label
-        className="grid min-h-28 cursor-pointer place-items-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-white p-2 text-center outline-none transition hover:border-teal-500 focus-within:border-teal-600 focus-within:ring-2 focus-within:ring-teal-100"
+        className={styles.imageDrop}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
@@ -252,13 +264,14 @@ function StarterAssetInput({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             alt={`${label} preview`}
-            className="max-h-24 w-full object-contain"
+            className={styles.imageDropPreview}
             src={asset.dataUrl}
           />
         ) : (
-          <span className="text-[11px] leading-4 text-slate-500">
-            <ImagePlus className="mx-auto mb-1 size-5 text-slate-400" aria-hidden />
-            Choose, drop, or paste
+          <span className={styles.imageDropMessage}>
+            <ImagePlus aria-hidden />
+            <strong>Paste or drop image</strong>
+            <small>Click here, then paste or choose an image.</small>
           </span>
         )}
         <input
@@ -273,7 +286,7 @@ function StarterAssetInput({
       </label>
       {asset ? (
         <button
-          className="mt-1 text-[11px] font-semibold text-red-700 hover:text-red-900"
+          className={styles.removeAssetButton}
           type="button"
           onClick={() => onChange(null)}
         >
@@ -283,6 +296,3 @@ function StarterAssetInput({
     </div>
   );
 }
-
-const inputClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100";

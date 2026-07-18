@@ -26,7 +26,7 @@ import {
 } from "./schema";
 import { selectDocument, useBuilderStore } from "./store";
 
-type DataView = "retrieval" | "classes" | "templates";
+export type DataView = "retrieval" | "classes" | "templates";
 
 type RetrievalDraft = {
   id: string;
@@ -38,14 +38,22 @@ type RetrievalDraft = {
   lastTaught: string;
 };
 
-export function GlobalDataEditor({ onBack }: { onBack: () => void }) {
+export function GlobalDataEditor({
+  onBack,
+  initialView = "retrieval",
+  embedded = false,
+}: {
+  onBack: () => void;
+  initialView?: DataView;
+  embedded?: boolean;
+}) {
   const document = useBuilderStore(selectDocument);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const insertTemplateSlide = useBuilderStore(
     (state) => state.insertTemplateSlide,
   );
   const setStatus = useBuilderStore((state) => state.setStatus);
-  const [view, setView] = useState<DataView>("retrieval");
+  const [view, setView] = useState<DataView>(initialView);
   const [busy, setBusy] = useState(false);
   const [classText, setClassText] = useState(document.classNames.join("\n"));
   const [templates, setTemplates] = useState<SlideTemplate[]>(() =>
@@ -233,13 +241,15 @@ export function GlobalDataEditor({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <section className="mx-auto max-w-[1500px] p-4">
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className={embedded ? "" : "mx-auto max-w-[1500px] p-4"}>
+      <div className={embedded ? "" : "rounded-xl border border-slate-200 bg-white shadow-sm"}>
         <div className="border-b border-slate-200 p-5">
-          <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-teal-700 hover:text-teal-900" type="button" onClick={onBack}>
-            <Undo2 className="size-4" aria-hidden />
-            Back to lesson
-          </button>
+          {!embedded ? (
+            <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-teal-700 hover:text-teal-900" type="button" onClick={onBack}>
+              <Undo2 className="size-4" aria-hidden />
+              Back to lesson
+            </button>
+          ) : null}
           <h2 className="text-xl font-semibold">Shared builder data</h2>
           <p className="mt-1 text-sm text-slate-500">
             Edit drafts locally, then use the explicit save or archive action for each section.

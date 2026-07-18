@@ -24,7 +24,13 @@ import {
 } from "./api-client";
 import { selectDocument, useBuilderStore } from "./store";
 
-export function SavedLessonLibrary({ onBack }: { onBack: () => void }) {
+export function SavedLessonLibrary({
+  onBack,
+  embedded = false,
+}: {
+  onBack: () => void;
+  embedded?: boolean;
+}) {
   const document = useBuilderStore(selectDocument);
   const openLesson = useBuilderStore((state) => state.openSavedLesson);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
@@ -229,14 +235,16 @@ export function SavedLessonLibrary({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <section className="mx-auto max-w-[1500px] p-4">
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className={embedded ? "" : "mx-auto max-w-[1500px] p-4"}>
+      <div className={embedded ? "" : "rounded-xl border border-slate-200 bg-white shadow-sm"}>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-5">
           <div>
-            <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-teal-700 hover:text-teal-900" type="button" onClick={onBack}>
-              <Undo2 className="size-4" aria-hidden />
-              Back to lesson
-            </button>
+            {!embedded ? (
+              <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-teal-700 hover:text-teal-900" type="button" onClick={onBack}>
+                <Undo2 className="size-4" aria-hidden />
+                Back to lesson
+              </button>
+            ) : null}
             <h2 className="text-xl font-semibold">Saved lesson library</h2>
             <p className="mt-1 text-sm text-slate-500">
               Library changes happen only when you press a named action.
