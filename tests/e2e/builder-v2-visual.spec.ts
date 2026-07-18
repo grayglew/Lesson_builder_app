@@ -94,4 +94,22 @@ test.describe("Builder v2 accepted UI baseline", () => {
       fullPage: true,
     });
   });
+
+  test("keeps Example in the legacy authoring layout", async ({ page }) => {
+    await page.goto("/builder-v2?visual=1");
+    await page.getByRole("button", { name: "Example", exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: "Example slide" })).toBeVisible();
+    await expect(page.getByLabel("Example image 1")).toBeAttached();
+    await expect(page.getByText("Retrieval images", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Question image 8")).toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "Add LO to retrieval bank" }),
+    ).toBeVisible();
+
+    await expect(page).toHaveScreenshot("builder-v2-example.png", {
+      animations: "disabled",
+      fullPage: true,
+    });
+  });
 });

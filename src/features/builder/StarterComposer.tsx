@@ -1,17 +1,12 @@
 "use client";
 
-import { ImagePlus, LoaderCircle, Plus, Sparkles, Trash2 } from "lucide-react";
+import { LoaderCircle, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { resolveStarterImages } from "./api-client";
+import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
-import {
-  type BuilderAsset,
-  type StarterSlot,
-} from "./schema";
-import {
-  fileToBuilderAsset,
-  selectDueStarterItems,
-} from "./starter";
+import { type StarterSlot } from "./schema";
+import { selectDueStarterItems } from "./starter";
 import { selectDocument, useBuilderStore } from "./store";
 
 const emptySlot = (): StarterSlot => ({
@@ -178,15 +173,15 @@ export function StarterComposer() {
               />
             </label>
             <div className={styles.assetPairGrid}>
-              <StarterAssetInput
+              <BuilderImageInput
                 asset={slot.image}
-                label={`Question ${index + 1}`}
+                label={`Question ${index + 1} image`}
                 onChange={(asset) => updateSlot(index, { image: asset })}
                 onError={(message) => setStatus({ tone: "error", message })}
               />
-              <StarterAssetInput
+              <BuilderImageInput
                 asset={slot.answerImage}
-                label={`Answer ${index + 1}`}
+                label={`Answer ${index + 1} image`}
                 onChange={(asset) => updateSlot(index, { answerImage: asset })}
                 onError={(message) => setStatus({ tone: "error", message })}
               />
@@ -205,94 +200,5 @@ export function StarterComposer() {
         </button>
       </div>
     </section>
-  );
-}
-
-function StarterAssetInput({
-  asset,
-  label,
-  onChange,
-  onError,
-}: {
-  asset: BuilderAsset | null | undefined;
-  label: string;
-  onChange: (asset: BuilderAsset | null) => void;
-  onError: (message: string) => void;
-}) {
-  async function acceptFile(file: File | null | undefined) {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      onError(`${label} must be an image file.`);
-      return;
-    }
-    try {
-      onChange(await fileToBuilderAsset(file));
-    } catch {
-      onError(`Could not read the ${label.toLowerCase()} image.`);
-    }
-  }
-
-  function pastedImage(event: React.ClipboardEvent<HTMLLabelElement>) {
-    const file = Array.from(event.clipboardData.items)
-      .find((item) => item.type.startsWith("image/"))
-      ?.getAsFile();
-    if (!file) return;
-    event.preventDefault();
-    void acceptFile(file);
-  }
-
-  return (
-    <div className={styles.assetEditor}>
-      <span className={styles.assetLabel}>{label} image</span>
-      <label
-        className={styles.imageDrop}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          void acceptFile(event.dataTransfer.files[0]);
-        }}
-        onPaste={pastedImage}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          event.currentTarget.querySelector("input")?.click();
-        }}
-        tabIndex={0}
-      >
-        {asset?.dataUrl ? (
-          // Embedded lesson images and signed URLs do not have stable dimensions.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            alt={`${label} preview`}
-            className={styles.imageDropPreview}
-            src={asset.dataUrl}
-          />
-        ) : (
-          <span className={styles.imageDropMessage}>
-            <ImagePlus aria-hidden />
-            <strong>Paste or drop image</strong>
-            <small>Click here, then paste or choose an image.</small>
-          </span>
-        )}
-        <input
-          className="sr-only"
-          type="file"
-          accept="image/*"
-          onChange={(event) => {
-            void acceptFile(event.target.files?.[0]);
-            event.target.value = "";
-          }}
-        />
-      </label>
-      {asset ? (
-        <button
-          className={styles.removeAssetButton}
-          type="button"
-          onClick={() => onChange(null)}
-        >
-          Remove {label.toLowerCase()}
-        </button>
-      ) : null}
-    </div>
   );
 }

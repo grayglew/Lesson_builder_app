@@ -9,6 +9,7 @@ import {
   syncBuilderDocument,
 } from "./api-client";
 import styles from "./BuilderShell.module.css";
+import { ExampleComposer } from "./ExampleComposer";
 import { GlobalDataEditor } from "./GlobalDataEditor";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { RetrievalComposer } from "./RetrievalComposer";
@@ -42,7 +43,7 @@ const tools: Array<{ name: ToolName; label: string; available: boolean }> = [
   { name: "starter", label: "Starter", available: true },
   { name: "saved-lessons", label: "Saved lessons", available: true },
   { name: "retrieval", label: "Retrieval", available: true },
-  { name: "example", label: "Example", available: false },
+  { name: "example", label: "Example", available: true },
   { name: "worksheet", label: "Worksheet", available: false },
   { name: "pdf", label: "PDF", available: false },
   { name: "cfu", label: "CFU", available: false },
@@ -420,6 +421,7 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
             </div>
           ) : null}
           {activeTool === "retrieval" ? <RetrievalComposer /> : null}
+          {activeTool === "example" ? <ExampleComposer /> : null}
           {activeTool === "templates" ? (
             <div className={styles.toolPanel}>
               <GlobalDataEditor
