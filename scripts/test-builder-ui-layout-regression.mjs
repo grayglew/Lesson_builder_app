@@ -44,6 +44,13 @@ assert(
 );
 
 assert(
+  /id="preview-present-lesson"[^>]*aria-label="Present lesson"[^>]*>[^<]*&#9654;/.test(indexHtml) &&
+    /id="handout-lesson"[^>]*aria-label="Open handout"[^>]*>[^<]*&#9636;/.test(indexHtml) &&
+    /id="reset-lesson"[^>]*aria-label="Reset lesson"[^>]*>[^<]*&#8634;/.test(indexHtml),
+  "Preview actions should use compact symbols with accessible hover labels."
+);
+
+assert(
   /<div class="brand-block">[\s\S]*id="current-user-email"[\s\S]*<\/div>\s*<\/div>\s*<label class="field-label" for="lesson-title">/.test(indexHtml) &&
     !indexHtml.includes("Local HTML lesson output"),
   "The signed-in user email should appear in the left brand block instead of the old local HTML subtitle."
@@ -122,6 +129,26 @@ assert(
   /\.slide-item\s*{[^}]*flex:\s*0 0 auto;/s.test(stylesCss) &&
     /\.slide-item\s+\.lesson-slide\s*{[^}]*width:\s*100%;[^}]*flex:\s*0 0 auto;/s.test(stylesCss),
   "Lesson preview cards and slide surfaces should keep their aspect-ratio height instead of shrinking to fit the panel."
+);
+
+assert(
+  /\.slide-toolbar\s*>\s*span\s*{[^}]*min-width:\s*0;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s.test(stylesCss) &&
+    /\.slide-actions\s*{[^}]*flex:\s*0 0 auto;/s.test(stylesCss) &&
+    /\.slide-actions\s+\.mini-button\s*{[^}]*width:\s*28px;/s.test(stylesCss),
+  "Preview slide titles should yield space to compact action buttons instead of clipping them."
+);
+
+assert(
+  /\.sidebar,\s*\.preview-pane,\s*\.workspace\s*{[^}]*min-height:\s*0;[^}]*min-width:\s*0;/s.test(stylesCss) &&
+    /\.preview-head\s*>\s*div:first-child\s*{[^}]*min-width:\s*0;/s.test(stylesCss),
+  "Preview grid items and their header title should be allowed to shrink inside the viewport."
+);
+
+assert(
+  appJs.includes('button.textContent = shouldCollapse ? "\\u21e4" : "\\u21e5";') &&
+    appJs.includes('aria-label="Move slide up"') &&
+    appJs.includes('aria-label="Delete slide"'),
+  "Preview collapse and slide actions should retain descriptive labels while using compact symbols."
 );
 
 console.log("Builder UI layout regression checks passed.");

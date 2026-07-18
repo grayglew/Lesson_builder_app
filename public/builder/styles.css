@@ -71,6 +71,7 @@ button {
 .preview-pane,
 .workspace {
   min-height: 0;
+  min-width: 0;
 }
 
 .sidebar {
@@ -1100,14 +1101,31 @@ body.image-drawing-open {
   margin-bottom: 14px;
 }
 
+.preview-head > div:first-child {
+  min-width: 0;
+}
+
 .preview-head-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
+}
+
+.preview-icon-button {
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
 }
 
 .preview-collapse-toggle {
-  white-space: nowrap;
+  font-size: 20px;
 }
 
 .slide-list {
@@ -1157,9 +1175,8 @@ body.preview-collapsed .preview-head-actions {
 }
 
 body.preview-collapsed .preview-collapse-toggle {
-  min-width: 42px;
-  padding: 5px 6px;
-  writing-mode: vertical-rl;
+  min-width: 34px;
+  writing-mode: initial;
 }
 
 .slide-item {
@@ -1199,9 +1216,23 @@ body.preview-collapsed .preview-collapse-toggle {
   color: var(--muted);
 }
 
+.slide-toolbar > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .slide-actions {
   display: flex;
   gap: 6px;
+  flex: 0 0 auto;
+}
+
+.slide-actions .mini-button {
+  width: 28px;
+  min-width: 28px;
+  padding: 4px;
 }
 
 .mini-button {

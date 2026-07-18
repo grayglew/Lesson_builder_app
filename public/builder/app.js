@@ -4994,7 +4994,7 @@
 
     const button = $("preview-collapse-toggle");
     if (button) {
-      button.textContent = shouldCollapse ? "Preview" : "Collapse";
+      button.textContent = shouldCollapse ? "\u21e4" : "\u21e5";
       button.setAttribute("aria-expanded", shouldCollapse ? "false" : "true");
       button.setAttribute("title", shouldCollapse ? "Show lesson preview" : "Collapse lesson preview");
       button.setAttribute("aria-label", shouldCollapse ? "Show lesson preview" : "Collapse lesson preview");
@@ -5027,9 +5027,9 @@
           <div class="slide-toolbar">
             <span>${index + 1}. ${escapeHtml(slide.title || slide.type)}</span>
             <div class="slide-actions">
-              <button class="mini-button" type="button" data-action="up">Up</button>
-              <button class="mini-button" type="button" data-action="down">Down</button>
-              <button class="mini-button" type="button" data-action="delete">Delete</button>
+              <button class="mini-button" type="button" data-action="up" aria-label="Move slide up" title="Move slide up">\u2191</button>
+              <button class="mini-button" type="button" data-action="down" aria-label="Move slide down" title="Move slide down">\u2193</button>
+              <button class="mini-button" type="button" data-action="delete" aria-label="Delete slide" title="Delete slide">\u00d7</button>
             </div>
           </div>
           ${renderLessonSlide(slide)}
