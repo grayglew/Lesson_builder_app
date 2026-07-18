@@ -1,0 +1,360 @@
+import { z } from "zod";
+import {
+  type BuilderDocument,
+  type RetrievalItem,
+  type SlideTemplate,
+  mergeWorkspaceAndGlobal,
+  normalizeBuilderDocument,
+  retrievalItemSchema,
+  toWorkspaceDocument,
+} from "./schema";
+
+const syncLatestSchema = z.object({
+  ok: z.boolean().optional(),
+  exists: z.boolean(),
+  kind: z.string().optional(),
+  signedUrl: z.string().url().optional(),
+  updatedAt: z.string().optional(),
+  legacy: z.boolean().optional(),
+});
+
+const uploadTicketSchema = z.object({
+  ok: z.literal(true),
+  kind: z.string(),
+  path: z.string(),
+  signedUrl: z.string().url(),
+  token: z.string().optional(),
+});
+
+const globalBootstrapSchema = z.object({
+  ok: z.literal(true),
+  state: z.unknown(),
+});
+
+const lessonSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  className: z.string(),
+  teachingDate: z.string(),
+  byteSize: z.number(),
+  taughtAt: z.string(),
+  isTaught: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
+
+const lessonListSchema = z.object({
+  ok: z.literal(true),
+  lessons: z.array(lessonSummarySchema),
+  totalByteSize: z.number(),
+});
+
+export type SavedLessonSummary = z.infer<typeof lessonSummarySchema>;
+
+export type SavedLessonMetadataPatch = Pick<
+  SavedLessonSummary,
+  "id" | "title" | "className" | "teachingDate"
+>;
+
+export class BuilderApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "BuilderApiError";
+  }
+}
+
+export async function loadBuilderDocument(): Promise<BuilderDocument | null> {
+  const [workspace, global] = await Promise.all([
+    loadWorkspaceDocument(),
+    getJson("/api/builder-global/bootstrap", globalBootstrapSchema),
+  ]);
+  if (!workspace && !global.state) return null;
+  return mergeWorkspaceAndGlobal(workspace ?? {}, global?.state ?? {});
+}
+
+export async function syncBuilderDocument(document: BuilderDocument) {
+  const workspace = toWorkspaceDocument(document);
+  const json = JSON.stringify(workspace);
+  const blob = new Blob([json], { type: "application/json" });
+  const ticket = await postJson(
+    "/api/builder-sync/upload-url",
+    { kind: "workspace", byteSize: blob.size, updatedAt: workspace.updatedAt },
+    uploadTicketSchema,
+  );
+
+  const formData = new FormData();
+  formData.append("cacheControl", "3600");
+  formData.append("", blob, "lesson-builder-state.json");
+  const uploadResponse = await fetch(ticket.signedUrl, {
+    method: "PUT",
+    headers: { "x-upsert": "true" },
+    body: formData,
+  });
+  if (!uploadResponse.ok) {
+    throw new BuilderApiError(
+      `Could not upload the v2 workspace (${uploadResponse.status}).`,
+      uploadResponse.status,
+    );
+  }
+
+  await postJson(
+    "/api/builder-sync/complete",
+    {
+      kind: "workspace",
+      path: ticket.path,
+      byteSize: blob.size,
+      updatedAt: workspace.updatedAt,
+    },
+    z.object({ ok: z.literal(true) }).passthrough(),
+  );
+}
+
+export async function listSavedLessons() {
+  return getJson("/api/builder-lessons", lessonListSchema);
+}
+
+export async function openSavedLesson(id: string) {
+  const response = await postJson(
+    "/api/builder-lessons/open",
+    { id },
+    z.object({
+      ok: z.literal(true),
+      lesson: lessonSummarySchema,
+      signedUrl: z.string().url(),
+    }),
+  );
+  const lessonResponse = await fetch(response.signedUrl, { cache: "no-store" });
+  if (!lessonResponse.ok) {
+    throw new BuilderApiError(
+      `Could not download the saved lesson (${lessonResponse.status}).`,
+      lessonResponse.status,
+    );
+  }
+  return {
+    document: normalizeBuilderDocument(await lessonResponse.json()),
+    lesson: response.lesson,
+  };
+}
+
+export async function saveCurrentLesson(
+  document: BuilderDocument,
+  options: { copy?: boolean } = {},
+) {
+  const savedDocument = {
+    schemaVersion: 1,
+    lessonKind: "saved-builder-lesson",
+    title: document.title.trim() || "Untitled lesson",
+    className: document.className.trim(),
+    teachingDate: document.teachingDate,
+    overallLessonLo: document.overallLessonLo.trim(),
+    slides: document.slides,
+    savedAt: new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(savedDocument)], {
+    type: "application/json",
+  });
+  const ticket = await postJson(
+    "/api/builder-lessons/upload-url",
+    {
+      id: options.copy ? "" : document.activeLessonId,
+      byteSize: blob.size,
+    },
+    z.object({
+      ok: z.literal(true),
+      id: z.string(),
+      path: z.string(),
+      signedUrl: z.string().url(),
+      token: z.string().optional(),
+    }),
+  );
+
+  const formData = new FormData();
+  formData.append("cacheControl", "3600");
+  formData.append("", blob, "lesson.json");
+  const uploadResponse = await fetch(ticket.signedUrl, {
+    method: "PUT",
+    headers: { "x-upsert": "true" },
+    body: formData,
+  });
+  if (!uploadResponse.ok) {
+    throw new BuilderApiError(
+      `Could not upload the saved lesson (${uploadResponse.status}).`,
+      uploadResponse.status,
+    );
+  }
+
+  const completed = await postJson(
+    "/api/builder-lessons/complete",
+    {
+      id: ticket.id,
+      path: ticket.path,
+      title: savedDocument.title,
+      className: savedDocument.className,
+      teachingDate: savedDocument.teachingDate,
+      byteSize: blob.size,
+    },
+    lessonMutationSchema,
+  );
+  return completed.lesson;
+}
+
+export async function updateSavedLessonMetadata(patch: SavedLessonMetadataPatch) {
+  const result = await postJson(
+    "/api/builder-lessons/rename",
+    patch,
+    lessonMutationSchema,
+  );
+  return result.lesson;
+}
+
+export async function setSavedLessonTaught(id: string, taught: boolean) {
+  const result = await postJson(
+    "/api/builder-lessons/taught",
+    { id, taught },
+    lessonMutationSchema,
+  );
+  return result.lesson;
+}
+
+export async function deleteSavedLesson(id: string) {
+  await postJson(
+    "/api/builder-lessons/delete",
+    { id },
+    z.object({ ok: z.literal(true) }),
+  );
+}
+
+export async function saveClassNames(classNames: string[]) {
+  const result = await postJson(
+    "/api/builder-global/classes",
+    { classNames },
+    globalMutationSchema,
+  );
+  return normalizeGlobalState(result.state);
+}
+
+export async function saveSlideTemplates(slideTemplates: SlideTemplate[]) {
+  const result = await postJson(
+    "/api/builder-global/templates",
+    { slideTemplates },
+    globalMutationSchema,
+  );
+  return normalizeGlobalState(result.state);
+}
+
+export async function saveRetrievalItem(item: RetrievalItem) {
+  const result = await requestJson(
+    "/api/builder-global/retrieval-items",
+    item.id.includes("-") ? "PATCH" : "POST",
+    item,
+    z.object({
+      ok: z.literal(true),
+      item: retrievalItemSchema,
+      idMap: z.array(z.unknown()).optional(),
+    }),
+  );
+  return result.item;
+}
+
+export async function archiveRetrievalItem(id: string) {
+  await requestJson(
+    "/api/builder-global/retrieval-items",
+    "DELETE",
+    { id },
+    z.object({ ok: z.literal(true), id: z.string() }),
+  );
+}
+
+async function loadWorkspaceDocument() {
+  const latest = await getJson(
+    "/api/builder-sync/latest?kind=workspace",
+    syncLatestSchema,
+  );
+  if (!latest.exists || !latest.signedUrl) return null;
+  const response = await fetch(latest.signedUrl, { cache: "no-store" });
+  if (!response.ok) {
+    throw new BuilderApiError(
+      `Could not download the workspace (${response.status}).`,
+      response.status,
+    );
+  }
+  return response.json() as Promise<unknown>;
+}
+
+async function getJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  return readJson(response, schema);
+}
+
+async function postJson<T>(
+  url: string,
+  body: unknown,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return readJson(response, schema);
+}
+
+async function requestJson<T>(
+  url: string,
+  method: "POST" | "PATCH" | "DELETE",
+  body: unknown,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const response = await fetch(url, {
+    method,
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return readJson(response, schema);
+}
+
+async function readJson<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok || data.ok === false) {
+    throw new BuilderApiError(
+      typeof data.error === "string"
+        ? data.error
+        : `Request failed with status ${response.status}.`,
+      response.status,
+    );
+  }
+  return schema.parse(data);
+}
+
+const lessonMutationSchema = z.object({
+  ok: z.literal(true),
+  lesson: lessonSummarySchema,
+});
+
+const globalMutationSchema = z.object({
+  ok: z.literal(true),
+  state: z.unknown(),
+});
+
+function normalizeGlobalState(input: unknown): {
+  classNames: string[];
+  retrievalItems: RetrievalItem[];
+  slideTemplates: SlideTemplate[];
+  updatedAt: string;
+} {
+  const normalized = normalizeBuilderDocument(input);
+  return {
+    classNames: normalized.classNames,
+    retrievalItems: normalized.retrievalItems,
+    slideTemplates: normalized.slideTemplates,
+    updatedAt: normalized.updatedAt,
+  };
+}

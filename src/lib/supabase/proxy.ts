@@ -9,9 +9,10 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isBuilder = pathname === "/builder" || pathname === "/builder/" || pathname === "/builder/index.html";
+  const isBuilderV2 = pathname === "/builder-v2" || pathname.startsWith("/builder-v2/");
   const isLegacyLessonsRoute = pathname.startsWith("/lessons");
   const isAdminRoute = pathname.startsWith("/admin");
-  const isProtected = isBuilder || isLegacyLessonsRoute || isAdminRoute;
+  const isProtected = isBuilder || isBuilderV2 || isLegacyLessonsRoute || isAdminRoute;
 
   if (!isProtected) {
     return supabaseResponse;

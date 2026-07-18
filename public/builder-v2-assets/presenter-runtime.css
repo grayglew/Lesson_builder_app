@@ -1,0 +1,52 @@
+.annotation-svg {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.annotation-svg path {
+  pointer-events: none;
+}
+
+.lesson-slide {
+  touch-action: none;
+}
+
+.qa-toggle,
+.qa-question-button,
+.example-qa-block,
+.example-reveal-button {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.qa-toggle img,
+.qa-question-button img,
+.example-qa-block img {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+body:not(.annotation-pan) .lesson-slide {
+  cursor: crosshair;
+}
+
+body.annotation-eraser .lesson-slide {
+  cursor: cell;
+}
+
+body.annotation-pan .annotation-svg {
+  pointer-events: none;
+}
+
+body.annotation-highlighter .lesson-slide {
+  cursor: crosshair;
+}

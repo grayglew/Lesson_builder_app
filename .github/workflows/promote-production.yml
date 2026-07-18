@@ -1,0 +1,66 @@
+name: Promote production candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: Verified candidate URL ending in .vercel.app
+        required: true
+        type: string
+      confirmation:
+        description: Type PROMOTE to move production domains to this artifact
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote verified artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Validate manual inputs
+        shell: bash
+        run: |
+          if [[ "$CONFIRMATION" != "PROMOTE" ]]; then
+            echo "::error::Confirmation must be exactly PROMOTE."
+            exit 1
+          fi
+          if [[ ! "$DEPLOYMENT_URL" =~ ^https://[a-zA-Z0-9.-]+\.vercel\.app$ ]]; then
+            echo "::error::deployment_url must be an HTTPS vercel.app deployment URL."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned Vercel CLI
+        run: npm install --global vercel@56.3.1
+
+      - name: Inspect candidate
+        run: vercel inspect "$DEPLOYMENT_URL" --token "$VERCEL_TOKEN"
+
+      - name: Promote exact candidate
+        run: vercel promote "$DEPLOYMENT_URL" --yes --token "$VERCEL_TOKEN"
+
+      - name: Record promotion
+        shell: bash
+        run: |
+          echo "### Production promotion" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Promoted artifact: $DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Initiated by: $GITHUB_ACTOR" >> "$GITHUB_STEP_SUMMARY"
