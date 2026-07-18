@@ -54,8 +54,22 @@ const resolvedRetrievalImageSchema = z
   .object({
     itemId: z.string(),
     currentImageSlot: z.number().int().min(1).max(8),
-    questionImage: builderAssetSchema.nullable(),
-    answerImage: builderAssetSchema.nullable(),
+    questionImage: builderAssetSchema.nullable().optional(),
+    answerImage: builderAssetSchema.nullable().optional(),
+    images: z.array(builderAssetSchema.nullable()).optional(),
+    answerImages: z.array(builderAssetSchema.nullable()).optional(),
+  })
+  .passthrough();
+
+const retrievalProgressResultSchema = z
+  .object({
+    id: z.string(),
+    seenCount: z.number().optional(),
+    seen_count: z.number().optional(),
+    lastTaught: z.string().optional(),
+    last_taught: z.string().optional(),
+    currentImageSlot: z.number().optional(),
+    current_image_slot: z.number().optional(),
   })
   .passthrough();
 
@@ -279,14 +293,22 @@ export async function archiveRetrievalItem(id: string) {
 }
 
 export async function resolveStarterImages(items: RetrievalItem[]) {
+  return resolveRetrievalImages(items, "current");
+}
+
+export async function resolveRetrievalImages(
+  items: RetrievalItem[],
+  mode: "current" | "seen" | "all",
+) {
   const result = await postJson(
     "/api/builder-global/retrieval-images/resolve",
     {
       requests: items.map((item) => ({
         itemId: item.id,
+        contentId: item.contentId,
         lo: item.lo,
         className: item.className,
-        mode: "current",
+        mode,
         currentImageSlot: item.currentImageSlot,
         seenCount: item.seenCount,
       })),
@@ -297,6 +319,126 @@ export async function resolveStarterImages(items: RetrievalItem[]) {
     }),
   );
   return result.items;
+}
+
+export async function logRetrievalItems(
+  entries: Array<{
+    itemId: string;
+    lo: string;
+    className: string;
+    teachingDate: string;
+    deltaSeen?: 1 | -1;
+  }>,
+) {
+  const result = await postJson(
+    "/api/builder-global/retrieval-log",
+    { entries },
+    z.object({
+      ok: z.literal(true),
+      results: z.array(retrievalProgressResultSchema),
+    }),
+  );
+  return result.results;
+}
+
+export async function advanceRetrievalItems(itemIds: string[]) {
+  const result = await postJson(
+    "/api/builder-global/retrieval-next",
+    { itemIds },
+    z.object({
+      ok: z.literal(true),
+      results: z.array(retrievalProgressResultSchema),
+    }),
+  );
+  return result.results;
+}
+
+export async function uploadRetrievalImage(
+  itemId: string,
+  role: "question" | "answer",
+  seenIndex: number,
+  file: File,
+) {
+  const checksum = await checksumFile(file);
+  const ticket = await postJson(
+    "/api/builder-global/image-upload-url",
+    {
+      itemId,
+      role,
+      seenIndex,
+      fileName: file.name || `retrieval-${role}-${seenIndex + 1}.png`,
+      mimeType: file.type || "image/png",
+      byteSize: file.size,
+      checksum,
+    },
+    z.object({
+      ok: z.literal(true),
+      upload: z
+        .object({
+          reusedImage: builderAssetSchema.optional(),
+          signedUrl: z.string().url().optional(),
+          assetId: z.string().optional(),
+          path: z.string().optional(),
+        })
+        .passthrough(),
+    }),
+  );
+
+  if (ticket.upload.reusedImage) return ticket.upload.reusedImage;
+  if (
+    !ticket.upload.signedUrl ||
+    !ticket.upload.assetId ||
+    !ticket.upload.path
+  ) {
+    throw new BuilderApiError("The retrieval image upload ticket was incomplete.", 500);
+  }
+
+  const formData = new FormData();
+  formData.append("cacheControl", "3600");
+  formData.append("", file, file.name || `retrieval-${role}-${seenIndex + 1}.png`);
+  const uploadResponse = await fetch(ticket.upload.signedUrl, {
+    method: "PUT",
+    headers: { "x-upsert": "false" },
+    body: formData,
+  });
+  if (!uploadResponse.ok) {
+    throw new BuilderApiError(
+      `Could not upload the retrieval image (${uploadResponse.status}).`,
+      uploadResponse.status,
+    );
+  }
+
+  const completed = await postJson(
+    "/api/builder-global/image-complete",
+    {
+      itemId,
+      role,
+      seenIndex,
+      assetId: ticket.upload.assetId,
+      path: ticket.upload.path,
+      fileName: file.name || `retrieval-${role}-${seenIndex + 1}.png`,
+      mimeType: file.type || "image/png",
+      byteSize: file.size,
+      checksum,
+    },
+    z.object({
+      ok: z.literal(true),
+      image: builderAssetSchema,
+    }),
+  );
+  return completed.image;
+}
+
+export async function clearRetrievalImage(
+  itemId: string,
+  role: "question" | "answer",
+  seenIndex: number,
+) {
+  await postJson(
+    "/api/builder-global/image-complete",
+    { itemId, role, seenIndex, clear: true },
+    z.object({ ok: z.literal(true), image: z.null() }),
+  );
 }
 
 async function loadWorkspaceDocument() {
@@ -363,6 +505,17 @@ async function readJson<T>(response: Response, schema: z.ZodType<T>): Promise<T>
     );
   }
   return schema.parse(data);
+}
+
+async function checksumFile(file: File) {
+  if (!globalThis.crypto?.subtle) return "";
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer(),
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 const lessonMutationSchema = z.object({

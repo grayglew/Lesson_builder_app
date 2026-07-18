@@ -54,6 +54,7 @@ export type BuilderStore = {
   addBlankSlide: () => void;
   addPlaceholderSlide: (text?: string) => void;
   addStarterSlide: (slots: StarterSlot[]) => void;
+  addSlides: (slides: BuilderSlide[]) => void;
   insertTemplateSlide: (template: SlideTemplate) => void;
   duplicateSlide: (slideId: string) => void;
   moveSlide: (slideId: string, direction: -1 | 1) => void;
@@ -220,6 +221,20 @@ export const useBuilderStore = create<BuilderStore>()(
           createdAt: new Date().toISOString(),
         };
         insertAfterSelection(state, slide);
+      }),
+
+    addSlides: (slides) =>
+      set((state) => {
+        const prepared = clonePlain(slides);
+        if (!prepared.length) return;
+        const selectedIndex = state.document.slides.findIndex(
+          (entry) => entry.id === state.selectedSlideId,
+        );
+        const insertionIndex =
+          selectedIndex < 0 ? state.document.slides.length : selectedIndex + 1;
+        state.document.slides.splice(insertionIndex, 0, ...prepared);
+        state.selectedSlideId = prepared[prepared.length - 1].id;
+        touchDocument(state.document);
       }),
 
     insertTemplateSlide: (template) =>

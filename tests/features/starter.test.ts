@@ -144,6 +144,9 @@ function retrievalItem(
     spacingFactor: 1.3,
     currentImageSlot: 1,
     lastTaught: "2026-01-01",
+    selected: false,
+    images: [],
+    answerImages: [],
     ...overrides,
   };
 }

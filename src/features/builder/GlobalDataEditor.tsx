@@ -122,6 +122,8 @@ export function GlobalDataEditor({
         lo: retrievalDraft.lo.trim(),
         className: retrievalDraft.className.trim(),
         selected: false,
+        images: source?.images ?? [],
+        answerImages: source?.answerImages ?? [],
       });
       const nextItems = source
         ? document.retrievalItems.map((item) =>

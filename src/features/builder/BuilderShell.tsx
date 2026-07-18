@@ -11,6 +11,7 @@ import {
 import styles from "./BuilderShell.module.css";
 import { GlobalDataEditor } from "./GlobalDataEditor";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
+import { RetrievalComposer } from "./RetrievalComposer";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { type BuilderSlide } from "./schema";
@@ -418,13 +419,12 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
               />
             </div>
           ) : null}
-          {activeTool === "retrieval" || activeTool === "templates" ? (
+          {activeTool === "retrieval" ? <RetrievalComposer /> : null}
+          {activeTool === "templates" ? (
             <div className={styles.toolPanel}>
               <GlobalDataEditor
                 embedded
-                initialView={
-                  activeTool === "templates" ? "templates" : "retrieval"
-                }
+                initialView="templates"
                 onBack={() => setActiveTool("starter")}
               />
             </div>
@@ -672,6 +672,24 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
             <li key={index}>{lo}</li>
           ))}
         </ol>
+      </SlideFrame>
+    );
+  }
+
+  if (slide.type === "revision") {
+    const items = arrayOfRecords(data.items).slice(0, 2);
+    return (
+      <SlideFrame label="Revision">
+        <div className={styles.revisionGrid}>
+          {items.map((item, index) => (
+            <div key={index} className={styles.revisionItem}>
+              <p>{stringValue(item.lo)}</p>
+              {recordOf(item.image).dataUrl ? (
+                <AssetImage asset={item.image} alt={`Revision image ${index + 1}`} fill />
+              ) : null}
+            </div>
+          ))}
+        </div>
       </SlideFrame>
     );
   }

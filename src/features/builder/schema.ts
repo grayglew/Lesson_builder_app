@@ -201,8 +201,19 @@ export const retrievalItemSchema = z
     id: z.string().min(1),
     lo: z.string().default(""),
     className: z.string().default(""),
-    currentImageSlot: z.number().int().min(1).max(4).optional(),
-    seenCount: z.number().nonnegative().optional(),
+    trackingId: z.string().optional(),
+    contentId: z.string().optional(),
+    loCode: z.string().optional(),
+    codeSource: z.string().optional(),
+    legacyLoId: z.string().optional(),
+    legacyJsonId: z.string().optional(),
+    spacingFactor: z.number().min(1).max(2).default(1.3),
+    currentImageSlot: z.number().int().min(1).max(8).default(1),
+    seenCount: z.number().nonnegative().default(0),
+    lastTaught: isoDateSchema.optional(),
+    selected: z.boolean().default(false),
+    images: z.array(builderAssetSchema.nullable()).max(8).default([]),
+    answerImages: z.array(builderAssetSchema.nullable()).max(8).default([]),
   })
   .passthrough();
 

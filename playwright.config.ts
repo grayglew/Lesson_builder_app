@@ -33,6 +33,10 @@ export default defineConfig({
     : {
         command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
         url: localBaseUrl,
+        env: {
+          ...process.env,
+          BUILDER_VISUAL_TEST: "1",
+        },
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       },
