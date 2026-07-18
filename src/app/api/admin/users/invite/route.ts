@@ -11,7 +11,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Enter a valid email address." }, { status: 400 });
   }
 
-  const { data, error } = await auth.adminSupabase.auth.admin.inviteUserByEmail(email);
+  const redirectTo = new URL("/account/accept-invite", request.url).toString();
+  const { data, error } = await auth.adminSupabase.auth.admin.inviteUserByEmail(email, {
+    redirectTo,
+  });
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
