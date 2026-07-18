@@ -225,6 +225,48 @@ export async function saveCurrentLesson(
   return completed.lesson;
 }
 
+export async function downloadPresenterPdf(lessonId: string, html: string) {
+  const blob = new Blob([html], { type: "text/html" });
+  const ticket = await postJson(
+    "/api/presenter/pdf-snapshot/upload-url",
+    { lessonId, byteSize: blob.size },
+    z.object({
+      ok: z.literal(true),
+      path: z.string(),
+      signedUrl: z.string().url(),
+      token: z.string().optional(),
+    }),
+  );
+
+  const formData = new FormData();
+  formData.append("cacheControl", "3600");
+  formData.append("", blob, "presenter.html");
+  const uploadResponse = await fetch(ticket.signedUrl, {
+    method: "PUT",
+    headers: { "x-upsert": "true" },
+    body: formData,
+  });
+  if (!uploadResponse.ok) {
+    throw new BuilderApiError(
+      `Could not upload the PDF snapshot (${uploadResponse.status}).`,
+      uploadResponse.status,
+    );
+  }
+
+  const response = await fetch("/api/presenter/pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lessonId, snapshotPath: ticket.path }),
+  });
+  if (!response.ok) {
+    throw new BuilderApiError(
+      `Could not render the lesson PDF (${response.status}).`,
+      response.status,
+    );
+  }
+  return response.blob();
+}
+
 export async function updateSavedLessonMetadata(patch: SavedLessonMetadataPatch) {
   const result = await postJson(
     "/api/builder-lessons/rename",

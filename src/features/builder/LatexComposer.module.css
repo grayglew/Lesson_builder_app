@@ -1,0 +1,244 @@
+.panel {
+  padding: 18px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #f8fafc;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.panelHead {
+  margin-bottom: 16px;
+}
+
+.panelHead h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+}
+
+.editorGrid,
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.textArea {
+  width: 100%;
+  min-height: 190px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #111827;
+  font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.textArea:focus {
+  outline: 2px solid rgba(15, 118, 110, 0.2);
+  border-color: #0f766e;
+}
+
+.previewGrid {
+  margin-top: 16px;
+}
+
+.previewPanel {
+  min-width: 0;
+}
+
+.previewSurface {
+  min-height: 220px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.emptyState {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.rendered {
+  display: grid;
+  gap: 12px;
+}
+
+.rendered :global(p),
+.rendered :global(.latex-list) {
+  margin: 0;
+}
+
+.rendered :global(.latex-list) {
+  padding-left: 1.2em;
+}
+
+.rendered :global(.latex-math) {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.25;
+}
+
+.rendered :global(.latex-inline) {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.05em;
+  vertical-align: baseline;
+}
+
+.rendered :global(.latex-display) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.08em;
+  width: 100%;
+  padding: 8px 0;
+  font-size: 1.25em;
+  text-align: center;
+}
+
+.rendered :global(.latex-align) {
+  display: grid;
+  gap: 8px;
+}
+
+.rendered :global(.latex-align-row) {
+  display: flex;
+  justify-content: center;
+}
+
+.rendered :global(.latex-frac) {
+  display: inline-grid;
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-items: center;
+  margin: 0 0.1em;
+  vertical-align: middle;
+}
+
+.rendered :global(.latex-frac-num),
+.rendered :global(.latex-frac-den) {
+  display: block;
+  padding: 0 0.18em;
+}
+
+.rendered :global(.latex-frac-num) {
+  border-bottom: 1.5px solid currentColor;
+}
+
+.rendered :global(.latex-root) {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.02em;
+  vertical-align: middle;
+}
+
+.rendered :global(.latex-root > sup) {
+  margin-right: -0.18em;
+  font-size: 0.55em;
+}
+
+.rendered :global(.latex-radical) {
+  font-size: 1.25em;
+  line-height: 1;
+}
+
+.rendered :global(.latex-root-body) {
+  display: inline-block;
+  padding: 0.05em 0.12em 0;
+  border-top: 1.5px solid currentColor;
+}
+
+.rendered :global(.latex-script) {
+  display: inline-flex;
+  align-items: baseline;
+  vertical-align: baseline;
+}
+
+.rendered :global(.latex-script sup),
+.rendered :global(.latex-script sub) {
+  margin-left: 0.04em;
+  font-size: 0.65em;
+  line-height: 1;
+}
+
+.rendered :global(.latex-script sup) {
+  align-self: flex-start;
+}
+
+.rendered :global(.latex-script sub) {
+  align-self: flex-end;
+}
+
+.rendered :global(.latex-text),
+.rendered :global(.latex-fn) {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+}
+
+.rendered :global(.latex-var),
+.rendered :global(.latex-italic) {
+  font-style: italic;
+}
+
+.rendered :global(.latex-bold) {
+  font-weight: 800;
+}
+
+.rendered :global(.latex-quad) {
+  display: inline-block;
+  width: 1em;
+}
+
+.rendered :global(.latex-qquad) {
+  display: inline-block;
+  width: 2em;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #0f766e;
+  border-radius: 7px;
+  padding: 8px 13px;
+  background: #0f766e;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+@media (max-width: 800px) {
+  .editorGrid,
+  .previewGrid {
+    grid-template-columns: 1fr;
+  }
+}

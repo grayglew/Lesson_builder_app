@@ -64,6 +64,16 @@ describe("BuilderShell legacy UI parity", () => {
     expect(screen.getByRole("button", { name: "Save as" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New lesson" })).toBeInTheDocument();
     expect(
+      screen.queryByLabelText("Migration pending"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Preview full lesson" }),
+    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Export HTML" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Export PDF" })).toBeEnabled();
+    expect(screen.getByText("Import HTML", { selector: "label" })).toBeInTheDocument();
+    expect(screen.getByText("Import JSON", { selector: "label" })).toBeInTheDocument();
+    expect(
       screen.getByRole("heading", { name: "0 slides" }),
     ).toBeInTheDocument();
   });

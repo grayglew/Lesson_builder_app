@@ -112,4 +112,98 @@ test.describe("Builder v2 accepted UI baseline", () => {
       fullPage: true,
     });
   });
+
+  test("keeps Worksheet in the legacy file-pair layout", async ({ page }) => {
+    await page.goto("/builder-v2?visual=1");
+    await page.getByRole("button", { name: "Worksheet", exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: "Worksheet slide" })).toBeVisible();
+    await expect(page.getByLabel("Worksheet file")).toBeAttached();
+    await expect(page.getByLabel("Answers file")).toBeAttached();
+
+    await expect(page).toHaveScreenshot("builder-v2-worksheet.png", {
+      animations: "disabled",
+      fullPage: true,
+    });
+  });
+
+  test("keeps PDF in the legacy render-controls layout", async ({ page }) => {
+    await page.goto("/builder-v2?visual=1");
+    await page.getByRole("button", { name: "PDF", exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: "PDF worksheet" })).toBeVisible();
+    await expect(page.getByLabel("PDF file")).toBeAttached();
+    await expect(page.getByLabel("Render width")).toBeVisible();
+
+    await expect(page).toHaveScreenshot("builder-v2-pdf.png", {
+      animations: "disabled",
+      fullPage: true,
+    });
+  });
+
+  test("keeps CFU in the legacy placement-and-image layout", async ({ page }) => {
+    await page.goto("/builder-v2?visual=1");
+    await page.getByRole("button", { name: "CFU", exact: true }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Check for Understanding" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Placement")).toBeVisible();
+    await expect(page.getByLabel("CFU image")).toBeAttached();
+
+    await expect(page).toHaveScreenshot("builder-v2-cfu.png", {
+      animations: "disabled",
+      fullPage: true,
+    });
+  });
+
+  test("keeps Draw in the legacy canvas layout", async ({ page }) => {
+    await page.goto("/builder-v2?visual=1");
+    await page.getByRole("button", { name: "Draw", exact: true }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "High-resolution drawing" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Drawing canvas")).toBeVisible();
+    await expect(page.getByLabel("Drawing resolution")).toBeVisible();
+
+    await expect(page).toHaveScreenshot("builder-v2-draw.png", {
+      animations: "disabled",
+      fullPage: true,
+    });
+  });
+
+  test("keeps LaTeX in the legacy two-editor layout", async ({ page }) => {
+    await page.goto("/builder-v2?visual=1");
+    await page.getByRole("button", { name: "LaTeX", exact: true }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Rendered LaTeX slides" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Questions preview" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Answers preview" }),
+    ).toBeVisible();
+
+    await expect(page).toHaveScreenshot("builder-v2-latex.png", {
+      animations: "disabled",
+      fullPage: true,
+    });
+  });
+
+  test("opens the standalone presenter from Builder v2", async ({ page }) => {
+    await page.goto("/builder-v2?visual=1");
+    const popupPromise = page.waitForEvent("popup");
+
+    await page.getByRole("button", { name: "Preview full lesson" }).click();
+    const presenter = await popupPromise;
+
+    await expect(presenter).toHaveTitle("Untitled lesson");
+    await expect(
+      presenter.getByRole("navigation", { name: "Presenter tools" }),
+    ).toBeVisible();
+    await expect(presenter.getByText("No slides exported.")).toBeVisible();
+  });
 });

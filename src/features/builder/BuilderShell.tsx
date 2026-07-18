@@ -9,17 +9,26 @@ import {
   syncBuilderDocument,
 } from "./api-client";
 import styles from "./BuilderShell.module.css";
+import { CfuComposer } from "./CfuComposer";
+import { DrawComposer } from "./DrawComposer";
 import { ExampleComposer } from "./ExampleComposer";
 import { GlobalDataEditor } from "./GlobalDataEditor";
+import latexStyles from "./LatexComposer.module.css";
+import { LatexComposer } from "./LatexComposer";
+import { LessonTransferActions } from "./LessonTransferActions";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
+import { PdfComposer } from "./PdfComposer";
 import { RetrievalComposer } from "./RetrievalComposer";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
+import { WorksheetComposer } from "./WorksheetComposer";
 import { type BuilderSlide } from "./schema";
 import {
   selectDocument,
   useBuilderStore,
 } from "./store";
+import { useLessonExportActions } from "./useLessonExportActions";
+import { renderLatexDocument } from "./latex";
 
 type BuilderShellProps = {
   userEmail: string;
@@ -44,13 +53,13 @@ const tools: Array<{ name: ToolName; label: string; available: boolean }> = [
   { name: "saved-lessons", label: "Saved lessons", available: true },
   { name: "retrieval", label: "Retrieval", available: true },
   { name: "example", label: "Example", available: true },
-  { name: "worksheet", label: "Worksheet", available: false },
-  { name: "pdf", label: "PDF", available: false },
-  { name: "cfu", label: "CFU", available: false },
-  { name: "draw", label: "Draw", available: false },
+  { name: "worksheet", label: "Worksheet", available: true },
+  { name: "pdf", label: "PDF", available: true },
+  { name: "cfu", label: "CFU", available: true },
+  { name: "draw", label: "Draw", available: true },
   { name: "templates", label: "Templates", available: true },
   { name: "placeholder", label: "Placeholder", available: true },
-  { name: "math", label: "LaTeX", available: false },
+  { name: "math", label: "LaTeX", available: true },
 ];
 
 const toolLabels: Record<ToolName, string> = {
@@ -86,6 +95,7 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [busyAction, setBusyAction] = useState("");
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
+  const lessonActions = useLessonExportActions();
 
   useEffect(() => {
     let cancelled = false;
@@ -213,19 +223,6 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
       reset();
       setActiveTool("starter");
     }
-  }
-
-  function exportJson() {
-    const blob = new Blob([JSON.stringify(document, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = window.document.createElement("a");
-    link.href = url;
-    link.download = `${safeFileName(document.title || "lesson")}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setStatus({ tone: "success", message: "Exported the lesson JSON." });
   }
 
   if (!hydrated) {
@@ -377,36 +374,7 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
             </a>
           </div>
 
-          <div className={styles.exportGroup}>
-            <button className={styles.primaryButton} type="button" disabled>
-              Preview full lesson
-            </button>
-            <button className={styles.secondaryButton} type="button" disabled>
-              Export HTML
-            </button>
-            <button className={styles.secondaryButton} type="button" disabled>
-              Export PDF
-            </button>
-            <button
-              className={styles.secondaryButton}
-              type="button"
-              onClick={exportJson}
-            >
-              Export JSON
-            </button>
-            <button className={styles.secondaryButton} type="button" disabled>
-              Export full backup
-            </button>
-            <button className={styles.secondaryButton} type="button" disabled>
-              Import HTML
-            </button>
-            <button className={styles.secondaryButton} type="button" disabled>
-              Import JSON
-            </button>
-            <a className={styles.secondaryButton} href="/auth/logout">
-              Log out
-            </a>
-          </div>
+          <LessonTransferActions actions={lessonActions} />
         </aside>
 
         <section className={styles.workspace} aria-label={toolLabels[activeTool]}>
@@ -422,6 +390,10 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
           ) : null}
           {activeTool === "retrieval" ? <RetrievalComposer /> : null}
           {activeTool === "example" ? <ExampleComposer /> : null}
+          {activeTool === "worksheet" ? <WorksheetComposer /> : null}
+          {activeTool === "pdf" ? <PdfComposer /> : null}
+          {activeTool === "cfu" ? <CfuComposer /> : null}
+          {activeTool === "draw" ? <DrawComposer /> : null}
           {activeTool === "templates" ? (
             <div className={styles.toolPanel}>
               <GlobalDataEditor
@@ -451,7 +423,15 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
                   className={styles.primaryButton}
                   type="button"
                   onClick={() => {
-                    addPlaceholderSlide(placeholderText);
+                    const text = placeholderText.trim();
+                    if (!text) {
+                      setStatus({
+                        tone: "error",
+                        message: "Add placeholder text first.",
+                      });
+                      return;
+                    }
+                    addPlaceholderSlide(text);
                     setStatus({
                       tone: "success",
                       message: "Added a placeholder slide.",
@@ -463,6 +443,7 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
               </div>
             </section>
           ) : null}
+          {activeTool === "math" ? <LatexComposer /> : null}
           {!tools.find((tool) => tool.name === activeTool)?.available ? (
             <section className={styles.toolPanel}>
               <div className={styles.panelHead}>
@@ -495,8 +476,8 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
                 className={styles.previewIconButton}
                 type="button"
                 aria-label="Present lesson"
-                title="Presenter migration pending"
-                disabled
+                title="Present lesson"
+                onClick={() => void lessonActions.previewLesson(false)}
               >
                 ▶
               </button>
@@ -504,8 +485,8 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
                 className={styles.previewIconButton}
                 type="button"
                 aria-label="Open handout"
-                title="Handout migration pending"
-                disabled
+                title="Open handout"
+                onClick={() => void lessonActions.previewLesson(true)}
               >
                 ▤
               </button>
@@ -731,7 +712,12 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
   if (slide.type === "math") {
     return (
       <SlideFrame label="LaTeX">
-        <pre className={styles.mathPreview}>{stringValue(data.latex)}</pre>
+        <div
+          className={`${styles.mathPreview} ${latexStyles.rendered}`}
+          dangerouslySetInnerHTML={{
+            __html: renderLatexDocument(stringValue(data.latex)),
+          }}
+        />
       </SlideFrame>
     );
   }
@@ -810,8 +796,4 @@ function timestampValue(value: string) {
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function safeFileName(value: string) {
-  return value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-") || "lesson";
 }
