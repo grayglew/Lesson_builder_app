@@ -13,19 +13,28 @@ Re-read the current production deployment before every release and update the re
 
 Vercel Preview must use a separate Supabase staging project. Production variables must not be copied into Preview.
 
+Staging Supabase:
+
+- Project: `lesson-builder-staging`
+- Project ref: `sbtzyrakbbymahfmdfth`
+- Region: `ap-southeast-2`
+- Quoted project cost at creation: `$0/month`
+- Data policy: schema and empty buckets only; do not copy production users, lessons or assets
+
 Required Preview variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SECRET_KEY`
-- `BUILDER_V2_ACCESS=all`
+- `STUDENT_SESSION_CODE_SECRET`
+- `BUILDER_V2_ACCESS=admin`
 
 Required Production variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SECRET_KEY`
-- `BUILDER_V2_ACCESS=admin` until cutover
+- `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY`
+- `BUILDER_V2_ACCESS=admin` until cutover; `admin` is also the application default
 
 Required GitHub Actions secrets:
 
