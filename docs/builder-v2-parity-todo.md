@@ -57,14 +57,16 @@ behaviour. Items marked **missing** have no equivalent implementation.
   global builder data and active saved lessons. The replacement is audited,
   uncached, access-controlled and size-limited.
 
-- [ ] **Import/export functional audit — implementation fixed; manual
-  validation pending.** The 2026-07-19 PDF `500` was caused by sending a very
-  large, duplicated data-URL document through Puppeteer’s protocol. The export
-  now strips runtime/state duplication, loads a static temporary document,
-  waits for fonts/images, supports the 300-second function duration and returns
-  actionable errors. Automated mixed-slide and portrait-PDF coverage passes.
-  Manually verify Export HTML, Export PDF, Export JSON, Import HTML, and Import
-  JSON against a real large lesson before checking off this item.
+- [ ] **Import/export functional audit — PDF fixed and live-validated; remaining
+  round trips pending.** The 2026-07-19 PDF `500` was first traced to duplicated
+  data-URL state and then, in the deployed 15-slide lesson, to Chromium decoding
+  the complete image-heavy deck in one renderer target. The export now strips
+  runtime/state duplication, renders one isolated slide at a time, closes each
+  renderer target immediately, and merges the full-page results. The exact
+  15-slide Preview lesson completed successfully on 2026-07-19, with automated
+  15-page, mixed-slide, and portrait-PDF coverage also passing. Manually inspect
+  the downloaded PDF and verify Export HTML, Export JSON, Import HTML, and Import
+  JSON round trips before checking off this item.
 
 - [x] **Per-entry image drawing — completed.** Restored the production-style
   Draw image editor on every question/answer image box in Starter, Example,
