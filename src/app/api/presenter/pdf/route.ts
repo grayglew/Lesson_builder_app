@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium";
+import { PDFDocument } from "pdf-lib";
 import puppeteer from "puppeteer-core";
 import { randomUUID } from "node:crypto";
 import { writeFile, unlink } from "node:fs/promises";
@@ -17,7 +18,7 @@ import {
   safeLessonDownloadName,
 } from "@/lib/builder-sync/saved-lessons";
 import {
-  preparePresenterPdfSnapshotHtml,
+  createPresenterPdfSlideDocuments,
   presenterPdfError,
 } from "@/features/builder/presenter-pdf";
 
@@ -108,16 +109,7 @@ export async function POST(request: Request) {
 }
 
 export async function renderPresenterSnapshotToPdf(html: string) {
-  const snapshotFile = join(
-    tmpdir(),
-    `lesson-builder-presenter-${randomUUID()}.html`,
-  );
-  await writeFile(
-    snapshotFile,
-    preparePresenterPdfSnapshotHtml(html),
-    "utf8",
-  );
-
+  const slideDocuments = createPresenterPdfSlideDocuments(html);
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
 
   try {
@@ -138,41 +130,64 @@ export async function renderPresenterSnapshotToPdf(html: string) {
       headless: "shell",
       protocolTimeout: 180000,
     });
-    const page = await browser.newPage();
-    await page.goto(pathToFileURL(snapshotFile).href, {
-      waitUntil: "load",
-      timeout: 120000,
-    });
-    await page.emulateMediaType("print");
-    await page.evaluate(async () => {
-      await document.fonts?.ready;
-      await Promise.all(
-        Array.from(document.images, (image) =>
-          typeof image.decode === "function"
-            ? image.decode().catch(() => undefined)
-            : Promise.resolve(),
-        ),
+    const merged = await PDFDocument.create();
+
+    for (const [index, slideHtml] of slideDocuments.entries()) {
+      const snapshotFile = join(
+        tmpdir(),
+        `lesson-builder-presenter-${randomUUID()}-${index + 1}.html`,
       );
-    });
-    return page.pdf({
-      printBackground: true,
-      preferCSSPageSize: true,
-      width: "16in",
-      height: "10in",
-      margin: {
-        top: "0",
-        right: "0",
-        bottom: "0",
-        left: "0",
-      },
-      timeout: 120000,
-    });
+      let page: Awaited<ReturnType<typeof browser.newPage>> | undefined;
+      try {
+        await writeFile(snapshotFile, slideHtml, "utf8");
+        page = await browser.newPage();
+        await page.goto(pathToFileURL(snapshotFile).href, {
+          waitUntil: "load",
+          timeout: 120000,
+        });
+        await page.emulateMediaType("print");
+        await page.evaluate(async () => {
+          await document.fonts?.ready;
+          await Promise.all(
+            Array.from(document.images, (image) =>
+              typeof image.decode === "function"
+                ? image.decode().catch(() => undefined)
+                : Promise.resolve(),
+            ),
+          );
+        });
+        const onePagePdf = await page.pdf(pdfPageOptions());
+        const source = await PDFDocument.load(onePagePdf);
+        const [copiedPage] = await merged.copyPages(source, [0]);
+        merged.addPage(copiedPage);
+      } finally {
+        await page?.close().catch(() => undefined);
+        await unlink(snapshotFile).catch(() => undefined);
+      }
+    }
+
+    return merged.save();
   } finally {
     await browser?.close().catch(() => undefined);
-    await unlink(snapshotFile).catch(() => undefined);
   }
 }
 
 function safePdfDownloadName(title: string) {
   return safeLessonDownloadName(title).replace(/\.lesson\.json$/, ".pdf");
+}
+
+function pdfPageOptions() {
+  return {
+    printBackground: true,
+    preferCSSPageSize: true,
+    width: "16in",
+    height: "10in",
+    margin: {
+      top: "0",
+      right: "0",
+      bottom: "0",
+      left: "0",
+    },
+    timeout: 120000,
+  } as const;
 }

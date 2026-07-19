@@ -26,6 +26,21 @@ export function preparePresenterPdfSnapshotHtml(html: string) {
   return `<!doctype html><html><head>${printStyle}</head><body>${staticHtml}</body></html>`;
 }
 
+export function createPresenterPdfSlideDocuments(html: string) {
+  const snapshot = preparePresenterPdfSnapshotHtml(html);
+  const slides = extractLessonSlides(snapshot);
+  if (!slides.length) {
+    throw new Error("The PDF snapshot does not contain any lesson slides.");
+  }
+
+  const head =
+    snapshot.match(/<head\b[^>]*>([\s\S]*?)<\/head\s*>/i)?.[1] || "";
+  return slides.map(
+    (slide) =>
+      `<!doctype html><html><head>${head}</head><body><main class="lesson-deck">${slide}</main></body></html>`,
+  );
+}
+
 export function presenterPdfError(
   error: unknown,
 ): { message: string; status: number } {
@@ -72,4 +87,38 @@ export function presenterPdfError(
     message: "Could not render the lesson PDF. Please try the export again.",
     status: 500,
   };
+}
+
+function extractLessonSlides(html: string) {
+  const sectionTag = /<\/?section\b[^>]*>/gi;
+  const slides: string[] = [];
+  let slideStart = -1;
+  let sectionDepth = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = sectionTag.exec(html))) {
+    const tag = match[0];
+    const isClosing = /^<\//.test(tag);
+    if (slideStart < 0) {
+      if (!isClosing && hasLessonSlideClass(tag)) {
+        slideStart = match.index;
+        sectionDepth = 1;
+      }
+      continue;
+    }
+
+    sectionDepth += isClosing ? -1 : 1;
+    if (sectionDepth === 0) {
+      slides.push(html.slice(slideStart, sectionTag.lastIndex));
+      slideStart = -1;
+    }
+  }
+
+  return slides;
+}
+
+function hasLessonSlideClass(tag: string) {
+  const className =
+    tag.match(/\bclass\s*=\s*(["'])([\s\S]*?)\1/i)?.[2] || "";
+  return className.split(/\s+/).includes("lesson-slide");
 }

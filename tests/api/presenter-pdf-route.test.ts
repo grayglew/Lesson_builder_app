@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { PDFDocument } from "pdf-lib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -41,28 +42,31 @@ describe("presenter PDF route renderer", () => {
   });
 
   it("loads a static mixed-lesson snapshot from a temporary file", async () => {
-    let loadedHtml = "";
-    let snapshotPath = "";
+    const loadedHtml: string[] = [];
+    const snapshotPaths: string[] = [];
     const goto = vi.fn(async (url: string) => {
-      snapshotPath = fileURLToPath(url);
-      loadedHtml = await readFile(snapshotPath, "utf8");
+      const snapshotPath = fileURLToPath(url);
+      snapshotPaths.push(snapshotPath);
+      loadedHtml.push(await readFile(snapshotPath, "utf8"));
     });
     const setContent = vi.fn();
     const emulateMediaType = vi.fn().mockResolvedValue(undefined);
     const evaluate = vi.fn().mockResolvedValue(undefined);
-    const pdf = vi
-      .fn()
-      .mockResolvedValue(new Uint8Array([0x25, 0x50, 0x44, 0x46]));
-    const close = vi.fn().mockResolvedValue(undefined);
-    mocks.launch.mockResolvedValue({
-      newPage: vi.fn().mockResolvedValue({
+    const onePagePdf = await validOnePagePdf();
+    const pdf = vi.fn().mockResolvedValue(onePagePdf);
+    const closePage = vi.fn().mockResolvedValue(undefined);
+    const closeBrowser = vi.fn().mockResolvedValue(undefined);
+    const newPage = vi.fn().mockResolvedValue({
         goto,
         setContent,
         emulateMediaType,
         evaluate,
         pdf,
-      }),
-      close,
+        close: closePage,
+      });
+    mocks.launch.mockResolvedValue({
+      newPage,
+      close: closeBrowser,
     });
     const portraitPage = "data:image/png;base64," + "cGRm".repeat(2048);
     const html = `<!doctype html><html><head></head><body>
@@ -71,25 +75,39 @@ describe("presenter PDF route renderer", () => {
         <section class="lesson-slide pdf-page-slide portrait">
           <img class="slide-image-fit" src="${portraitPage}">
         </section>
+        ${Array.from(
+          { length: 13 },
+          (_, index) => `<section class="lesson-slide pdf-page-slide portrait">
+            <img class="slide-image-fit" src="${portraitPage}" alt="Page ${index + 3}">
+          </section>`,
+        ).join("")}
       </main>
       <script type="application/json">{"duplicate":"${portraitPage}"}</script>
     </body></html>`;
 
     const result = await renderPresenterSnapshotToPdf(html);
+    const resultDocument = await PDFDocument.load(result);
 
-    expect(Array.from(result)).toEqual([0x25, 0x50, 0x44, 0x46]);
+    expect(resultDocument.getPageCount()).toBe(15);
     expect(setContent).not.toHaveBeenCalled();
-    expect(goto).toHaveBeenCalledWith(
+    expect(newPage).toHaveBeenCalledTimes(15);
+    expect(goto).toHaveBeenCalledTimes(15);
+    expect(goto).toHaveBeenNthCalledWith(
+      1,
       expect.stringMatching(/^file:/),
       expect.objectContaining({ waitUntil: "load", timeout: 120000 }),
     );
-    expect(loadedHtml).toContain("starter-slide");
-    expect(loadedHtml).toContain("pdf-page-slide portrait");
-    expect(loadedHtml.split(portraitPage)).toHaveLength(2);
-    expect(loadedHtml).not.toContain("<script");
+    expect(documentBody(loadedHtml[0])).toContain("starter-slide");
+    expect(documentBody(loadedHtml[0])).not.toContain("pdf-page-slide");
+    expect(documentBody(loadedHtml[1])).toContain("pdf-page-slide portrait");
+    expect(loadedHtml[1].split(portraitPage)).toHaveLength(2);
+    loadedHtml.forEach((document) => expect(document).not.toContain("<script"));
+    expect(emulateMediaType).toHaveBeenCalledTimes(15);
     expect(emulateMediaType).toHaveBeenCalledWith("print");
-    expect(evaluate).toHaveBeenCalledOnce();
-    expect(pdf).toHaveBeenCalledWith(
+    expect(evaluate).toHaveBeenCalledTimes(15);
+    expect(pdf).toHaveBeenCalledTimes(15);
+    expect(pdf).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         printBackground: true,
         preferCSSPageSize: true,
@@ -98,10 +116,15 @@ describe("presenter PDF route renderer", () => {
         timeout: 120000,
       }),
     );
-    expect(close).toHaveBeenCalledOnce();
-    await expect(readFile(snapshotPath)).rejects.toMatchObject({
-      code: "ENOENT",
-    });
+    expect(closePage).toHaveBeenCalledTimes(15);
+    expect(closeBrowser).toHaveBeenCalledOnce();
+    await Promise.all(
+      snapshotPaths.map((snapshotPath) =>
+        expect(readFile(snapshotPath)).rejects.toMatchObject({
+          code: "ENOENT",
+        }),
+      ),
+    );
   });
 
   it("removes the temporary snapshot when Chromium cannot start", async () => {
@@ -109,8 +132,18 @@ describe("presenter PDF route renderer", () => {
 
     await expect(
       renderPresenterSnapshotToPdf(
-        "<!doctype html><main class=\"lesson-deck\">Lesson</main>",
+        '<!doctype html><main class="lesson-deck"><section class="lesson-slide">Lesson</section></main>',
       ),
     ).rejects.toThrow("Failed to launch browser process");
   });
 });
+
+async function validOnePagePdf() {
+  const document = await PDFDocument.create();
+  document.addPage([1152, 720]);
+  return document.save();
+}
+
+function documentBody(html: string) {
+  return html.match(/<body>([\s\S]*?)<\/body>/i)?.[1] || "";
+}

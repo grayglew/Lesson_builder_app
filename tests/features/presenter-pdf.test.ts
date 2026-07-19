@@ -1,4 +1,5 @@
 import {
+  createPresenterPdfSlideDocuments,
   preparePresenterPdfSnapshotHtml,
   presenterPdfError,
 } from "@/features/builder/presenter-pdf";
@@ -82,6 +83,31 @@ describe("presenter PDF snapshots", () => {
     });
   });
 
+  it("isolates every slide while preserving nested section markup", () => {
+    const documents = createPresenterPdfSlideDocuments(`<!doctype html>
+      <html><head><style>.lesson-slide{color:#123}</style></head><body>
+        <main class="lesson-deck">
+          <section class="lesson-slide starter-slide">
+            <section class="worked-step">Nested section</section>
+          </section>
+          <section class="lesson-slide pdf-page-slide portrait">
+            <img src="data:image/png;base64,cGRm">
+          </section>
+        </main>
+      </body></html>`);
+
+    expect(documents).toHaveLength(2);
+    expect(documentBody(documents[0])).toContain("starter-slide");
+    expect(documentBody(documents[0])).toContain("worked-step");
+    expect(documentBody(documents[0])).not.toContain("pdf-page-slide");
+    expect(documentBody(documents[1])).toContain("pdf-page-slide portrait");
+    expect(documentBody(documents[1])).not.toContain("starter-slide");
+    documents.forEach((document) => {
+      expect(document).toContain(".lesson-slide{color:#123}");
+      expect(document).toContain('id="presenter-pdf-print-css"');
+    });
+  });
+
   it("surfaces the route's useful error message to the builder", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -126,4 +152,8 @@ function jsonResponse(value: unknown, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function documentBody(html: string) {
+  return html.match(/<body>([\s\S]*?)<\/body>/i)?.[1] || "";
 }
