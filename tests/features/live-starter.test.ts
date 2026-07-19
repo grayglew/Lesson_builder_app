@@ -130,6 +130,112 @@ describe("live starter hydration", () => {
     expect(slots[0].image).toEqual(existingImage);
     expect(document.slides[0]).not.toBe(starter);
   });
+
+  it("recovers a legacy starter link from a unique class-scoped image identity", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "Year 7";
+    const legacyImage = {
+      ...asset("legacy-question.png"),
+      assetId: "asset-question-1",
+      storagePath: "retrieval/year-7/question-1.png",
+      checksum: "ABC123",
+    };
+    document.slides = [
+      {
+        id: "starter",
+        type: "starter",
+        title: "Starter",
+        slots: [
+          {
+            lo: "",
+            retrievalItemId: "retired-json-id",
+            image: legacyImage,
+          },
+        ],
+      },
+    ];
+    const matching = retrievalItem("current-item", "101a: Expand", 4);
+    matching.images = [
+      {
+        ...asset("current-question.png"),
+        assetId: "ASSET-QUESTION-1",
+        storagePath: "retrieval/year-7/question-1.png",
+        checksum: "abc123",
+      },
+    ];
+    const wrongClass = retrievalItem("wrong-class", "201a: Fractions", 2);
+    wrongClass.className = "Year 8";
+    wrongClass.images = [legacyImage];
+    const resolver = vi.fn(async (items: RetrievalItem[]) =>
+      items.map((item) => ({
+        itemId: item.id,
+        currentImageSlot: item.currentImageSlot,
+        questionImage: item.images[0] || null,
+        answerImage: null,
+      })),
+    );
+
+    const hydrated = await hydrateLiveStarterSlots(
+      document,
+      [wrongClass, matching],
+      resolver as LiveStarterImageResolver,
+    );
+    const starter = hydrated.slides[0];
+    expect(starter.type).toBe("starter");
+    if (starter.type !== "starter") throw new Error("Expected starter slide.");
+    const slot = (starter as { slots: StarterSlot[] }).slots[0];
+    expect(slot.lo).toBe("101a: Expand");
+    expect(slot.retrievalItemId).toBe("current-item");
+    expect(slot.currentImageSlot).toBe(4);
+    expect(resolver).toHaveBeenCalledWith([matching], "current");
+
+    const html = buildStandaloneLessonHtml(hydrated, {
+      liveRetrieval: {
+        enabled: true,
+        endpoint: "/api/presenter/retrieval-log",
+        nextEndpoint: "/api/presenter/retrieval-next",
+        lessonId: "lesson-id",
+        className: "Year 7",
+        teachingDate: "2026-07-19",
+      },
+    });
+    expect(html).toContain('aria-label="Seen +1"');
+    expect(html).toContain('aria-label="Seen -1"');
+    expect(html).toContain('aria-label="Next retrieval question"');
+  });
+
+  it("does not guess when an image identity matches multiple retrieval items", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "Year 7";
+    const sharedImage = {
+      ...asset("shared.png"),
+      storagePath: "retrieval/year-7/shared.png",
+    };
+    document.slides = [
+      {
+        id: "starter",
+        type: "starter",
+        title: "Starter",
+        slots: [{ lo: "", image: sharedImage }],
+      },
+    ];
+    const first = retrievalItem("first", "101a: Expand", 1);
+    const second = retrievalItem("second", "102a: Factorise", 1);
+    first.images = [sharedImage];
+    second.images = [sharedImage];
+    const resolver = vi.fn();
+
+    const hydrated = await hydrateLiveStarterSlots(
+      document,
+      [first, second],
+      resolver as LiveStarterImageResolver,
+    );
+    const starter = hydrated.slides[0];
+    expect(starter.type).toBe("starter");
+    if (starter.type !== "starter") throw new Error("Expected starter slide.");
+    expect((starter as { slots: StarterSlot[] }).slots[0].lo).toBe("");
+    expect(resolver).not.toHaveBeenCalled();
+  });
 });
 
 function retrievalItem(

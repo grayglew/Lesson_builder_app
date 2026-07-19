@@ -114,15 +114,59 @@ function findRetrievalItemForLiveSlot(
   }
 
   const lo = normalizeText(slot.lo);
-  if (!lo) return null;
   const targetClass = normalizeText(className);
-  return (
-    items.find((item) => {
+  if (lo) {
+    const byLo = items.find((item) => {
       if (normalizeText(item.lo) !== lo) return false;
       const itemClass = normalizeText(item.className);
       return !targetClass || !itemClass || itemClass === targetClass;
-    }) || null
-  );
+    });
+    if (byLo) return byLo;
+  }
+
+  return findUniqueRetrievalItemByAsset(items, slot, targetClass);
+}
+
+function findUniqueRetrievalItemByAsset(
+  items: readonly RetrievalItem[],
+  slot: StarterSlot,
+  targetClass: string,
+) {
+  const slotIdentities = new Set([
+    ...assetIdentities(slot.image),
+    ...assetIdentities(slot.answerImage),
+  ]);
+  if (!slotIdentities.size) return null;
+
+  const matches = items.filter((item) => {
+    if (targetClass && normalizeText(item.className) !== targetClass) {
+      return false;
+    }
+    return [...item.images, ...item.answerImages].some((asset) =>
+      assetIdentities(asset).some((identity) => slotIdentities.has(identity)),
+    );
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function assetIdentities(asset: unknown) {
+  if (!asset || typeof asset !== "object" || Array.isArray(asset)) return [];
+  const record = asset as Record<string, unknown>;
+  return [
+    identityValue("asset", record.assetId, true),
+    identityValue("path", record.storagePath),
+    identityValue("checksum", record.checksum, true),
+  ].filter((value): value is string => Boolean(value));
+}
+
+function identityValue(
+  kind: string,
+  value: unknown,
+  lowercase = false,
+) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return `${kind}:${lowercase ? text.toLowerCase() : text}`;
 }
 
 function normalizeText(value: unknown) {
