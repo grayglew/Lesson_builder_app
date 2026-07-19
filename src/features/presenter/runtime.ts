@@ -481,11 +481,15 @@ export function mountPresenterRuntime(
   }
 
   function panTarget(): Element {
-    return (
-      queryOne<Element>(root, selectors.deck) ??
-      documentRoot.scrollingElement ??
-      documentRoot.documentElement
-    );
+    const deck = queryOne<Element>(root, selectors.deck);
+    const body = documentRoot.body;
+    const deckOwnsPresentationScroll =
+      body?.classList.contains("focus-mode") ||
+      body?.classList.contains("fullscreen-mode") ||
+      body?.classList.contains("presenter-zoom-mode");
+    return deck && deckOwnsPresentationScroll
+      ? deck
+      : documentRoot.scrollingElement ?? documentRoot.documentElement;
   }
 
   function beginTouch(event: PointerEvent, slide: HTMLElement): void {
@@ -871,6 +875,13 @@ export function autoMountPresenterRuntime(): PresenterRuntimeController | null {
   }
   const controller = mountPresenterRuntime({
     confirmClear: () => window.confirm("Clear all presenter annotations?"),
+    onPinchZoom: (scale, clientPoint) => {
+      document.dispatchEvent(
+        new CustomEvent("lessonpresenterpinch", {
+          detail: { scale, clientPoint },
+        }),
+      );
+    },
   });
   window.__lessonPresenterRuntimeController = controller;
   return controller;

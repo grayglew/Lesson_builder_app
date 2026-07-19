@@ -939,7 +939,7 @@
   position: relative;
   overflow: hidden;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: var(--preview-slide-aspect, 16 / 10);
   background: #fffefb;
   color: #111827;
   padding: 24px;
@@ -952,6 +952,15 @@
 .slideContent {
   height: 100%;
   min-height: 0;
+}
+
+.fullBleedSlide {
+  margin: -24px;
+  height: calc(100% + 48px);
+}
+
+.fullBleedSlide + .slideLabel {
+  display: none;
 }
 
 .lessonSlide h4 {

@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import {
   loadBuilderDocument,
   saveClassNames,
@@ -691,9 +691,25 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
     );
   }
 
-  if (["pdf-page", "cfu", "drawing"].includes(slide.type)) {
+  if (slide.type === "pdf-page") {
+    const aspect = normalizedSlideAspect(
+      data.aspect,
+      Number(data.width) / Math.max(1, Number(data.height) || 1),
+    );
     return (
-      <SlideFrame label={slide.type === "pdf-page" ? "PDF" : label}>
+      <SlideFrame
+        aspect={aspect}
+        contentClassName={styles.fullBleedSlide}
+        label="PDF"
+      >
+        <AssetImage asset={data.image} alt={label} fill />
+      </SlideFrame>
+    );
+  }
+
+  if (["cfu", "drawing"].includes(slide.type)) {
+    return (
+      <SlideFrame label={label}>
         <AssetImage asset={data.image} alt={label} fill />
       </SlideFrame>
     );
@@ -732,15 +748,24 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
 }
 
 function SlideFrame({
+  aspect,
   label,
+  contentClassName,
   children,
 }: {
+  aspect?: number;
   label: string;
+  contentClassName?: string;
   children: React.ReactNode;
 }) {
+  const style = aspect
+    ? ({ "--preview-slide-aspect": String(aspect) } as CSSProperties)
+    : undefined;
   return (
-    <div className={styles.lessonSlide}>
-      <div className={styles.slideContent}>{children}</div>
+    <div className={styles.lessonSlide} style={style}>
+      <div className={`${styles.slideContent} ${contentClassName || ""}`}>
+        {children}
+      </div>
       <span className={styles.slideLabel}>{label}</span>
     </div>
   );
@@ -792,6 +817,11 @@ function stringArray(value: unknown) {
 function timestampValue(value: string) {
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function normalizedSlideAspect(...values: unknown[]) {
+  const value = values.map(Number).find((candidate) => Number.isFinite(candidate) && candidate > 0);
+  return Math.max(0.45, Math.min(2.4, value || 16 / 10));
 }
 
 function errorMessage(error: unknown, fallback: string) {

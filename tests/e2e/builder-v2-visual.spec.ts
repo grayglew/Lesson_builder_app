@@ -206,4 +206,149 @@ test.describe("Builder v2 accepted UI baseline", () => {
     ).toBeVisible();
     await expect(presenter.getByText("No slides exported.")).toBeVisible();
   });
+
+  test("keeps presenter scrolling, toolbar placement, and PDF page proportions", async ({
+    page,
+  }) => {
+    const workspaceUrl = "http://127.0.0.1:3100/__fixture/presenter-workspace";
+    await page.unroute("**/api/builder-sync/latest?kind=workspace");
+    await page.route("**/api/builder-sync/latest?kind=workspace", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          exists: true,
+          kind: "workspace",
+          signedUrl: workspaceUrl,
+          updatedAt: "2026-07-19T04:00:00.000Z",
+        }),
+      });
+    });
+    await page.route(workspaceUrl, async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          schemaVersion: 3,
+          syncKind: "workspace",
+          title: "Presenter parity",
+          className: "Year 9",
+          teachingDate: "2026-07-19",
+          overallLessonLo: "",
+          activeLessonId: "",
+          activeLessonSavedAt: "",
+          lessonUpdatedAt: "2026-07-19T04:00:00.000Z",
+          updatedAt: "2026-07-19T04:00:00.000Z",
+          slides: [
+            {
+              id: "opening",
+              type: "placeholder",
+              title: "Opening",
+              text: "Opening slide",
+            },
+            {
+              id: "portrait-pdf",
+              type: "pdf-page",
+              title: "Portrait PDF",
+              sourceName: "worksheet.pdf",
+              pageNumber: 1,
+              pageCount: 1,
+              width: 1200,
+              height: 1800,
+              aspect: 2 / 3,
+              orientation: "portrait",
+              image: {
+                name: "worksheet-page-1.png",
+                type: "image/png",
+                size: 68,
+                dataUrl:
+                  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0mQAAAAASUVORK5CYII=",
+              },
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/builder-v2?visual=1");
+    await expect(page.getByRole("heading", { name: "2 slides" })).toBeVisible();
+    const builderPdfAspect = await page
+      .locator('aside [style*="--preview-slide-aspect"]')
+      .evaluate((slide) => {
+        const rect = slide.getBoundingClientRect();
+        return rect.width / rect.height;
+      });
+    expect(builderPdfAspect).toBeCloseTo(2 / 3, 2);
+
+    const popupPromise = page.waitForEvent("popup");
+    await page.getByRole("button", { name: "Preview full lesson" }).click();
+    const presenter = await popupPromise;
+    const presenterErrors: string[] = [];
+    presenter.on("pageerror", (error) => presenterErrors.push(error.message));
+
+    const slides = presenter.locator(".lesson-slide");
+    await expect(slides).toHaveCount(2);
+    await expect(slides.nth(0)).toBeVisible();
+    await expect(slides.nth(1)).toBeVisible();
+    await expect(
+      presenter.getByRole("button", { name: "Previous slide" }),
+    ).toHaveCount(0);
+    await expect(
+      presenter.getByRole("button", { name: "Next slide" }),
+    ).toHaveCount(0);
+
+    const layout = await presenter.evaluate(() => {
+      const toolbar = document.querySelector(".presenter-tools");
+      const pdf = document.querySelector(".pdf-page-slide");
+      if (!toolbar || !pdf) throw new Error("Presenter parity fixture did not render.");
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const pdfRect = pdf.getBoundingClientRect();
+      return {
+        toolbarTop: toolbarRect.top,
+        pdfAspect: pdfRect.width / pdfRect.height,
+        pdfHeight: pdfRect.height,
+        viewportHeight: window.innerHeight,
+        scrollHeight: document.scrollingElement?.scrollHeight || 0,
+      };
+    });
+
+    expect(layout.toolbarTop).toBeLessThan(16);
+    expect(layout.pdfAspect).toBeCloseTo(2 / 3, 2);
+    expect(layout.pdfHeight).toBeGreaterThan(layout.viewportHeight);
+    expect(layout.scrollHeight).toBeGreaterThan(layout.viewportHeight);
+
+    await presenter.locator(".pdf-page-slide").scrollIntoViewIfNeeded();
+    await expect(presenter).toHaveScreenshot("builder-v2-presenter-pdf.png", {
+      animations: "disabled",
+    });
+
+    const scrollAfterDrag = await presenter.evaluate(() => {
+      const slide = document.querySelector(".lesson-slide");
+      const scrollingElement = document.scrollingElement;
+      if (!slide || !scrollingElement) return 0;
+      scrollingElement.scrollTop = 0;
+      const dispatch = (
+        target: EventTarget,
+        type: string,
+        clientY: number,
+      ) => {
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 42,
+            pointerType: "touch",
+            button: type === "pointermove" ? -1 : 0,
+            clientX: 400,
+            clientY,
+          }),
+        );
+      };
+      dispatch(slide, "pointerdown", 700);
+      dispatch(document, "pointermove", 250);
+      dispatch(document, "pointerup", 250);
+      return scrollingElement.scrollTop;
+    });
+    expect(scrollAfterDrag).toBeGreaterThan(100);
+    expect(presenterErrors).toEqual([]);
+  });
 });

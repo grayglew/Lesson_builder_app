@@ -55,6 +55,9 @@ export function BuilderImageInput({
       <span className={styles.assetLabel}>{label}</span>
       <label
         className={`${styles.imageDrop} ${sizeClass}`}
+        onMouseEnter={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+        }}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
@@ -80,7 +83,7 @@ export function BuilderImageInput({
           <span className={styles.imageDropMessage}>
             <ImagePlus aria-hidden />
             <strong>Paste or drop image</strong>
-            <small>Click here, then paste or choose an image.</small>
+            <small>Hover here and paste, or click to choose an image.</small>
           </span>
         )}
         <input

@@ -163,6 +163,7 @@ try {
     const afterHighlighter = controller.getAnnotations();
     const highlighterStroke = afterHighlighter["0"]?.[2];
 
+    document.body.classList.add("focus-mode");
     deck.scrollTop = 100;
     dispatch(slide, "pointerdown", {
       pointerId: 5,
@@ -183,6 +184,41 @@ try {
       clientY: 80,
     });
 
+    let pinchScale = 0;
+    document.addEventListener("lessonpresenterpinch", (event) => {
+      pinchScale = Number(event.detail && event.detail.scale) || 0;
+    });
+    dispatch(slide, "pointerdown", {
+      pointerId: 6,
+      pointerType: "touch",
+      clientX: 140,
+      clientY: 180,
+    });
+    dispatch(slide, "pointerdown", {
+      pointerId: 7,
+      pointerType: "touch",
+      clientX: 240,
+      clientY: 180,
+    });
+    dispatch(document, "pointermove", {
+      pointerId: 7,
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 180,
+    });
+    dispatch(document, "pointerup", {
+      pointerId: 7,
+      pointerType: "touch",
+      clientX: 300,
+      clientY: 180,
+    });
+    dispatch(document, "pointerup", {
+      pointerId: 6,
+      pointerType: "touch",
+      clientX: 140,
+      clientY: 180,
+    });
+
     return {
       version: controller.version,
       mousePanStrokeCount,
@@ -193,6 +229,7 @@ try {
       highlighterWidth: highlighterStroke?.width,
       penWidth: penStroke?.width,
       touchScrollTop: deck.scrollTop,
+      pinchScale,
       svgPathCount: slide.querySelectorAll(".annotation-svg path").length,
       undoWorked: controller.undo(),
       strokeCountAfterUndo:
@@ -211,6 +248,7 @@ try {
     "Highlighter strokes must be thicker than pen strokes.",
   );
   assert(result.touchScrollTop > 100, "One-finger touch must pan the lesson deck.");
+  assert(result.pinchScale > 1, "Pinch input must request presenter zoom.");
   assert(result.svgPathCount === 3, "All live strokes must render as SVG paths.");
   assert(result.undoWorked, "Undo must report a completed action.");
   assert(result.strokeCountAfterUndo === 2, "Undo must remove the latest stroke.");

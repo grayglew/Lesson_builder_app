@@ -32,13 +32,53 @@ describe("standalone lesson export", () => {
     });
   });
 
-  it("includes presenter navigation, answer reveals, and printable slides", () => {
+  it("keeps the production scroll presenter toolbar and printable slides", () => {
     const html = buildStandaloneLessonHtml(lessonDocument());
 
-    expect(html).toContain('id="presenter-next"');
+    expect(html).not.toContain('id="presenter-next"');
+    expect(html).not.toContain('id="presenter-prev"');
+    expect(html).toContain('id="presenter-pan"');
+    expect(html).toContain('id="presenter-blank-slide"');
+    expect(html).toContain('id="presenter-camera"');
+    expect(html).toContain('id="presenter-zoom"');
+    expect(html).toContain('data-presenter-color');
+    expect(html).toContain('id="presenter-download"');
+    expect(html).toContain('id="presenter-pdf"');
     expect(html).toContain('data-qa-toggle="replace"');
     expect(html).toContain("requestFullscreen");
+    expect(html).toContain("overflow:auto");
     expect(html).toContain("@media print");
+  });
+
+  it("preserves a PDF page aspect ratio so portrait pages can scroll", () => {
+    const document = lessonDocument();
+    document.slides = [
+      {
+        id: "pdf-page",
+        type: "pdf-page",
+        title: "Worksheet page 1",
+        width: 1200,
+        height: 1800,
+        aspect: 2 / 3,
+        orientation: "portrait",
+        image: {
+          name: "worksheet-page-1.png",
+          type: "image/png",
+          size: 10,
+          dataUrl: "data:image/png;base64,cGRm",
+        },
+      },
+    ];
+
+    const html = buildStandaloneLessonHtml(document);
+
+    expect(html).toContain(
+      'class="lesson-slide pdf-page-slide portrait"',
+    );
+    expect(html).toContain('data-slide-aspect="0.6666666666666666"');
+    expect(html).toContain(
+      ".lesson-slide.pdf-page-slide{max-height:none",
+    );
   });
 
   it("preserves current global data when importing a lesson-only payload", () => {
