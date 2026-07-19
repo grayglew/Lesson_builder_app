@@ -22,12 +22,14 @@ import { RetrievalComposer } from "./RetrievalComposer";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
+import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
 import { type BuilderSlide } from "./schema";
 import {
   selectDocument,
   useBuilderStore,
 } from "./store";
 import { useLessonExportActions } from "./useLessonExportActions";
+import { useWorkspaceAutosave } from "./useWorkspaceAutosave";
 import { renderLatexDocument } from "./latex";
 
 type BuilderShellProps = {
@@ -96,6 +98,7 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
   const [busyAction, setBusyAction] = useState("");
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
   const lessonActions = useLessonExportActions();
+  const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,19 +153,6 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
       cancelled = true;
     };
   }, [hydrate, setStatus]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    const timer = window.setTimeout(() => {
-      void saveV2CachedDocument(document).catch(() => {
-        setStatus({
-          tone: "warning",
-          message: "The browser recovery cache is unavailable. Save before leaving.",
-        });
-      });
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [document, hydrated, setStatus]);
 
   async function saveLesson(copy: boolean) {
     if (!document.className.trim()) {
@@ -329,6 +319,7 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
               New lesson
             </button>
           </div>
+          <WorkspaceAutosaveIndicator {...workspaceAutosave} />
 
           <nav className={styles.panelNav} aria-label="Slide tools">
             {tools.map((tool) => (

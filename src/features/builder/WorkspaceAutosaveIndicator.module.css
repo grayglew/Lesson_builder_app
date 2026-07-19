@@ -1,0 +1,45 @@
+.indicator {
+  display: flex;
+  min-height: 18px;
+  align-items: center;
+  gap: 6px;
+  margin: -12px 1px -8px;
+  color: var(--builder-muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.indicator svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.saving svg {
+  animation: workspace-sync-spin 0.9s linear infinite;
+}
+
+.saved {
+  color: var(--builder-accent-dark);
+}
+
+.error,
+.conflict {
+  color: var(--builder-danger);
+}
+
+.retry {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  text-decoration: underline;
+}
+
+@keyframes workspace-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

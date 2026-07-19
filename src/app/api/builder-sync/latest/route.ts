@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getAuthorizedBuilderSyncClient } from "@/lib/builder-sync/auth";
 import {
   builderSyncDocumentFolder,
+  builderSyncSnapshotRevision,
   latestBuilderSyncSnapshot,
   normalizeBuilderSyncKind,
   storageSnapshotByteSize,
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       exists: true,
       kind,
+      revision: builderSyncSnapshotRevision(auth.user.id, kind, snapshot.name),
       signedUrl: signed.signedUrl,
       updatedAt: storageSnapshotTimestamp(snapshot),
       byteSize: storageSnapshotByteSize(snapshot),
@@ -82,6 +84,7 @@ export async function GET(request: NextRequest) {
     exists: true,
     kind,
     legacy: true,
+    revision: `legacy:${data.bucket}:${data.storage_path}:${data.updated_at}`,
     signedUrl: signed.signedUrl,
     updatedAt: data.updated_at,
     byteSize: data.byte_size,

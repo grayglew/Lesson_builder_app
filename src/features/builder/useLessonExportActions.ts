@@ -13,6 +13,7 @@ import {
   normalizeImportedBuilderDocument,
   parseStandaloneLessonHtml,
 } from "./lesson-export";
+import { buildA4Handout } from "./handout-export";
 
 export function useLessonExportActions() {
   const document = useBuilderStore((state) => state.document);
@@ -57,22 +58,34 @@ export function useLessonExportActions() {
           viewerUrl: createdSession.viewerUrl,
           expiresAt: createdSession.expiresAt,
         };
+      } else {
+        setStatus({
+          tone: "working",
+          message: "Preparing the production A4 handout...",
+        });
       }
-      const html = await prepareStandaloneHtml(
-        handout,
-        presenterLessonId,
-        studentSession,
-      );
+      const output = handout
+        ? await prepareA4Handout()
+        : {
+            html: await prepareStandaloneHtml(
+              false,
+              presenterLessonId,
+              studentSession,
+            ),
+            warnings: [] as string[],
+          };
       const previewUrl = URL.createObjectURL(
-        new Blob([html], { type: "text/html" }),
+        new Blob([output.html], { type: "text/html" }),
       );
       previewWindow.location.replace(previewUrl);
       window.setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
       previewWindow.focus();
       setStatus({
-        tone: "success",
+        tone: output.warnings.length ? "warning" : "success",
         message: handout
-          ? "Opened the lesson handout."
+          ? output.warnings.length
+            ? `Opened the lesson handout. ${output.warnings.join(" ")}`
+            : "Opened the lesson handout."
           : "Opened the full lesson preview.",
       });
     } catch (error) {
@@ -249,6 +262,10 @@ export function useLessonExportActions() {
           }
         : null,
     });
+  }
+
+  async function prepareA4Handout() {
+    return buildA4Handout(await embedRemoteBuilderAssets(document));
   }
 
   return {

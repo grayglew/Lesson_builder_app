@@ -17,6 +17,7 @@ const syncLatestSchema = z.object({
   kind: z.string().optional(),
   signedUrl: z.string().url().optional(),
   updatedAt: z.string().optional(),
+  revision: z.string().optional(),
   legacy: z.boolean().optional(),
 });
 
@@ -26,6 +27,13 @@ const uploadTicketSchema = z.object({
   path: z.string(),
   signedUrl: z.string().url(),
   token: z.string().optional(),
+});
+
+const syncCompleteSchema = z.object({
+  ok: z.literal(true),
+  kind: z.string(),
+  updatedAt: z.string(),
+  revision: z.string(),
 });
 
 const globalBootstrapSchema = z.object({
@@ -99,6 +107,35 @@ export class BuilderApiError extends Error {
   }
 }
 
+export type WorkspaceSyncResult = z.infer<typeof syncCompleteSchema>;
+
+type WorkspaceSyncListener = (result: WorkspaceSyncResult) => void;
+
+const workspaceSyncListeners = new Set<WorkspaceSyncListener>();
+let workspaceSyncQueue: Promise<void> = Promise.resolve();
+
+export function subscribeWorkspaceSync(listener: WorkspaceSyncListener) {
+  workspaceSyncListeners.add(listener);
+  return () => {
+    workspaceSyncListeners.delete(listener);
+  };
+}
+
+export async function getWorkspaceSyncHead() {
+  const latest = await getJson(
+    "/api/builder-sync/latest?kind=workspace",
+    syncLatestSchema,
+  );
+  return {
+    exists: latest.exists,
+    revision: latest.exists
+      ? latest.revision ||
+        `legacy:${latest.kind || "workspace"}:${latest.updatedAt || ""}`
+      : "",
+    updatedAt: latest.updatedAt || "",
+  };
+}
+
 export async function loadBuilderDocument(): Promise<BuilderDocument | null> {
   const [workspace, global] = await Promise.all([
     loadWorkspaceDocument(),
@@ -108,7 +145,24 @@ export async function loadBuilderDocument(): Promise<BuilderDocument | null> {
   return mergeWorkspaceAndGlobal(workspace ?? {}, global?.state ?? {});
 }
 
-export async function syncBuilderDocument(document: BuilderDocument) {
+export function syncBuilderDocument(
+  document: BuilderDocument,
+  options: { expectedRevision?: string } = {},
+) {
+  const operation = workspaceSyncQueue
+    .catch(() => undefined)
+    .then(() => performWorkspaceSync(document, options));
+  workspaceSyncQueue = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return operation;
+}
+
+async function performWorkspaceSync(
+  document: BuilderDocument,
+  options: { expectedRevision?: string },
+) {
   const workspace = toWorkspaceDocument(document);
   const json = JSON.stringify(workspace);
   const blob = new Blob([json], { type: "application/json" });
@@ -133,16 +187,21 @@ export async function syncBuilderDocument(document: BuilderDocument) {
     );
   }
 
-  await postJson(
+  const completed = await postJson(
     "/api/builder-sync/complete",
     {
       kind: "workspace",
       path: ticket.path,
       byteSize: blob.size,
       updatedAt: workspace.updatedAt,
+      ...(options.expectedRevision === undefined
+        ? {}
+        : { expectedRevision: options.expectedRevision }),
     },
-    z.object({ ok: z.literal(true) }).passthrough(),
+    syncCompleteSchema,
   );
+  workspaceSyncListeners.forEach((listener) => listener(completed));
+  return completed;
 }
 
 export async function createPresenterStudentSession(lessonId: string) {

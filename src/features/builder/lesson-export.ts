@@ -205,6 +205,7 @@ function renderStandaloneSlide(
 
   if (slide.type === "starter") {
     const slots = arrayOfRecords(data.slots).slice(0, 4);
+    const reveals = presentationReveals(data);
     return `<section ${attrs}>
       <div class="starter-grid">${Array.from(
         { length: 4 },
@@ -220,6 +221,7 @@ function renderStandaloneSlide(
                 `Question ${slotIndex + 1}`,
                 "replace",
                 `starter-answer-${slotIndex}`,
+                reveals[`starter-answer-${slotIndex}`] === true,
               )}
             </div>
             ${liveRetrievalControl(slot, slotIndex, index, liveRetrieval)}
@@ -230,6 +232,7 @@ function renderStandaloneSlide(
   }
 
   if (slide.type === "example") {
+    const reveals = presentationReveals(data);
     const pairs = [
       [data.image1, data.answerImage1, "Example 1"],
       [data.image2, data.answerImage2, "Example 2"],
@@ -239,15 +242,15 @@ function renderStandaloneSlide(
         <span class="lo-bar-text">${escapeHtml(String(data.lo || ""))}</span>
         ${
           pairs.length > 1
-            ? '<button class="example-reveal-button" data-example-reveal type="button" aria-expanded="false">Show second image</button>'
+            ? `<button class="example-reveal-button" data-example-reveal type="button" aria-expanded="${reveals["example-second-image"] === true ? "true" : "false"}">${reveals["example-second-image"] === true ? "Hide second image" : "Show second image"}</button>`
             : ""
         }
       </div>
       <div class="example-grid">${pairs
         .map(
           ([question, answer, label], pairIndex) =>
-            `<article class="example-block${pairIndex === 1 ? " example-second example-reveal-region is-hidden" : ""}"${pairIndex === 1 ? ' data-example-reveal-region aria-hidden="true"' : ""}>
-              ${toggleableImage(question, answer, String(label), "append")}
+            `<article class="example-block${pairIndex === 1 ? ` example-second example-reveal-region${reveals["example-second-image"] === true ? "" : " is-hidden"}` : ""}"${pairIndex === 1 ? ` data-example-reveal-region data-reveal-key="example-second-image" aria-hidden="${reveals["example-second-image"] === true ? "false" : "true"}"` : ""}>
+              ${toggleableImage(question, answer, String(label), "append", `example-answer-${pairIndex}`, reveals[`example-answer-${pairIndex}`] === true)}
             </article>`,
         )
         .join("")}</div>
@@ -278,11 +281,12 @@ function renderStandaloneSlide(
   }
 
   if (slide.type === "revision") {
+    const reveals = presentationReveals(data);
     const items = arrayOfRecords(data.items).slice(0, 2);
     return `<section ${attrs}><div class="revision-grid">${items
       .map(
         (item, itemIndex) => `<article>
-          ${toggleableImage(item.image, item.answerImage, `Revision ${itemIndex + 1}`)}
+          ${toggleableImage(item.image, item.answerImage, `Revision ${itemIndex + 1}`, "replace", `revision-answer-${itemIndex}`, reveals[`revision-answer-${itemIndex}`] === true)}
         </article>`,
       )
       .join("")}</div></section>`;
@@ -311,14 +315,26 @@ function toggleableImage(
   label: string,
   mode = "replace",
   revealKey = "",
+  initiallyShown = false,
 ) {
   const questionHtml = assetImage(question, label, "slide-image-fit");
   if (!assetSource(answer)) return questionHtml;
-  return `<button class="qa-toggle qa-toggle-${mode}" type="button" data-qa-toggle="${mode}" data-reveal-key="${escapeAttr(revealKey)}" aria-pressed="false">
-    <span class="qa-toggle-label" data-qa-toggle-label>Question</span>
+  return `<button class="qa-toggle qa-toggle-${mode}${initiallyShown ? " is-showing-answer" : ""}" type="button" data-qa-toggle="${mode}" data-reveal-key="${escapeAttr(revealKey)}" aria-pressed="${initiallyShown ? "true" : "false"}">
+    <span class="qa-toggle-label" data-qa-toggle-label>${initiallyShown ? "Answer" : "Question"}</span>
     <span class="qa-image-layer qa-question-layer">${questionHtml}</span>
     <span class="qa-image-layer qa-answer-layer">${assetImage(answer, `${label} answer`, "slide-image-fit")}</span>
   </button>`;
+}
+
+function presentationReveals(
+  slide: Record<string, unknown>,
+): Record<string, boolean> {
+  const state = asRecord(slide.presentationState);
+  if (Number(state.version) !== 1) return {};
+  const reveals = asRecord(state.reveals);
+  return Object.fromEntries(
+    Object.entries(reveals).map(([key, value]) => [key, value === true]),
+  );
 }
 
 function liveRetrievalControl(

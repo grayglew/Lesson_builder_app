@@ -57,16 +57,15 @@ behaviour. Items marked **missing** have no equivalent implementation.
   global builder data and active saved lessons. The replacement is audited,
   uncached, access-controlled and size-limited.
 
-- [ ] **Import/export functional audit — PDF fixed and live-validated; remaining
-  round trips pending.** The 2026-07-19 PDF `500` was first traced to duplicated
+- [x] **Import/export functional audit — completed.** The 2026-07-19 PDF `500`
+  was first traced to duplicated
   data-URL state and then, in the deployed 15-slide lesson, to Chromium decoding
   the complete image-heavy deck in one renderer target. The export now strips
   runtime/state duplication, renders one isolated slide at a time, closes each
   renderer target immediately, and merges the full-page results. The exact
   15-slide Preview lesson completed successfully on 2026-07-19, with automated
-  15-page, mixed-slide, and portrait-PDF coverage also passing. Manually inspect
-  the downloaded PDF and verify Export HTML, Export JSON, Import HTML, and Import
-  JSON round trips before checking off this item.
+  15-page, mixed-slide, and portrait-PDF coverage also passing. Manual testing
+  confirmed the PDF output and HTML/JSON export/import round trips.
 
 - [x] **Per-entry image drawing — completed.** Restored the production-style
   Draw image editor on every question/answer image box in Starter, Example,
@@ -74,32 +73,30 @@ behaviour. Items marked **missing** have no equivalent implementation.
   done/cancel/Escape and 2048×1536 PNG output written back to the selected
   image slot.
 
-- [ ] **Production A4 handout generator — missing.** V2 currently prints a
-  generic two-column grid of lesson slides. Production validates the selected
-  content and builds purpose-designed A4 pages: glue/starter page, example
-  question/answer page, retrieval grids, rotated full-page PDFs, worksheet
-  pages, and half-page template/placeholder/LaTeX layouts.
+- [x] **Production A4 handout generator — completed.** V2 now applies the
+  production selection rules and builds purpose-designed A4 pages for the
+  glue/starter cover, example questions and answers, retrieval grids,
+  rotated/full-page PDFs, worksheet pages, and paired
+  template/placeholder/drawing/blank/LaTeX content. Unsupported content is
+  reported as a visible warning.
 
-- [ ] **Saved-lesson action parity — partial.** Add direct `Present`,
-  `Download`, `PPT bundle`, `Confidence`, and `Class` actions to each saved
-  lesson. V2 currently supports Open, Rename, Mark taught/planned and Delete.
-  Also restore the confidence histogram and production sorting/dirty indicator.
+- [x] **Saved-lesson action parity — completed.** Each saved lesson now provides
+  direct `Present`, `Download`, `PPT bundle`, `Confidence`, and `Class` actions
+  alongside the existing lifecycle controls. Confidence histograms,
+  production planned/date/title sorting, and the 500 ms dirty indicator are
+  restored.
 
-- [ ] **PowerPoint/static bundle export — missing.** Restore the downloadable
-  ZIP containing a static `.pptx`, `.pdf`, worksheet files, and README.
-  Preserve saved reveal state, and generate both question and answer variants
-  for slides without a saved presentation state.
+- [x] **PowerPoint/static bundle export — completed.** Saved lessons can
+  download a ZIP containing an image-based `.pptx`, matching `.pdf`, worksheet
+  and answer files, and a README. Saved reveal state is preserved; slides
+  without saved state receive question-hidden and answer-shown variants where
+  applicable.
 
-- [x] **Student presenter sharing — completed.** Hosted presenters create a
-  student session, display the student code badge and Upload button, publish a
-  stripped read-only snapshot, and retain the existing `/student` code-opening
-  flow.
-
-- [ ] **Cloud workspace autosave parity — partial.** Production debounces
-  lesson changes to both IndexedDB and Supabase. V2 currently writes the local
-  recovery cache automatically but syncs the workspace to Supabase on named
-  save/export flows. Add debounced, conflict-aware workspace sync and a visible
-  saved/dirty state.
+- [x] **Cloud workspace autosave parity — completed.** V2 now debounces local
+  recovery and serialized Supabase workspace writes, exposes
+  dirty/saving/saved/error/conflict states, ignores stale completions, and uses
+  opaque snapshot revisions to reject conflicting cloud writes without
+  overwriting either browser's recovery copy.
 
 ### P1 — important workflow and rendering parity
 
@@ -109,11 +106,10 @@ behaviour. Items marked **missing** have no equivalent implementation.
 - [ ] **Legacy retrieval import — missing.** Restore `.xlsx` tracker import,
   image-folder selection, preview/validation, ID migration, and database update.
 
-- [ ] **Saved-lesson direct presenter lifecycle — partial.** The main Present
-  button now creates a live hosted presenter, but the saved-library row still
-  needs the production direct-present flow that downloads the selected saved
-  version and hydrates live starter images without first replacing the current
-  workspace.
+- [x] **Saved-lesson direct presenter lifecycle — completed.** The saved-library
+  row downloads the selected saved version and opens its hosted presenter
+  directly without replacing the current builder workspace. Student-session
+  startup is non-blocking while that separate P2 issue remains deprioritized.
 
 - [ ] **Presenter print/PDF view — partial.** V2 calls the browser print dialog
   on the live document. Production builds a clean dedicated print document,
@@ -139,6 +135,12 @@ behaviour. Items marked **missing** have no equivalent implementation.
   impersonation session is active.
 
 ### P2 — polish and secondary parity
+
+- [ ] **Student presenter sharing — incomplete and deprioritized.** V2 creates
+  a student session, shows the code and Upload control, and attempts to publish
+  a stripped read-only snapshot, but the end-to-end student view failed manual
+  testing on 2026-07-19. Diagnose the publish/open flow later; this is no longer
+  a blocker for the current P0 implementation sequence.
 
 - [ ] **Saved-lesson filter controls — partial.** Add a one-click Clear filters
   action and match production’s planned-first, teaching-date, then title sort.

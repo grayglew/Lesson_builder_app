@@ -2,26 +2,46 @@
 
 import {
   Archive,
+  BarChart3,
   CheckCircle2,
   Copy,
+  Download,
   FolderOpen,
   LoaderCircle,
+  Package,
   Pencil,
+  Presentation,
   RefreshCw,
   Save,
+  School,
   Trash2,
   Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   deleteSavedLesson,
+  createPresenterStudentSession,
   listSavedLessons,
-  openSavedLesson as downloadSavedLesson,
+  openSavedLesson as fetchSavedLesson,
   saveCurrentLesson,
   type SavedLessonSummary,
   setSavedLessonTaught,
   updateSavedLessonMetadata,
 } from "./api-client";
+import { ConfidenceModal } from "./ConfidenceModal";
+import {
+  buildPowerPointBundleZip,
+  downloadBlob,
+  prepareSavedLessonHtml,
+  safeFileName,
+} from "./saved-lesson-export";
+import {
+  isLessonDirty,
+  sortSavedLessons,
+  usableConfidenceSummary,
+  type ConfidenceSummary,
+  type SavedLessonWithConfidence,
+} from "./saved-lesson-parity";
 import { selectDocument, useBuilderStore } from "./store";
 
 export function SavedLessonLibrary({
@@ -47,6 +67,10 @@ export function SavedLessonLibrary({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [taughtFilter, setTaughtFilter] = useState<"all" | "planned" | "taught">("all");
+  const [confidenceLesson, setConfidenceLesson] = useState<{
+    title: string;
+    summary: ConfidenceSummary;
+  } | null>(null);
 
   const refresh = useCallback(async (announce = false) => {
     setLoading(true);
@@ -97,7 +121,7 @@ export function SavedLessonLibrary({
 
   const filteredLessons = useMemo(() => {
     const query = titleFilter.trim().toLowerCase();
-    return lessons.filter((lesson) => {
+    return sortSavedLessons(lessons.filter((lesson) => {
       if (query && !lesson.title.toLowerCase().includes(query)) return false;
       if (classFilter && lesson.className !== classFilter) return false;
       if (dateFrom && lesson.teachingDate < dateFrom) return false;
@@ -105,7 +129,7 @@ export function SavedLessonLibrary({
       if (taughtFilter === "planned" && lesson.isTaught) return false;
       if (taughtFilter === "taught" && !lesson.isTaught) return false;
       return true;
-    });
+    }));
   }, [classFilter, dateFrom, dateTo, lessons, taughtFilter, titleFilter]);
 
   async function saveLesson(copy: boolean) {
@@ -141,7 +165,7 @@ export function SavedLessonLibrary({
 
   async function openLessonById(lesson: SavedLessonSummary) {
     if (
-      hasLocalLessonContent(document) &&
+      isLessonDirty(document) &&
       !window.confirm(
         `Open "${lesson.title}"? Unsaved changes in the current v2 workspace will be replaced.`,
       )
@@ -151,7 +175,7 @@ export function SavedLessonLibrary({
     setBusyId(lesson.id);
     setStatus({ tone: "working", message: `Opening "${lesson.title}"…` });
     try {
-      const opened = await downloadSavedLesson(lesson.id);
+      const opened = await fetchSavedLesson(lesson.id);
       openLesson(opened.document, opened.lesson);
       onBack();
     } catch (error) {
@@ -162,6 +186,110 @@ export function SavedLessonLibrary({
     } finally {
       setBusyId("");
     }
+  }
+
+  async function presentLesson(lesson: SavedLessonSummary) {
+    const previewWindow = window.open("", "_blank");
+    if (!previewWindow) {
+      setStatus({
+        tone: "error",
+        message: "Allow pop-ups for Lesson Builder to open the presenter.",
+      });
+      return;
+    }
+    previewWindow.document.write(
+      "<!doctype html><title>Preparing lesson</title><p>Preparing lesson...</p>",
+    );
+    await mutateLesson(lesson.id, async () => {
+      let session = null;
+      let sessionWarning = "";
+      const opened = await fetchSavedLesson(lesson.id);
+      try {
+        const created = await createPresenterStudentSession(lesson.id);
+        session = {
+          sessionId: created.sessionId,
+          code: created.code,
+          viewerUrl: created.viewerUrl,
+          expiresAt: created.expiresAt,
+        };
+      } catch {
+        sessionWarning =
+          " Student sharing could not be started, but the presenter is ready.";
+      }
+      const html = await prepareSavedLessonHtml(opened.document, {
+        lessonId: lesson.id,
+        studentSession: session,
+      });
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      previewWindow.location.replace(url);
+      previewWindow.focus();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setStatus({
+        tone: sessionWarning ? "warning" : "success",
+        message: `Opened "${lesson.title}" in the presenter.${sessionWarning}`,
+      });
+    }, () => previewWindow.close());
+  }
+
+  async function downloadLesson(lesson: SavedLessonSummary) {
+    await mutateLesson(lesson.id, async () => {
+      setStatus({
+        tone: "working",
+        message: `Preparing "${lesson.title}" for download…`,
+      });
+      const opened = await fetchSavedLesson(lesson.id);
+      const html = await prepareSavedLessonHtml(opened.document);
+      downloadBlob(
+        new Blob([html], { type: "text/html" }),
+        `${safeFileName(lesson.title)}.html`,
+      );
+      setStatus({
+        tone: "success",
+        message: `Downloaded "${lesson.title}".`,
+      });
+    });
+  }
+
+  async function downloadPowerPointBundle(lesson: SavedLessonSummary) {
+    await mutateLesson(lesson.id, async () => {
+      setStatus({
+        tone: "working",
+        message: `Building the static PowerPoint bundle for "${lesson.title}"…`,
+      });
+      const opened = await fetchSavedLesson(lesson.id);
+      const bundle = await buildPowerPointBundleZip(opened.document);
+      downloadBlob(bundle, `${safeFileName(lesson.title)}-bundle.zip`);
+      setStatus({
+        tone: "success",
+        message: `Downloaded the PowerPoint bundle for "${lesson.title}".`,
+      });
+    });
+  }
+
+  async function changeClass(lesson: SavedLessonSummary) {
+    const entered = window.prompt("Class", lesson.className);
+    if (entered === null) return;
+    const className = entered.trim();
+    if (!className) {
+      setStatus({ tone: "error", message: "Enter a class before updating." });
+      return;
+    }
+    await mutateLesson(lesson.id, async () => {
+      const updated = await updateSavedLessonMetadata({
+        id: lesson.id,
+        title: lesson.title,
+        className,
+        teachingDate: lesson.teachingDate,
+      });
+      setLessons((current) =>
+        current.map((entry) => (entry.id === updated.id ? updated : entry)),
+      );
+      updateActiveLessonMetadata(updated);
+      setStatus({
+        tone: "success",
+        message: `Moved "${updated.title}" to ${updated.className}.`,
+      });
+    });
   }
 
   async function renameLesson(lesson: SavedLessonSummary) {
@@ -220,11 +348,16 @@ export function SavedLessonLibrary({
     });
   }
 
-  async function mutateLesson(id: string, mutation: () => Promise<void>) {
+  async function mutateLesson(
+    id: string,
+    mutation: () => Promise<void>,
+    onError?: () => void,
+  ) {
     setBusyId(id);
     try {
       await mutation();
     } catch (error) {
+      onError?.();
       setStatus({
         tone: "error",
         message: errorMessage(error, "Could not update the saved lesson."),
@@ -235,6 +368,7 @@ export function SavedLessonLibrary({
   }
 
   return (
+    <>
     <section className={embedded ? "" : "mx-auto max-w-[1500px] p-4"}>
       <div className={embedded ? "" : "rounded-xl border border-slate-200 bg-white shadow-sm"}>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-5">
@@ -328,8 +462,11 @@ export function SavedLessonLibrary({
                 {filteredLessons.map((lesson) => (
                   <tr key={lesson.id} className={lesson.id === document.activeLessonId ? "bg-teal-50/70" : "bg-white"}>
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-slate-900">{lesson.title}</p>
-                      {lesson.id === document.activeLessonId ? <p className="mt-1 text-xs font-semibold text-teal-700">Currently open</p> : null}
+                      <p className="font-semibold text-slate-900">
+                        {lesson.title}
+                        {lesson.id === document.activeLessonId && isLessonDirty(document) ? " *" : ""}
+                      </p>
+                      {lesson.id === document.activeLessonId ? <p className="mt-1 text-xs font-semibold text-teal-700">Currently open{isLessonDirty(document) ? " · unsaved changes" : ""}</p> : null}
                     </td>
                     <td className="px-4 py-4 text-slate-600">{lesson.className || "—"}</td>
                     <td className="px-4 py-4 text-slate-600">{lesson.teachingDate || "—"}</td>
@@ -342,8 +479,23 @@ export function SavedLessonLibrary({
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
                         <IconAction label="Open lesson" disabled={Boolean(busyId)} onClick={() => void openLessonById(lesson)} icon={busyId === lesson.id ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />} />
-                        <IconAction label="Rename lesson" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)} icon={<Pencil className="size-4" />} />
+                        <IconAction label="Present lesson" disabled={Boolean(busyId)} onClick={() => void presentLesson(lesson)} icon={<Presentation className="size-4" />} />
+                        <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
+                        <IconAction label="Download PowerPoint bundle" disabled={Boolean(busyId)} onClick={() => void downloadPowerPointBundle(lesson)} icon={<Package className="size-4" />} />
                         <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
+                        {usableConfidenceSummary(lesson as SavedLessonWithConfidence) ? (
+                          <IconAction
+                            label="View confidence"
+                            disabled={Boolean(busyId)}
+                            onClick={() => {
+                              const summary = usableConfidenceSummary(lesson as SavedLessonWithConfidence);
+                              if (summary) setConfidenceLesson({ title: lesson.title, summary });
+                            }}
+                            icon={<BarChart3 className="size-4" />}
+                          />
+                        ) : null}
+                        <IconAction label="Change class" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)} icon={<School className="size-4" />} />
+                        <IconAction label="Rename lesson" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)} icon={<Pencil className="size-4" />} />
                         <IconAction label="Delete lesson" danger disabled={Boolean(busyId)} onClick={() => void removeLesson(lesson)} icon={<Trash2 className="size-4" />} />
                       </div>
                     </td>
@@ -363,6 +515,14 @@ export function SavedLessonLibrary({
         )}
       </div>
     </section>
+    {confidenceLesson ? (
+      <ConfidenceModal
+        lessonTitle={confidenceLesson.title}
+        summary={confidenceLesson.summary}
+        onClose={() => setConfidenceLesson(null)}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -416,14 +576,6 @@ function IconAction({
 
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
-
-function hasLocalLessonContent(document: ReturnType<typeof selectDocument>) {
-  return Boolean(
-    document.slides.length ||
-      document.className ||
-      (document.title && document.title !== "Untitled lesson"),
-  );
-}
 
 function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;
