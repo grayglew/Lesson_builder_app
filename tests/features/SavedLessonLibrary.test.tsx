@@ -67,6 +67,11 @@ describe("SavedLessonLibrary production actions", () => {
     expect(within(rows[2]).getByText("Active lesson *")).toBeInTheDocument();
     expect(rows[2]).toHaveTextContent("unsaved changes");
     expect(within(rows[3]).getByText("Already taught")).toBeInTheDocument();
+    expect(rows[1]).toHaveStyle({
+      backgroundColor: "#dcfce7",
+      boxShadow: "inset 4px 0 0 #22c55e",
+    });
+    expect(rows[3]).toHaveClass("bg-slate-100", "opacity-70", "grayscale");
 
     const activeRow = rows[2];
     expect(

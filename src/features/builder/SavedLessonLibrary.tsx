@@ -17,7 +17,13 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   deleteSavedLesson,
   createPresenterStudentSession,
@@ -36,6 +42,7 @@ import {
   safeFileName,
 } from "./saved-lesson-export";
 import {
+  confidenceAverageColors,
   isLessonDirty,
   sortSavedLessons,
   usableConfidenceSummary,
@@ -459,8 +466,29 @@ export function SavedLessonLibrary({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {filteredLessons.map((lesson) => (
-                  <tr key={lesson.id} className={lesson.id === document.activeLessonId ? "bg-teal-50/70" : "bg-white"}>
+                {filteredLessons.map((lesson) => {
+                  const active = lesson.id === document.activeLessonId;
+                  const confidence = usableConfidenceSummary(
+                    lesson as SavedLessonWithConfidence,
+                  );
+                  const confidenceColors = confidence
+                    ? confidenceAverageColors(confidence.average || 3)
+                    : null;
+                  const rowStyle: CSSProperties | undefined = confidenceColors
+                    ? {
+                        backgroundColor: confidenceColors.background,
+                        boxShadow: `inset 4px 0 0 ${confidenceColors.border}`,
+                      }
+                    : undefined;
+                  const rowClassName = confidenceColors
+                    ? ""
+                    : lesson.isTaught
+                      ? "bg-slate-100 opacity-70 grayscale"
+                      : active
+                        ? "bg-teal-50/70"
+                        : "bg-white";
+                  return (
+                  <tr key={lesson.id} className={rowClassName} style={rowStyle}>
                     <td className="px-5 py-4">
                       <p className="font-semibold text-slate-900">
                         {lesson.title}
@@ -483,14 +511,11 @@ export function SavedLessonLibrary({
                         <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
                         <IconAction label="Download PowerPoint bundle" disabled={Boolean(busyId)} onClick={() => void downloadPowerPointBundle(lesson)} icon={<Package className="size-4" />} />
                         <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
-                        {usableConfidenceSummary(lesson as SavedLessonWithConfidence) ? (
+                        {confidence ? (
                           <IconAction
                             label="View confidence"
                             disabled={Boolean(busyId)}
-                            onClick={() => {
-                              const summary = usableConfidenceSummary(lesson as SavedLessonWithConfidence);
-                              if (summary) setConfidenceLesson({ title: lesson.title, summary });
-                            }}
+                            onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })}
                             icon={<BarChart3 className="size-4" />}
                           />
                         ) : null}
@@ -500,7 +525,8 @@ export function SavedLessonLibrary({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

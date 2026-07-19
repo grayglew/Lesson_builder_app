@@ -117,4 +117,55 @@ describe("BuilderShell legacy UI parity", () => {
       screen.getByRole("heading", { name: "1 slide" }),
     ).toBeInTheDocument();
   });
+
+  it("allows several preview slides to be selected independently for a handout", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument(
+      "2026-07-18T06:00:00.000Z",
+    );
+    document.slides = [
+      { id: "starter", type: "starter", title: "Starter", slots: [] },
+      {
+        id: "example",
+        type: "example",
+        title: "Example",
+        lo: "",
+      },
+      { id: "blank", type: "blank", title: "Blank" },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+
+    render(<BuilderShell accessMode="admin" userEmail="teacher@example.com" />);
+
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Select slide 1 for handout",
+      })[0],
+    );
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Select slide 2 for handout",
+      })[0],
+    );
+
+    expect(useBuilderStore.getState().selectedPreviewSlideIds).toEqual([
+      "starter",
+      "example",
+    ]);
+    expect(
+      screen.getByRole("button", {
+        name: "Open handout from 2 selected slides",
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "Deselect slide 1 for handout",
+      })[0],
+    );
+    expect(useBuilderStore.getState().selectedPreviewSlideIds).toEqual([
+      "example",
+    ]);
+  });
 });

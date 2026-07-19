@@ -39,6 +39,17 @@ type RetrievalQuestion = {
   label: string;
 };
 
+export function selectHandoutDocument(
+  document: BuilderDocument,
+  selectedSlideIds: readonly string[],
+): BuilderDocument {
+  const selectedIds = new Set(selectedSlideIds);
+  return {
+    ...document,
+    slides: document.slides.filter((slide) => selectedIds.has(slide.id)),
+  };
+}
+
 export function validateHandoutDocument(
   document: Pick<BuilderDocument, "slides">,
 ): HandoutSelection {
@@ -54,17 +65,17 @@ export function validateHandoutDocument(
 
   if (!document.slides.length) {
     throw new Error(
-      "Add one starter slide and one or two example slides for the handout.",
+      "Select one starter slide and one or two example slides for the handout.",
     );
   }
   if (starters.length !== 1) {
     throw new Error(
-      "The handout needs exactly one starter slide. Retrieval starters do not count.",
+      "Select exactly one starter slide for the handout. Retrieval starters do not count.",
     );
   }
   if (examples.length < 1 || examples.length > 2) {
     throw new Error(
-      "The handout needs one or two worked example slides.",
+      "Select one or two worked example slides for the handout.",
     );
   }
 

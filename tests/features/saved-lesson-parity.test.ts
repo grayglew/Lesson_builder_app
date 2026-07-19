@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildStandaloneLessonHtml } from "@/features/builder/lesson-export";
 import {
+  confidenceAverageColors,
   createStaticExportDocument,
   expandSlidesForStaticExport,
   isLessonDirty,
@@ -59,6 +60,21 @@ describe("saved lesson production parity", () => {
         confidenceSummary: { ...lesson.confidenceSummary, total: 0 },
       }),
     ).toBeNull();
+  });
+
+  it("interpolates the production confidence row colour scale", () => {
+    expect(confidenceAverageColors(1)).toEqual({
+      background: "#fee2e2",
+      border: "#ef4444",
+    });
+    expect(confidenceAverageColors(4.2)).toEqual({
+      background: "#d5fbe2",
+      border: "#20be5a",
+    });
+    expect(confidenceAverageColors(5)).toEqual({
+      background: "#bbf7d0",
+      border: "#16a34a",
+    });
   });
 
   it("preserves saved reveal state and creates hidden/shown variants otherwise", () => {

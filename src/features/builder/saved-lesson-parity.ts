@@ -64,6 +64,32 @@ export function usableConfidenceSummary(
   return summary;
 }
 
+export function confidenceAverageColors(average: number) {
+  const value = Math.max(1, Math.min(5, Number(average) || 3));
+  const stops = [
+    { background: "#fee2e2", border: "#ef4444" },
+    { background: "#ffedd5", border: "#f97316" },
+    { background: "#fef9c3", border: "#eab308" },
+    { background: "#dcfce7", border: "#22c55e" },
+    { background: "#bbf7d0", border: "#16a34a" },
+  ];
+  const lowerIndex = Math.max(0, Math.min(4, Math.floor(value) - 1));
+  const upperIndex = Math.max(0, Math.min(4, Math.ceil(value) - 1));
+  const ratio = Math.max(0, Math.min(1, value - Math.floor(value)));
+  return {
+    background: mixHexColor(
+      stops[lowerIndex].background,
+      stops[upperIndex].background,
+      ratio,
+    ),
+    border: mixHexColor(
+      stops[lowerIndex].border,
+      stops[upperIndex].border,
+      ratio,
+    ),
+  };
+}
+
 export function expandSlidesForStaticExport(
   slides: readonly BuilderSlide[],
 ): StaticSlideVariant[] {
@@ -212,6 +238,28 @@ function valueHasImagePayload(value: unknown): boolean {
 
 function validTeachingDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "9999-12-31";
+}
+
+function mixHexColor(left: string, right: string, ratio: number) {
+  const leftChannels = parseHexColor(left);
+  const rightChannels = parseHexColor(right);
+  return `#${leftChannels
+    .map((channel, index) =>
+      Math.round(
+        channel + (rightChannels[index] - channel) * ratio,
+      )
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+function parseHexColor(value: string) {
+  const clean = value.replace(/^#/, "");
+  if (!/^[0-9a-f]{6}$/i.test(clean)) return [255, 255, 255];
+  return [0, 2, 4].map((index) =>
+    Number.parseInt(clean.slice(index, index + 2), 16),
+  );
 }
 
 function uniqueWorksheetPath(

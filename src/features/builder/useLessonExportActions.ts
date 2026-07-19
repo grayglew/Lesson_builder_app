@@ -13,10 +13,16 @@ import {
   normalizeImportedBuilderDocument,
   parseStandaloneLessonHtml,
 } from "./lesson-export";
-import { buildA4Handout } from "./handout-export";
+import {
+  buildA4Handout,
+  selectHandoutDocument,
+} from "./handout-export";
 
 export function useLessonExportActions() {
   const document = useBuilderStore((state) => state.document);
+  const selectedPreviewSlideIds = useBuilderStore(
+    (state) => state.selectedPreviewSlideIds,
+  );
   const hydrate = useBuilderStore((state) => state.hydrate);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const setStatus = useBuilderStore((state) => state.setStatus);
@@ -265,7 +271,11 @@ export function useLessonExportActions() {
   }
 
   async function prepareA4Handout() {
-    return buildA4Handout(await embedRemoteBuilderAssets(document));
+    const selectedDocument = selectHandoutDocument(
+      document,
+      selectedPreviewSlideIds,
+    );
+    return buildA4Handout(await embedRemoteBuilderAssets(selectedDocument));
   }
 
   return {

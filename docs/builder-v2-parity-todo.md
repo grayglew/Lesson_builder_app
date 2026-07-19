@@ -98,6 +98,13 @@ behaviour. Items marked **missing** have no equivalent implementation.
   opaque snapshot revisions to reject conflicting cloud writes without
   overwriting either browser's recovery copy.
 
+- [x] **Manual-test regression follow-up — completed.** Restored independent
+  multi-slide selection for A4 handouts; production-style confidence shading
+  and no-confidence taught-row greying in the saved lesson library;
+  compatibility fallback for legacy presenter assets; and reliable PowerPoint
+  bundle rendering after an iframe startup race. These fixes retain the current
+  cloud-save behaviour and have focused regression coverage.
+
 ### P1 — important workflow and rendering parity
 
 - [ ] **Starter “Log retrieval” — missing.** The V2 button is present but

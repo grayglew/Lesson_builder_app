@@ -247,6 +247,53 @@ describe("standalone lesson export", () => {
     expect(starterSlots[0].image?.dataUrl).toBe(remoteUrl);
     fetchMock.mockRestore();
   });
+
+  it("accepts a legacy asset response with a successful 200 status and preserves inaccessible URLs", async () => {
+    const document = lessonDocument();
+    const starter = document.slides[0];
+    if (starter.type !== "starter") throw new Error("Expected starter fixture.");
+    const slots = (starter as { slots: StarterSlot[] }).slots;
+    const remoteUrl = "https://assets.example.test/legacy-question.png";
+    slots[0].image = {
+      name: "legacy-question.png",
+      type: "image/png",
+      size: 8,
+      dataUrl: remoteUrl,
+    };
+
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 200,
+        blob: async () => new Blob(["legacy"], { type: "image/png" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+      } as Response);
+
+    const embedded = await embedRemoteBuilderAssets(document);
+    const embeddedStarter = embedded.slides[0] as {
+      slots: StarterSlot[];
+    };
+    expect(embeddedStarter.slots[0].image?.dataUrl).toBe(
+      "data:image/png;base64,bGVnYWN5",
+    );
+
+    slots[0].image = {
+      ...slots[0].image!,
+      dataUrl: "https://assets.example.test/expired.png",
+    };
+    const fallback = await embedRemoteBuilderAssets(document);
+    const fallbackStarter = fallback.slides[0] as {
+      slots: StarterSlot[];
+    };
+    expect(fallbackStarter.slots[0].image?.dataUrl).toBe(
+      "https://assets.example.test/expired.png",
+    );
+    fetchMock.mockRestore();
+  });
 });
 
 function lessonDocument(): BuilderDocument {

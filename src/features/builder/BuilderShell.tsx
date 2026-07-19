@@ -81,6 +81,9 @@ const toolLabels: Record<ToolName, string> = {
 export function BuilderShell({ userEmail }: BuilderShellProps) {
   const document = useBuilderStore(selectDocument);
   const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
+  const selectedPreviewSlideIds = useBuilderStore(
+    (state) => state.selectedPreviewSlideIds,
+  );
   const hydrated = useBuilderStore((state) => state.hydrated);
   const status = useBuilderStore((state) => state.status);
   const hydrate = useBuilderStore((state) => state.hydrate);
@@ -88,7 +91,9 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
   const reset = useBuilderStore((state) => state.reset);
   const updateMetadata = useBuilderStore((state) => state.updateMetadata);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
-  const selectSlide = useBuilderStore((state) => state.selectSlide);
+  const togglePreviewSlideSelection = useBuilderStore(
+    (state) => state.togglePreviewSlideSelection,
+  );
   const addPlaceholderSlide = useBuilderStore((state) => state.addPlaceholderSlide);
   const moveSlide = useBuilderStore((state) => state.moveSlide);
   const removeSlide = useBuilderStore((state) => state.removeSlide);
@@ -479,8 +484,8 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
               <button
                 className={styles.previewIconButton}
                 type="button"
-                aria-label="Open handout"
-                title="Open handout"
+                aria-label={`Open handout from ${selectedPreviewSlideIds.length} selected slide${selectedPreviewSlideIds.length === 1 ? "" : "s"}`}
+                title={`Open handout (${selectedPreviewSlideIds.length} selected)`}
                 onClick={() => void lessonActions.previewLesson(true)}
               >
                 ▤
@@ -522,16 +527,24 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
               <li
                 key={slide.id}
                 className={`${styles.slideItem} ${
-                  slide.id === selectedSlideId ? styles.slideItemSelected : ""
+                  selectedPreviewSlideIds.includes(slide.id)
+                    ? styles.slideItemSelected
+                    : ""
+                } ${
+                  slide.id === selectedSlideId ? styles.slideItemActive : ""
                 }`}
               >
                 <div className={styles.slideToolbar}>
                   <button
                     className={styles.slideSelectButton}
                     type="button"
-                    aria-pressed={slide.id === selectedSlideId}
-                    onClick={() => selectSlide(slide.id)}
+                    aria-label={`${selectedPreviewSlideIds.includes(slide.id) ? "Deselect" : "Select"} slide ${index + 1} for handout`}
+                    aria-pressed={selectedPreviewSlideIds.includes(slide.id)}
+                    onClick={() => togglePreviewSlideSelection(slide.id)}
                   >
+                    <span aria-hidden className={styles.slideSelectionMark}>
+                      {selectedPreviewSlideIds.includes(slide.id) ? "✓" : ""}
+                    </span>
                     {index + 1}. {slide.title || slide.type}
                   </button>
                   <div className={styles.slideActions}>
@@ -566,8 +579,9 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
                 <button
                   className={styles.slidePreviewButton}
                   type="button"
-                  aria-label={`Select slide ${index + 1}`}
-                  onClick={() => selectSlide(slide.id)}
+                  aria-label={`${selectedPreviewSlideIds.includes(slide.id) ? "Deselect" : "Select"} slide ${index + 1} for handout`}
+                  aria-pressed={selectedPreviewSlideIds.includes(slide.id)}
+                  onClick={() => togglePreviewSlideSelection(slide.id)}
                 >
                   <SlidePreview slide={slide} />
                 </button>

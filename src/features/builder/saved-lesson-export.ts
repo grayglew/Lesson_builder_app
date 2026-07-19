@@ -156,7 +156,7 @@ async function renderStandaloneSlidesToJpeg(
   document.body.appendChild(frame);
 
   try {
-    await waitForFrame(frame);
+    await waitForStaticSlidesFrame(frame);
     const frameDocument = frame.contentDocument;
     if (!frameDocument) throw new Error("Could not prepare the static slides.");
     const slides = Array.from(
@@ -175,17 +175,39 @@ async function renderStandaloneSlidesToJpeg(
   }
 }
 
-function waitForFrame(frame: HTMLIFrameElement) {
-  if (frame.contentDocument?.readyState === "complete") {
-    return Promise.resolve();
-  }
+export function waitForStaticSlidesFrame(
+  frame: HTMLIFrameElement,
+  timeoutMs = 5_000,
+) {
   return new Promise<void>((resolve, reject) => {
-    frame.addEventListener("load", () => resolve(), { once: true });
-    frame.addEventListener(
-      "error",
-      () => reject(new Error("Could not prepare the static slides.")),
-      { once: true },
-    );
+    let settled = false;
+    const startedAt = Date.now();
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearInterval(poll);
+      frame.removeEventListener("load", check);
+      frame.removeEventListener("error", fail);
+      if (error) reject(error);
+      else resolve();
+    };
+    const check = () => {
+      const frameDocument = frame.contentDocument;
+      if (
+        frameDocument?.readyState === "complete" &&
+        frameDocument.querySelector(".lesson-slide")
+      ) {
+        finish();
+      } else if (Date.now() - startedAt > timeoutMs) {
+        finish(new Error("Could not prepare the static slides."));
+      }
+    };
+    const fail = () =>
+      finish(new Error("Could not prepare the static slides."));
+    const poll = window.setInterval(check, 25);
+    frame.addEventListener("load", check);
+    frame.addEventListener("error", fail);
+    check();
   });
 }
 

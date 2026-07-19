@@ -163,18 +163,26 @@ export async function embedRemoteBuilderAssets(
 
   await Promise.all(
     records.map(async (record) => {
-      const source = String(record.dataUrl || "");
+      const source = String(record.dataUrl || record.url || record.path || "");
       if (!/^https?:\/\//i.test(source)) return;
       let pending = dataUrlCache.get(source);
       if (!pending) {
         pending = fetch(source, { cache: "no-store" }).then(async (response) => {
-          if (!response.ok) {
+          const status = Number(response.status || 0);
+          if (!response.ok && !(status >= 200 && status < 300)) {
             throw new Error(
               `Could not embed a lesson asset (${response.status}).`,
             );
           }
-          return blobToDataUrl(await response.blob());
-        });
+          const downloaded = await response.blob();
+          const contentType =
+            downloaded.type ||
+            String(record.type || "application/octet-stream");
+          const blob = downloaded.type
+            ? downloaded
+            : new Blob([downloaded], { type: contentType });
+          return blobToDataUrl(blob);
+        }).catch(() => source);
         dataUrlCache.set(source, pending);
       }
       record.dataUrl = await pending;

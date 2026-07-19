@@ -1,6 +1,9 @@
 import JSZip from "jszip";
 import { describe, expect, it, vi } from "vitest";
-import { buildPowerPointBundleZip } from "@/features/builder/saved-lesson-export";
+import {
+  buildPowerPointBundleZip,
+  waitForStaticSlidesFrame,
+} from "@/features/builder/saved-lesson-export";
 import { createInitialBuilderDocument } from "@/features/builder/schema";
 
 describe("saved lesson static bundle", () => {
@@ -88,6 +91,45 @@ describe("saved lesson static bundle", () => {
     expect(await zip.file("README.txt")?.async("string")).toContain(
       "answer images appear twice",
     );
+  });
+
+  it("waits for srcdoc slides instead of accepting the iframe's initial blank document", async () => {
+    vi.useFakeTimers();
+    try {
+      const frame = document.createElement("iframe");
+      const initialDocument = document.implementation.createHTMLDocument();
+      const loadedDocument = document.implementation.createHTMLDocument();
+      Object.defineProperty(initialDocument, "readyState", {
+        configurable: true,
+        value: "complete",
+      });
+      Object.defineProperty(loadedDocument, "readyState", {
+        configurable: true,
+        value: "complete",
+      });
+      const slide = loadedDocument.createElement("section");
+      slide.className = "lesson-slide";
+      loadedDocument.body.appendChild(slide);
+      let currentDocument = initialDocument;
+      Object.defineProperty(frame, "contentDocument", {
+        configurable: true,
+        get: () => currentDocument,
+      });
+
+      const ready = waitForStaticSlidesFrame(frame, 1_000);
+      let resolved = false;
+      void ready.then(() => {
+        resolved = true;
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(resolved).toBe(false);
+
+      currentDocument = loadedDocument;
+      await vi.advanceTimersByTimeAsync(25);
+      await expect(ready).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildA4Handout,
+  selectHandoutDocument,
   validateHandoutDocument,
 } from "@/features/builder/handout-export";
 import {
@@ -15,18 +16,35 @@ describe("production A4 handout export", () => {
     const document = handoutDocument();
     document.slides = [];
     expect(() => validateHandoutDocument(document)).toThrow(
-      "Add one starter slide and one or two example slides",
+      "Select one starter slide and one or two example slides",
     );
 
     document.slides = [starter("starter-1"), starter("starter-2"), example()];
     expect(() => validateHandoutDocument(document)).toThrow(
-      "exactly one starter slide",
+      "Select exactly one starter slide",
     );
 
     document.slides = [starter("starter-1")];
     expect(() => validateHandoutDocument(document)).toThrow(
-      "one or two worked example slides",
+      "Select one or two worked example slides",
     );
+  });
+
+  it("keeps only the independently selected preview slides in deck order", () => {
+    const document = handoutDocument();
+    document.slides.push({
+      id: "blank",
+      type: "blank",
+      title: "Blank",
+    });
+
+    const selected = selectHandoutDocument(document, ["blank", "starter"]);
+
+    expect(selected.slides.map((slide) => slide.id)).toEqual([
+      "starter",
+      "blank",
+    ]);
+    expect(document.slides).toHaveLength(3);
   });
 
   it("builds purpose-designed glue/starter and example A4 pages", async () => {
