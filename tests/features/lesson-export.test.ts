@@ -50,6 +50,75 @@ describe("standalone lesson export", () => {
     expect(html).toContain("@media print");
   });
 
+  it("enables production live starter controls, Poll, and Save for hosted presenters", () => {
+    const html = buildStandaloneLessonHtml(lessonDocument(), {
+      liveRetrieval: {
+        enabled: true,
+        endpoint: "/api/presenter/retrieval-log",
+        nextEndpoint: "/api/presenter/retrieval-next",
+        lessonId: "saved-lesson",
+        className: "Year 9",
+        teachingDate: "2026-07-18",
+      },
+      presenterConfig: {
+        enabled: true,
+        sourceLessonId: "saved-lesson",
+        originalTitle: "Algebra lesson",
+        className: "Year 9",
+        teachingDate: "2026-07-18",
+        uploadEndpoint: "/api/builder-lessons/upload-url",
+        completeEndpoint: "/api/builder-lessons/complete",
+        taughtEndpoint: "/api/builder-lessons/taught",
+      },
+    });
+
+    expect(html).toContain('aria-label="Seen +1"');
+    expect(html).toContain('aria-label="Seen -1"');
+    expect(html).toContain('aria-label="Next retrieval question"');
+    expect(html).toContain('"sourceLessonId":"saved-lesson"');
+    expect(html).toContain("if (pollButton) pollButton.hidden = false");
+    expect(html).toContain(
+      "if (saveBuilderButton) saveBuilderButton.hidden = false",
+    );
+    expect(html).toContain("showConfidencePollSlide");
+    expect(html).toContain("savePresentedLesson");
+  });
+
+  it("uses the compact production LO styling without rendering LO text in starter cells", () => {
+    const html = buildStandaloneLessonHtml(lessonDocument());
+
+    expect(html).toContain(
+      ".lo-bar{display:flex;align-items:center;gap:10px;border-bottom:2px solid #111827",
+    );
+    expect(html).not.toContain(
+      ".slide-title-bar,.lo-bar{padding:12px 16px;background:#0f766e",
+    );
+    expect(html).not.toContain('<div class="slide-title-bar">Starter</div>');
+    expect(html).toContain('<span class="lo-bar-text">101a: Expand brackets</span>');
+  });
+
+  it("emits syntactically valid presenter interaction JavaScript", () => {
+    const html = buildStandaloneLessonHtml(lessonDocument(), {
+      presenterConfig: {
+        enabled: true,
+        sourceLessonId: "saved-lesson",
+        originalTitle: "Algebra lesson",
+        className: "Year 9",
+        teachingDate: "2026-07-18",
+        uploadEndpoint: "/api/builder-lessons/upload-url",
+        completeEndpoint: "/api/builder-lessons/complete",
+        taughtEndpoint: "/api/builder-lessons/taught",
+      },
+    });
+    const scripts = Array.from(
+      html.matchAll(/<script(?![^>]*type=["']application\/json["'])[^>]*>([\s\S]*?)<\/script>/gi),
+      (match) => match[1],
+    );
+
+    expect(scripts.length).toBeGreaterThan(0);
+    scripts.forEach((source) => expect(() => new Function(source)).not.toThrow());
+  });
+
   it("preserves a PDF page aspect ratio so portrait pages can scroll", () => {
     const document = lessonDocument();
     document.slides = [

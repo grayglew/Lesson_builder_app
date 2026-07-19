@@ -10,6 +10,42 @@ test.describe("Builder v2 accepted UI baseline", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test.beforeEach(async ({ page }) => {
+    await page.route("**/api/builder-lessons/upload-url", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          id: "visual-lesson",
+          path: "lessons/visual-lesson.json",
+          signedUrl: "http://127.0.0.1:3100/__fixture/lesson-upload",
+        }),
+      });
+    });
+    await page.route(
+      "http://127.0.0.1:3100/__fixture/lesson-upload",
+      async (route) => {
+        await route.fulfill({ status: 200, body: "{}" });
+      },
+    );
+    await page.route("**/api/builder-lessons/complete", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          lesson: {
+            id: "visual-lesson",
+            title: "Untitled lesson",
+            className: "",
+            teachingDate: "",
+            byteSize: 100,
+            taughtAt: "",
+            isTaught: false,
+            createdAt: "2026-07-18T06:00:00.000Z",
+            updatedAt: "2026-07-18T06:00:00.000Z",
+          },
+        }),
+      });
+    });
     await page.route("**/api/builder-sync/latest?kind=workspace", async (route) => {
       await route.fulfill({
         contentType: "application/json",
@@ -27,6 +63,9 @@ test.describe("Builder v2 accepted UI baseline", () => {
             className: "Year 9",
             teachingDate: "2026-07-18",
             overallLessonLo: "Expand and factorise quadratic expressions",
+            activeLessonId: "visual-lesson",
+            activeLessonSavedAt: "2026-07-18T06:00:00.000Z",
+            lessonUpdatedAt: "2026-07-18T06:00:00.000Z",
             classNames: ["Year 7", "Year 8", "Year 9", "Year 10"],
             slides: [],
             retrievalItems: [
@@ -204,12 +243,106 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await expect(
       presenter.getByRole("navigation", { name: "Presenter tools" }),
     ).toBeVisible();
+    await expect(
+      presenter.getByRole("button", { name: "Save to Builder" }),
+    ).toBeVisible();
+    await expect(presenter.getByRole("button", { name: "Poll" })).toBeVisible();
     await expect(presenter.getByText("No slides exported.")).toBeVisible();
+    await presenter.getByRole("button", { name: "Poll" }).click();
+    await expect(
+      presenter.getByRole("heading", { name: "How confident do you feel?" }),
+    ).toBeVisible();
   });
 
   test("keeps presenter scrolling, toolbar placement, and PDF page proportions", async ({
     page,
   }) => {
+    const context = page.context();
+    const liveApiRequests: string[] = [];
+    context.on("request", (request) => {
+      if (
+        request.url().includes("/api/presenter/retrieval") ||
+        request.url().includes("/api/builder-lessons/")
+      ) {
+        liveApiRequests.push(request.url());
+      }
+    });
+    await context.route("**/api/presenter/retrieval-log", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          result: {
+            id: "retrieval-one",
+            seenCount: 4,
+            currentImageSlot: 1,
+          },
+        }),
+      });
+    });
+    await context.route("**/api/presenter/retrieval-next", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          result: {
+            itemId: "retrieval-one",
+            currentImageSlot: 2,
+            questionImage: {
+              name: "retrieval-question-2.png",
+              type: "image/png",
+              size: 68,
+              dataUrl:
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0mQAAAAASUVORK5CYII=",
+            },
+            answerImage: null,
+          },
+        }),
+      });
+    });
+    await context.route("**/api/builder-lessons/upload-url", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          id: "visual-taught-lesson",
+          path: "lessons/visual-taught-lesson.json",
+          signedUrl:
+            "http://127.0.0.1:3100/__fixture/presenter-save-upload",
+        }),
+      });
+    });
+    await context.route(
+      "http://127.0.0.1:3100/__fixture/presenter-save-upload",
+      async (route) => {
+        await route.fulfill({ status: 200, body: "{}" });
+      },
+    );
+    await context.route("**/api/builder-lessons/complete", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          lesson: {
+            id: "visual-taught-lesson",
+            title: "Presenter parity - Taught",
+            className: "Year 9",
+            teachingDate: "2026-07-19",
+            byteSize: 100,
+            taughtAt: "",
+            isTaught: false,
+            createdAt: "2026-07-19T04:00:00.000Z",
+            updatedAt: "2026-07-19T04:00:00.000Z",
+          },
+        }),
+      });
+    });
+    await context.route("**/api/builder-lessons/taught", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
     const workspaceUrl = "http://127.0.0.1:3100/__fixture/presenter-workspace";
     await page.unroute("**/api/builder-sync/latest?kind=workspace");
     await page.route("**/api/builder-sync/latest?kind=workspace", async (route) => {
@@ -234,11 +367,31 @@ test.describe("Builder v2 accepted UI baseline", () => {
           className: "Year 9",
           teachingDate: "2026-07-19",
           overallLessonLo: "",
-          activeLessonId: "",
-          activeLessonSavedAt: "",
+          activeLessonId: "visual-presenter-lesson",
+          activeLessonSavedAt: "2026-07-19T04:00:00.000Z",
           lessonUpdatedAt: "2026-07-19T04:00:00.000Z",
           updatedAt: "2026-07-19T04:00:00.000Z",
           slides: [
+            {
+              id: "starter",
+              type: "starter",
+              title: "Starter",
+              slots: [
+                {
+                  lo: "101a: Expand a single bracket",
+                  retrievalItemId: "retrieval-one",
+                  currentImageSlot: 1,
+                  image: {
+                    name: "retrieval-question-1.png",
+                    type: "image/png",
+                    size: 68,
+                    dataUrl:
+                      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0mQAAAAASUVORK5CYII=",
+                  },
+                  answerImage: null,
+                },
+              ],
+            },
             {
               id: "opening",
               type: "placeholder",
@@ -270,7 +423,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
     });
 
     await page.goto("/builder-v2?visual=1");
-    await expect(page.getByRole("heading", { name: "2 slides" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "3 slides" })).toBeVisible();
     const builderPdfAspect = await page
       .locator('aside [style*="--preview-slide-aspect"]')
       .evaluate((slide) => {
@@ -286,9 +439,40 @@ test.describe("Builder v2 accepted UI baseline", () => {
     presenter.on("pageerror", (error) => presenterErrors.push(error.message));
 
     const slides = presenter.locator(".lesson-slide");
-    await expect(slides).toHaveCount(2);
+    await expect(slides).toHaveCount(3);
     await expect(slides.nth(0)).toBeVisible();
     await expect(slides.nth(1)).toBeVisible();
+    await expect(slides.nth(2)).toBeVisible();
+    await expect(
+      presenter.getByRole("button", { name: "Seen +1" }),
+    ).toBeVisible();
+    await expect(
+      presenter.getByRole("button", { name: "Seen -1" }),
+    ).toBeVisible();
+    await expect(
+      presenter.getByRole("button", { name: "Next retrieval question" }),
+    ).toBeVisible();
+    await presenter.getByRole("button", { name: "Seen +1" }).click();
+    await expect.poll(() => liveApiRequests).toContain(
+      "http://127.0.0.1:3100/api/presenter/retrieval-log",
+    );
+    await expect(presenter.locator("[data-live-retrieval]").first()).toHaveText(
+      "Seen 4",
+    );
+    await presenter
+      .getByRole("button", { name: "Next retrieval question" })
+      .click();
+    await expect(presenter.locator("[data-live-retrieval-next]").first()).toHaveText(
+      "Loaded",
+    );
+    presenter.on("dialog", (dialog) => void dialog.accept());
+    await presenter.getByRole("button", { name: "Save to Builder" }).click();
+    await expect.poll(() => liveApiRequests).toContain(
+      "http://127.0.0.1:3100/api/builder-lessons/taught",
+    );
+    await expect(
+      presenter.getByRole("button", { name: "Save to Builder" }),
+    ).toBeEnabled();
     await expect(
       presenter.getByRole("button", { name: "Previous slide" }),
     ).toHaveCount(0);

@@ -32,10 +32,28 @@ export function useLessonExportActions() {
       "<!doctype html><title>Preparing lesson</title><p>Preparing lesson...</p>",
     );
     try {
-      const html = await prepareStandaloneHtml(handout);
-      previewWindow.document.open();
-      previewWindow.document.write(html);
-      previewWindow.document.close();
+      let presenterLessonId = "";
+      if (!handout) {
+        setStatus({
+          tone: "working",
+          message: document.activeLessonId
+            ? "Preparing the live presenter..."
+            : "Saving the lesson before opening the live presenter...",
+        });
+        if (document.activeLessonId) {
+          presenterLessonId = document.activeLessonId;
+        } else {
+          const saved = await saveCurrentLesson(document);
+          markLessonSaved(saved);
+          presenterLessonId = saved.id;
+        }
+      }
+      const html = await prepareStandaloneHtml(handout, presenterLessonId);
+      const previewUrl = URL.createObjectURL(
+        new Blob([html], { type: "text/html" }),
+      );
+      previewWindow.location.replace(previewUrl);
+      window.setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
       previewWindow.focus();
       setStatus({
         tone: "success",
@@ -179,7 +197,10 @@ export function useLessonExportActions() {
     return true;
   }
 
-  async function prepareStandaloneHtml(handout: boolean) {
+  async function prepareStandaloneHtml(
+    handout: boolean,
+    presenterLessonId = "",
+  ) {
     const [runtimeCss, runtimeJavaScript, embeddedDocument] = await Promise.all([
       fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
       fetchAssetText("/builder-v2-assets/presenter-runtime.js"),
@@ -192,6 +213,28 @@ export function useLessonExportActions() {
         /<\/script/gi,
         "<\\/script",
       ),
+      liveRetrieval: presenterLessonId
+        ? {
+            enabled: true,
+            endpoint: appEndpoint("/api/presenter/retrieval-log"),
+            nextEndpoint: appEndpoint("/api/presenter/retrieval-next"),
+            lessonId: presenterLessonId,
+            className: embeddedDocument.className,
+            teachingDate: embeddedDocument.teachingDate,
+          }
+        : null,
+      presenterConfig: presenterLessonId
+        ? {
+            enabled: true,
+            sourceLessonId: presenterLessonId,
+            originalTitle: embeddedDocument.title,
+            className: embeddedDocument.className,
+            teachingDate: embeddedDocument.teachingDate,
+            uploadEndpoint: appEndpoint("/api/builder-lessons/upload-url"),
+            completeEndpoint: appEndpoint("/api/builder-lessons/complete"),
+            taughtEndpoint: appEndpoint("/api/builder-lessons/taught"),
+          }
+        : null,
     });
   }
 
@@ -220,6 +263,10 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function appEndpoint(path: string) {
+  return new URL(path, window.location.origin).toString();
 }
 
 function safeFileName(value: string) {

@@ -610,9 +610,7 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
                 <span className={styles.starterQuestionNumber}>{index + 1}</span>
                 {recordOf(slot.image).dataUrl ? (
                   <AssetImage asset={slot.image} alt="Starter image" fill />
-                ) : (
-                  <p className={styles.starterText}>{stringValue(slot.lo)}</p>
-                )}
+                ) : null}
               </div>
             ),
           )}
