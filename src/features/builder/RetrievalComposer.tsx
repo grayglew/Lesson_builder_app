@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, LoaderCircle, X } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   advanceRetrievalItems,
@@ -11,6 +11,7 @@ import {
   saveRetrievalItem,
   uploadRetrievalImage,
 } from "./api-client";
+import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
 import {
   compareRetrievalItems,
@@ -26,7 +27,7 @@ import {
   type RetrievalItem,
   createBuilderId,
 } from "./schema";
-import { fileToBuilderAsset, getRetrievalNextDueDate, isRetrievalItemDue } from "./starter";
+import { getRetrievalNextDueDate, isRetrievalItemDue } from "./starter";
 import { selectDocument, useBuilderStore } from "./store";
 
 type ImageDraft = {
@@ -711,6 +712,7 @@ export function RetrievalComposer() {
           busy={busyAction === "editor-save"}
           onChange={setEditor}
           onClose={() => setEditor(null)}
+          onError={(message) => setStatus({ tone: "error", message })}
           onSave={() => void saveEditor()}
         />
       ) : null}
@@ -723,33 +725,26 @@ function RetrievalEditor({
   busy,
   onChange,
   onClose,
+  onError,
   onSave,
 }: {
   editor: RetrievalEditorState;
   busy: boolean;
   onChange: (editor: RetrievalEditorState) => void;
   onClose: () => void;
+  onError: (message: string) => void;
   onSave: () => void;
 }) {
-  async function chooseImage(
+  function updateImage(
     role: "questions" | "answers",
     index: number,
-    file: File,
+    asset: BuilderAsset | null,
+    file?: File,
   ) {
-    const asset = await fileToBuilderAsset(file);
     onChange({
       ...editor,
       [role]: editor[role].map((slot, slotIndex) =>
         slotIndex === index ? { asset, file, changed: true } : slot,
-      ),
-    });
-  }
-
-  function clearImage(role: "questions" | "answers", index: number) {
-    onChange({
-      ...editor,
-      [role]: editor[role].map((slot, slotIndex) =>
-        slotIndex === index ? { asset: null, changed: true } : slot,
       ),
     });
   }
@@ -873,17 +868,23 @@ function RetrievalEditor({
           {Array.from({ length: 8 }, (_, index) => (
             <div key={index} className={styles.retrievalEditImageSlot}>
               <span className={styles.fieldLabel}>Seen {index + 1}</span>
-              <ImageDraftControl
+              <BuilderImageInput
+                asset={editor.questions[index].asset}
                 label={`Question image ${index + 1}`}
-                draft={editor.questions[index]}
-                onChoose={(file) => void chooseImage("questions", index, file)}
-                onClear={() => clearImage("questions", index)}
+                size="retrieval"
+                onChange={(asset, file) =>
+                  updateImage("questions", index, asset, file)
+                }
+                onError={onError}
               />
-              <ImageDraftControl
+              <BuilderImageInput
+                asset={editor.answers[index].asset}
                 label={`Answer image ${index + 1}`}
-                draft={editor.answers[index]}
-                onChoose={(file) => void chooseImage("answers", index, file)}
-                onClear={() => clearImage("answers", index)}
+                size="retrieval"
+                onChange={(asset, file) =>
+                  updateImage("answers", index, asset, file)
+                }
+                onError={onError}
               />
             </div>
           ))}
@@ -918,57 +919,6 @@ function RetrievalEditor({
     </div>
   );
 }
-
-/* eslint-disable @next/next/no-img-element */
-function ImageDraftControl({
-  label,
-  draft,
-  onChoose,
-  onClear,
-}: {
-  label: string;
-  draft: ImageDraft;
-  onChoose: (file: File) => void;
-  onClear: () => void;
-}) {
-  return (
-    <div className={styles.retrievalImageControl}>
-      <span className={styles.assetLabel}>{label}</span>
-      <label className={styles.retrievalImageDrop}>
-        <input
-          className={styles.srOnly}
-          type="file"
-          accept="image/*"
-          aria-label={label}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) onChoose(file);
-            event.target.value = "";
-          }}
-        />
-        {draft.asset?.dataUrl ? (
-          <img src={draft.asset.dataUrl} alt={label} />
-        ) : (
-          <span>
-            <ImagePlus aria-hidden />
-            Choose image
-          </span>
-        )}
-      </label>
-      {draft.asset ? (
-        <button
-          className={styles.removeAssetButton}
-          type="button"
-          onClick={onClear}
-        >
-          <X aria-hidden />
-          Clear
-        </button>
-      ) : null}
-    </div>
-  );
-}
-/* eslint-enable @next/next/no-img-element */
 
 function createEditorState(
   item: RetrievalItem | undefined,

@@ -10,6 +10,18 @@ test.describe("Builder v2 accepted UI baseline", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test.beforeEach(async ({ page }) => {
+    await page.route("**/api/presenter/student-session", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          sessionId: "22222222-2222-4222-8222-222222222222",
+          code: "ABC-123",
+          viewerUrl: "http://127.0.0.1:3100/student",
+          expiresAt: "2026-07-20T06:00:00.000Z",
+        }),
+      });
+    });
     await page.route("**/api/builder-lessons/upload-url", async (route) => {
       await route.fulfill({
         contentType: "application/json",
@@ -111,6 +123,14 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await expect(
       page.getByRole("complementary", { name: "Lesson preview" }),
     ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Draw Question 1 image" })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Draw Question 1 image" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Image drawing canvas")).toBeVisible();
+    await page.getByRole("button", { name: "Cancel drawing" }).click();
 
     await expect(page).toHaveScreenshot("builder-v2-starter.png", {
       animations: "disabled",
@@ -139,9 +159,13 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await page.getByRole("button", { name: "Example", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Example slide" })).toBeVisible();
-    await expect(page.getByLabel("Example image 1")).toBeAttached();
+    await expect(
+      page.getByLabel("Example image 1", { exact: true }),
+    ).toBeAttached();
     await expect(page.getByText("Retrieval images", { exact: true })).toBeVisible();
-    await expect(page.getByLabel("Question image 8")).toBeAttached();
+    await expect(
+      page.getByLabel("Question image 8", { exact: true }),
+    ).toBeAttached();
     await expect(
       page.getByRole("button", { name: "Add LO to retrieval bank" }),
     ).toBeVisible();
@@ -188,7 +212,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
       page.getByRole("heading", { name: "Check for Understanding" }),
     ).toBeVisible();
     await expect(page.getByLabel("Placement")).toBeVisible();
-    await expect(page.getByLabel("CFU image")).toBeAttached();
+    await expect(page.getByLabel("CFU image", { exact: true })).toBeAttached();
 
     await expect(page).toHaveScreenshot("builder-v2-cfu.png", {
       animations: "disabled",
@@ -262,6 +286,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
     context.on("request", (request) => {
       if (
         request.url().includes("/api/presenter/retrieval") ||
+        request.url().includes("/api/presenter/student-session") ||
         request.url().includes("/api/builder-lessons/")
       ) {
         liveApiRequests.push(request.url());
@@ -343,6 +368,40 @@ test.describe("Builder v2 accepted UI baseline", () => {
         body: JSON.stringify({ ok: true }),
       });
     });
+    await context.route(
+      "**/api/presenter/student-session/upload-url",
+      async (route) => {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            ok: true,
+            sessionId: "22222222-2222-4222-8222-222222222222",
+            path: "student-sessions/visual/snapshot.json",
+            signedUrl:
+              "http://127.0.0.1:3100/__fixture/student-snapshot-upload",
+          }),
+        });
+      },
+    );
+    await context.route(
+      "http://127.0.0.1:3100/__fixture/student-snapshot-upload",
+      async (route) => {
+        await route.fulfill({ status: 200, body: "{}" });
+      },
+    );
+    await context.route(
+      "**/api/presenter/student-session/complete",
+      async (route) => {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            ok: true,
+            version: 1,
+            uploadedAt: "2026-07-19T06:00:00.000Z",
+          }),
+        });
+      },
+    );
     const workspaceUrl = "http://127.0.0.1:3100/__fixture/presenter-workspace";
     await page.unroute("**/api/builder-sync/latest?kind=workspace");
     await page.route("**/api/builder-sync/latest?kind=workspace", async (route) => {
@@ -473,6 +532,12 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await expect(
       presenter.getByRole("button", { name: "Save to Builder" }),
     ).toBeEnabled();
+    await expect(presenter.getByText("Student code: ABC-123")).toBeVisible();
+    await presenter.getByRole("button", { name: "Upload" }).click();
+    await expect.poll(() => liveApiRequests).toContain(
+      "http://127.0.0.1:3100/api/presenter/student-session/complete",
+    );
+    await expect(presenter.getByRole("button", { name: "Upload" })).toBeEnabled();
     await expect(
       presenter.getByRole("button", { name: "Previous slide" }),
     ).toHaveCount(0);

@@ -1,0 +1,129 @@
+import {
+  preparePresenterPdfSnapshotHtml,
+  presenterPdfError,
+} from "@/features/builder/presenter-pdf";
+import {
+  BuilderApiError,
+  downloadPresenterPdf,
+} from "@/features/builder/api-client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+describe("presenter PDF snapshots", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("removes duplicate builder state and runtime scripts from a mixed lesson", () => {
+    const portraitPage =
+      "data:image/png;base64," + "cGRm".repeat(256 * 1024);
+    const html = `<!doctype html>
+      <html>
+        <head><title>Mixed lesson</title></head>
+        <body>
+          <main class="lesson-deck">
+            <section class="lesson-slide starter-slide">Starter</section>
+            <section class="lesson-slide pdf-page-slide portrait" data-slide-aspect="0.6666666667">
+              <img class="slide-image-fit" src="${portraitPage}" alt="Worksheet page 1">
+            </section>
+          </main>
+          <script id="lesson-builder-state" type="application/json">{"slides":[{"image":{"dataUrl":"${portraitPage}"}}]}</script>
+          <script>window.presenterLoaded = true;</script>
+        </body>
+      </html>`;
+
+    const snapshot = preparePresenterPdfSnapshotHtml(html);
+
+    expect(html.split(portraitPage)).toHaveLength(3);
+    expect(snapshot.split(portraitPage)).toHaveLength(2);
+    expect(snapshot).not.toContain("<script");
+    expect(snapshot).not.toContain("lesson-builder-state");
+    expect(snapshot).not.toContain("presenterLoaded");
+    expect(snapshot).toContain('id="presenter-pdf-print-css"');
+    expect(snapshot).toContain(
+      'class="lesson-slide pdf-page-slide portrait"',
+    );
+    expect(snapshot).toContain("object-fit:contain!important");
+    expect(snapshot.length).toBeLessThan(html.length * 0.6);
+    expect(preparePresenterPdfSnapshotHtml(snapshot)).toBe(snapshot);
+  });
+
+  it("returns actionable, non-sensitive renderer failures", () => {
+    expect(
+      presenterPdfError(
+        new Error("ProtocolError: Runtime.callFunctionOn timed out"),
+      ),
+    ).toEqual({
+      message:
+        "PDF rendering timed out. Try fewer slides or lower-resolution PDF pages.",
+      status: 504,
+    });
+    expect(
+      presenterPdfError(new Error("Target closed because the page crashed")),
+    ).toEqual({
+      message:
+        "The PDF renderer ran out of memory. Try fewer slides or lower-resolution PDF pages.",
+      status: 503,
+    });
+    expect(
+      presenterPdfError(
+        new Error(
+          "Failed to launch the browser process at /tmp/chromium-secret",
+        ),
+      ),
+    ).toEqual({
+      message: "The PDF renderer could not start. Please try the export again.",
+      status: 503,
+    });
+    expect(
+      presenterPdfError(new Error("private internal implementation detail")),
+    ).toEqual({
+      message: "Could not render the lesson PDF. Please try the export again.",
+      status: 500,
+    });
+  });
+
+  it("surfaces the route's useful error message to the builder", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          path: "user/presenter-pdf/lesson/snapshot.html",
+          signedUrl: "https://storage.example.test/upload",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            ok: false,
+            error:
+              "PDF rendering timed out. Try fewer slides or lower-resolution PDF pages.",
+          },
+          504,
+        ),
+      );
+
+    await expect(
+      downloadPresenterPdf(
+        "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c",
+        "<!doctype html><main class=\"lesson-deck\">Lesson</main><script>large duplicated state</script>",
+      ),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<BuilderApiError>>({
+        name: "BuilderApiError",
+        message:
+          "PDF rendering timed out. Try fewer slides or lower-resolution PDF pages.",
+        status: 504,
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+function jsonResponse(value: unknown, status = 200) {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}

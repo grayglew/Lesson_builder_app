@@ -9,6 +9,7 @@ import {
   retrievalItemSchema,
   toWorkspaceDocument,
 } from "./schema";
+import { preparePresenterPdfSnapshotHtml } from "./presenter-pdf";
 
 const syncLatestSchema = z.object({
   ok: z.boolean().optional(),
@@ -30,6 +31,14 @@ const uploadTicketSchema = z.object({
 const globalBootstrapSchema = z.object({
   ok: z.literal(true),
   state: z.unknown(),
+});
+
+const presenterStudentSessionSchema = z.object({
+  ok: z.literal(true),
+  sessionId: z.string(),
+  code: z.string(),
+  viewerUrl: z.string().url(),
+  expiresAt: z.string(),
 });
 
 const lessonSummarySchema = z.object({
@@ -136,6 +145,14 @@ export async function syncBuilderDocument(document: BuilderDocument) {
   );
 }
 
+export async function createPresenterStudentSession(lessonId: string) {
+  return postJson(
+    "/api/presenter/student-session",
+    { lessonId },
+    presenterStudentSessionSchema,
+  );
+}
+
 export async function listSavedLessons() {
   return getJson("/api/builder-lessons", lessonListSchema);
 }
@@ -226,7 +243,8 @@ export async function saveCurrentLesson(
 }
 
 export async function downloadPresenterPdf(lessonId: string, html: string) {
-  const blob = new Blob([html], { type: "text/html" });
+  const snapshotHtml = preparePresenterPdfSnapshotHtml(html);
+  const blob = new Blob([snapshotHtml], { type: "text/html" });
   const ticket = await postJson(
     "/api/presenter/pdf-snapshot/upload-url",
     { lessonId, byteSize: blob.size },
@@ -259,8 +277,13 @@ export async function downloadPresenterPdf(lessonId: string, html: string) {
     body: JSON.stringify({ lessonId, snapshotPath: ticket.path }),
   });
   if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: unknown;
+    };
     throw new BuilderApiError(
-      `Could not render the lesson PDF (${response.status}).`,
+      typeof data.error === "string" && data.error.trim()
+        ? data.error
+        : `Could not render the lesson PDF (${response.status}).`,
       response.status,
     );
   }

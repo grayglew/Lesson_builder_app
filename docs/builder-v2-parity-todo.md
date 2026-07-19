@@ -38,18 +38,39 @@ behaviour. Items marked **missing** have no equivalent implementation.
   print.
 - [x] Hosted presenter Poll and Save to Builder, including confidence summary
   persistence and taught-lesson creation.
-- [x] JSON/full-backup and HTML import/export, PDF export, local recovery cache,
-  writable Preview Supabase data, and saved-lesson CRUD.
+- [x] Local recovery cache, writable Preview Supabase data, and saved-lesson
+  CRUD.
 
 ## Remaining implementation to-do list
 
 ### P0 — required before replacing production
 
-- [ ] **Per-entry image drawing — missing.** Restore the production “Draw
-  image” editor on every question/answer image box in Starter, Example,
-  Retrieval and CFU. It needs pen/highlighter colours, size, undo, clear,
-  done/cancel, and must write the result back to the selected image slot.
-  This was intentionally deferred until the current presenter fixes.
+- [x] **Import/export menu relocation — completed.** Removed the
+  individual Export HTML, Export PDF, Export JSON, Import HTML, and Import JSON
+  buttons from the left sidebar. The remaining actions now live in one
+  accessible dropdown at the top of the Deck Preview panel. Preview full lesson
+  remains a direct presentation action.
+
+- [x] **Full-backup retirement and Admin replacement — completed.** Removed
+  `Export full backup` and its client export branch from Builder V2. Added an
+  Admin-only, owner-scoped recovery export containing the current workspace,
+  global builder data and active saved lessons. The replacement is audited,
+  uncached, access-controlled and size-limited.
+
+- [ ] **Import/export functional audit — implementation fixed; manual
+  validation pending.** The 2026-07-19 PDF `500` was caused by sending a very
+  large, duplicated data-URL document through Puppeteer’s protocol. The export
+  now strips runtime/state duplication, loads a static temporary document,
+  waits for fonts/images, supports the 300-second function duration and returns
+  actionable errors. Automated mixed-slide and portrait-PDF coverage passes.
+  Manually verify Export HTML, Export PDF, Export JSON, Import HTML, and Import
+  JSON against a real large lesson before checking off this item.
+
+- [x] **Per-entry image drawing — completed.** Restored the production-style
+  Draw image editor on every question/answer image box in Starter, Example,
+  Retrieval and CFU, with pen/highlighter colours, size, undo, clear,
+  done/cancel/Escape and 2048×1536 PNG output written back to the selected
+  image slot.
 
 - [ ] **Production A4 handout generator — missing.** V2 currently prints a
   generic two-column grid of lesson slides. Production validates the selected
@@ -67,9 +88,10 @@ behaviour. Items marked **missing** have no equivalent implementation.
   Preserve saved reveal state, and generate both question and answer variants
   for slides without a saved presentation state.
 
-- [ ] **Student presenter sharing — missing.** Create the presenter student
-  session, show the student code badge and Upload button, publish the stripped
-  student snapshot, and retain the existing `/student` open-session flow.
+- [x] **Student presenter sharing — completed.** Hosted presenters create a
+  student session, display the student code badge and Upload button, publish a
+  stripped read-only snapshot, and retain the existing `/student` code-opening
+  flow.
 
 - [ ] **Cloud workspace autosave parity — partial.** Production debounces
   lesson changes to both IndexedDB and Supabase. V2 currently writes the local

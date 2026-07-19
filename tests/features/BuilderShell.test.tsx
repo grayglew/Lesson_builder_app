@@ -66,16 +66,34 @@ describe("BuilderShell legacy UI parity", () => {
     expect(
       screen.queryByLabelText("Migration pending"),
     ).not.toBeInTheDocument();
+    const preview = screen.getByRole("complementary", {
+      name: "Lesson preview",
+    });
     expect(
       screen.getByRole("button", { name: "Preview full lesson" }),
     ).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Export HTML" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Export PDF" })).toBeEnabled();
-    expect(screen.getByText("Import HTML", { selector: "label" })).toBeInTheDocument();
-    expect(screen.getByText("Import JSON", { selector: "label" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Import or export lesson"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Export full backup")).not.toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("complementary", { name: "Lesson builder navigation" })
+        .querySelector("input[accept*='json']"),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "0 slides" }),
     ).toBeInTheDocument();
+
+    await userEvent.setup().click(
+      screen.getByText("Import or export lesson").closest("summary")!,
+    );
+    expect(preview).toHaveTextContent("Export HTML");
+    expect(preview).toHaveTextContent("Export PDF");
+    expect(preview).toHaveTextContent("Export JSON");
+    expect(preview).toHaveTextContent("Import HTML");
+    expect(preview).toHaveTextContent("Import JSON");
+    expect(preview).not.toHaveTextContent("Export full backup");
   });
 
   it("keeps placeholder authoring in the central tool panel", async () => {

@@ -26,6 +26,14 @@ type StandaloneLessonOptions = {
     uploadEndpoint: string;
     completeEndpoint: string;
     taughtEndpoint: string;
+    studentSession?: {
+      sessionId: string;
+      code: string;
+      viewerUrl: string;
+      expiresAt: string;
+    } | null;
+    studentSessionUploadEndpoint?: string;
+    studentSessionCompleteEndpoint?: string;
   } | null;
 };
 
@@ -101,6 +109,7 @@ export function buildStandaloneLessonHtml(
   <button id="presenter-download" class="presenter-tool primary" type="button" aria-label="Download annotated HTML" title="Download annotated HTML">&#x2B07;</button>
   <button id="presenter-pdf" class="presenter-tool primary" type="button" aria-label="Open print view" title="Open print view"><span class="presenter-tool-icon presenter-print-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/></svg></span></button>
 </nav>
+<div id="presenter-student-code" class="presenter-student-code" hidden></div>
 <script type="application/json" id="lesson-builder-state">${escapeJsonForHtml(JSON.stringify(document))}</script>
 <script type="application/json" id="lesson-live-retrieval">${escapeJsonForHtml(JSON.stringify(liveRetrieval))}</script>
 <script type="application/json" id="lesson-presenter-config">${escapeJsonForHtml(JSON.stringify(presenterConfig))}</script>
@@ -363,6 +372,7 @@ function standaloneLessonCss() {
 .template-slide h2,.math-slide h2,.placeholder-slide h2{font-size:clamp(28px,4vw,58px)}.template-slide li,.placeholder-content,.math-content{font-size:clamp(22px,3vw,42px);line-height:1.5}.placeholder-content{white-space:pre-wrap}.math-content{font-family:Georgia,serif}.latex-rendered p{margin:0 0 .8em}.latex-display{display:flex;justify-content:center;margin:.6em 0}.latex-frac{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center;line-height:1.1}.latex-frac-num{border-bottom:.06em solid currentColor;padding:0 .15em}.latex-root{display:inline-flex;align-items:flex-start}.latex-root-body{border-top:.06em solid currentColor}.latex-script{display:inline-flex;align-items:flex-start}.latex-script sup,.latex-script sub{font-size:.65em}.latex-var,.latex-italic{font-style:italic}.latex-bold{font-weight:800}.latex-list{margin:.5em 0}
 .confidence-poll-slide{display:grid;place-items:center;background:#fff;padding:32px}.confidence-poll-content{display:grid;gap:26px;width:100%;height:100%;align-content:center;text-align:center}.confidence-poll-content h2{margin:0;font-size:clamp(34px,5vw,72px);line-height:1.05;color:#111827}.confidence-poll-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;width:100%}.confidence-poll-choice{min-height:220px;border:4px solid rgba(17,24,39,.28);border-radius:14px;color:#111827;font:900 clamp(54px,8vw,112px)/1 system-ui,sans-serif;display:grid;place-items:center;cursor:pointer;touch-action:manipulation;box-shadow:0 16px 28px rgba(17,24,39,.16)}.confidence-poll-choice-1{background:#fecaca}.confidence-poll-choice-2{background:#fed7aa}.confidence-poll-choice-3{background:#fef08a}.confidence-poll-choice-4{background:#bbf7d0}.confidence-poll-choice-5{background:#86efac}.confidence-poll-total{font-size:clamp(24px,3vw,40px);font-weight:900;color:#374151}.confidence-end-lesson{justify-self:center;border:0;border-radius:10px;background:#0f766e;color:#fff;padding:14px 24px;font:800 18px/1 system-ui,sans-serif;cursor:pointer}
 .presenter-tools{position:fixed;left:50%;top:4px;top:max(4px,env(safe-area-inset-top));transform:translateX(-50%);z-index:20;display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:5px;max-width:calc(100vw - 8px);overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;touch-action:pan-x;padding:5px;border:1px solid #cad7d7;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 6px 16px rgba(19,37,42,.16)}.presenter-tools::-webkit-scrollbar{display:none}.presenter-tool{min-height:36px;border:1px solid #cad7d7;border-radius:7px;background:#fff;color:#172124;padding:5px 8px;font:inherit;font-size:15px;font-weight:750;cursor:pointer;white-space:nowrap;flex:0 0 auto}.presenter-tool:hover{border-color:#8ba3a0}.presenter-tool.is-active,.presenter-tool.primary{background:#0f766e;border-color:#0f766e;color:#fff}.presenter-tool-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;vertical-align:middle}.presenter-tool-icon svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.presenter-colors{display:flex;align-items:center;gap:3px;flex:0 0 auto}.presenter-color{width:36px;height:36px;border:1px solid #cad7d7;border-radius:7px;background:var(--swatch-color,#2563eb);padding:0;cursor:pointer;flex:0 0 auto}.presenter-color.is-active{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.22)}.presenter-custom-color,.presenter-camera-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.presenter-size{width:96px;height:33px;flex:0 0 auto}
+.presenter-student-code{position:fixed;right:10px;bottom:10px;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));z-index:24;border:1px solid #0f766e;border-radius:8px;background:rgba(255,255,255,.95);box-shadow:0 8px 18px rgba(19,37,42,.16);padding:8px 10px;color:#0f3d3b;font:900 16px/1.1 system-ui,sans-serif;letter-spacing:.02em}
 body.focus-mode .lesson-header,body.fullscreen-mode .lesson-header{display:none}body.focus-mode,body.fullscreen-mode{overflow:hidden}body.focus-mode .lesson-deck,body.fullscreen-mode .lesson-deck{max-width:none;box-sizing:border-box;height:100vh;height:100dvh;min-height:0;padding:var(--presenter-toolbar-space) var(--presenter-edge-space) var(--presenter-edge-space);gap:0;place-items:center;overflow:auto;scroll-padding-top:var(--presenter-toolbar-space)}body.focus-mode .lesson-slide,body.fullscreen-mode .lesson-slide{box-sizing:border-box;border:0;box-shadow:none;width:var(--presenter-slide-width);height:var(--presenter-slide-height);max-width:calc(100vw - 12px);max-height:calc(100vh - var(--presenter-toolbar-space) - var(--presenter-edge-space));max-height:calc(100dvh - var(--presenter-toolbar-space) - var(--presenter-edge-space));scroll-snap-align:center}body.focus-mode .lesson-slide.pdf-page-slide,body.fullscreen-mode .lesson-slide.pdf-page-slide{max-height:none;align-self:start;scroll-snap-align:start center}body.presenter-zoom-mode.focus-mode .lesson-deck,body.presenter-zoom-mode.fullscreen-mode .lesson-deck{place-items:start;justify-items:start;align-items:start;overflow:auto;overscroll-behavior:contain;scroll-padding-left:var(--presenter-edge-space)}body.presenter-zoom-mode.focus-mode .lesson-slide,body.presenter-zoom-mode.fullscreen-mode .lesson-slide{max-width:none;max-height:none;scroll-snap-align:start}
 .handout-mode{padding:12px;background:#fff}.handout-mode .lesson-header,.handout-mode .presenter-tools{display:none}.handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:10mm}.handout-mode .lesson-slide{display:block!important;width:100%;height:auto;box-shadow:none;break-inside:avoid}.empty-state{display:grid;place-items:center;height:100%;color:#6b7f83}
 @media (max-width:760px){.presenter-tools{left:4px;right:4px;transform:none}.presenter-tool{padding:5px 6px;font-size:14px}.presenter-size{width:84px}}
@@ -381,6 +391,8 @@ function standaloneInteractionScript() {
   const cameraInput = document.getElementById("presenter-camera-input");
   const pollButton = document.getElementById("presenter-poll");
   const saveBuilderButton = document.getElementById("presenter-save-builder");
+  const studentUploadButton = document.getElementById("presenter-student-upload");
+  const studentCodeBadge = document.getElementById("presenter-student-code");
   const builderStateElement = document.getElementById("lesson-builder-state");
   const liveRetrieval = readJsonScript("lesson-live-retrieval");
   const presenterConfig = readJsonScript("lesson-presenter-config");
@@ -395,6 +407,17 @@ function standaloneInteractionScript() {
   if (presenterConfig?.enabled) {
     if (pollButton) pollButton.hidden = false;
     if (saveBuilderButton) saveBuilderButton.hidden = false;
+    if (presenterConfig.studentSession?.sessionId) {
+      if (studentUploadButton) studentUploadButton.hidden = false;
+      if (studentCodeBadge) {
+        studentCodeBadge.hidden = false;
+        studentCodeBadge.textContent =
+          "Student code: " + (presenterConfig.studentSession.code || "");
+        if (presenterConfig.studentSession.viewerUrl) {
+          studentCodeBadge.title = presenterConfig.studentSession.viewerUrl;
+        }
+      }
+    }
   }
 
   function readJsonScript(id) {
@@ -1034,6 +1057,168 @@ function standaloneInteractionScript() {
     }
   }
 
+  function hasStudentSessionConfig() {
+    return Boolean(
+      presenterConfig?.studentSession?.sessionId &&
+        presenterConfig.studentSessionUploadEndpoint &&
+        presenterConfig.studentSessionCompleteEndpoint,
+    );
+  }
+
+  function buildStudentSnapshotHtml() {
+    const snapshot = document.implementation.createHTMLDocument(
+      document.title || "Lesson",
+    );
+    const viewport = snapshot.createElement("meta");
+    viewport.setAttribute("name", "viewport");
+    viewport.setAttribute("content", "width=device-width, initial-scale=1");
+    snapshot.head.appendChild(viewport);
+    document.querySelectorAll("style").forEach((sourceStyle) => {
+      const style = snapshot.createElement("style");
+      style.textContent = sourceStyle.textContent || "";
+      snapshot.head.appendChild(style);
+    });
+    const studentStyle = snapshot.createElement("style");
+    studentStyle.textContent =
+      "html,body{margin:0;padding:0;min-height:100%;background:#eef5f3;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}" +
+      "body.student-shared-view .lesson-header{position:static;display:flex;justify-content:space-between;gap:18px;max-width:1120px;margin:12px auto 0;padding:10px 14px;box-sizing:border-box;background:#fff;border:1px solid #cad7d7;border-radius:8px;box-shadow:0 4px 14px rgba(19,37,42,.08)}" +
+      "body.student-shared-view .lesson-deck{display:grid;gap:16px;place-items:center;margin:0;padding:16px;box-sizing:border-box}" +
+      "body.student-shared-view .lesson-slide{display:block;width:min(1120px,calc(100vw - 32px));height:auto;max-height:none;aspect-ratio:var(--slide-aspect,1.6);margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);zoom:1!important}" +
+      "body.student-shared-view .annotation-svg{pointer-events:none!important}" +
+      "@media(max-width:760px){body.student-shared-view .lesson-header{margin:8px 8px 0}body.student-shared-view .lesson-deck{padding:8px}body.student-shared-view .lesson-slide{width:calc(100vw - 16px)}}";
+    snapshot.head.appendChild(studentStyle);
+
+    const header = document.querySelector(".lesson-header");
+    const lessonDeck = document.querySelector(".lesson-deck");
+    if (header) snapshot.body.appendChild(header.cloneNode(true));
+    if (lessonDeck) snapshot.body.appendChild(lessonDeck.cloneNode(true));
+
+    snapshot.querySelectorAll("[data-qa-toggle]").forEach((toggle) => {
+      const showingAnswer = toggle.classList.contains("is-showing-answer");
+      const visibleLayer = toggle.querySelector(
+        showingAnswer ? ".qa-answer-layer" : ".qa-question-layer",
+      );
+      if (visibleLayer) {
+        toggle.replaceWith(...Array.from(visibleLayer.childNodes));
+      }
+    });
+    snapshot
+      .querySelectorAll(
+        ".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation],button",
+      )
+      .forEach((node) => node.remove());
+    snapshot
+      .querySelectorAll("[data-bound],[data-pointer-input-bound],[contenteditable]")
+      .forEach((node) => {
+        node.removeAttribute("data-bound");
+        node.removeAttribute("data-pointer-input-bound");
+        node.removeAttribute("contenteditable");
+      });
+    snapshot
+      .querySelectorAll(".annotation-svg")
+      .forEach((svg) => svg.setAttribute("pointer-events", "none"));
+    snapshot.body.className = "student-shared-view";
+    return "<!doctype html>\n" + snapshot.documentElement.outerHTML;
+  }
+
+  function studentSnapshotDocument() {
+    const state = syncBuilderStateForSave();
+    return {
+      schemaVersion: 1,
+      snapshotKind: "student-presentation-snapshot",
+      sourceLessonId: presenterConfig?.sourceLessonId || "",
+      sessionId: presenterConfig?.studentSession?.sessionId || "",
+      title:
+        state.title ||
+        presenterConfig?.originalTitle ||
+        document.title ||
+        "Lesson",
+      className: state.className || presenterConfig?.className || "",
+      teachingDate: state.teachingDate || presenterConfig?.teachingDate || "",
+      uploadedAt: new Date().toISOString(),
+      html: buildStudentSnapshotHtml(),
+    };
+  }
+
+  async function uploadStudentSnapshot() {
+    if (!hasStudentSessionConfig()) {
+      alert("This presenter does not have a student sharing session.");
+      return null;
+    }
+    if (studentUploadButton) {
+      studentUploadButton.disabled = true;
+      studentUploadButton.textContent = "Uploading...";
+    }
+    try {
+      const snapshot = studentSnapshotDocument();
+      const blob = new Blob([JSON.stringify(snapshot)], {
+        type: "application/json",
+      });
+      const uploadResponse = await fetch(
+        presenterConfig.studentSessionUploadEndpoint,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: presenterConfig.studentSession.sessionId,
+            byteSize: blob.size,
+          }),
+        },
+      );
+      const upload = await readApiJson(
+        uploadResponse,
+        "Could not create a student upload URL.",
+      );
+      const formData = new FormData();
+      formData.append("cacheControl", "3600");
+      formData.append("", blob, "snapshot.json");
+      const signedUploadResponse = await fetch(upload.signedUrl, {
+        method: "PUT",
+        headers: { "x-upsert": "true" },
+        body: formData,
+      });
+      if (!signedUploadResponse.ok) {
+        throw new Error(
+          "Could not upload the student view (" +
+            signedUploadResponse.status +
+            ").",
+        );
+      }
+      const completeResponse = await fetch(
+        presenterConfig.studentSessionCompleteEndpoint,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: presenterConfig.studentSession.sessionId,
+            path: upload.path,
+            byteSize: blob.size,
+          }),
+        },
+      );
+      const completed = await readApiJson(
+        completeResponse,
+        "Could not publish the student view.",
+      );
+      alert(
+        "Student view uploaded. Code: " +
+          (presenterConfig.studentSession.code || ""),
+      );
+      return completed;
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || "Could not upload the student view.");
+      throw error;
+    } finally {
+      if (studentUploadButton) {
+        studentUploadButton.disabled = false;
+        studentUploadButton.textContent = "Upload";
+      }
+    }
+  }
+
   async function readApiJson(response, fallbackMessage) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
@@ -1138,6 +1323,7 @@ function standaloneInteractionScript() {
   document.getElementById("presenter-blank-slide")?.addEventListener("click", addBlankSlide);
   pollButton?.addEventListener("click", showConfidencePollSlide);
   saveBuilderButton?.addEventListener("click", () => void savePresentedLesson());
+  studentUploadButton?.addEventListener("click", () => void uploadStudentSnapshot());
   document.getElementById("presenter-camera")?.addEventListener("click", () => {
     if (cameraInput) {
       cameraInput.value = "";

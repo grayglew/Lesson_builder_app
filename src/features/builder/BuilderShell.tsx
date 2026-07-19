@@ -372,9 +372,13 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
             >
               Gemini-Atom
             </a>
+            <a
+              className={`${styles.secondaryButton} ${styles.externalToolButton}`}
+              href="/auth/logout"
+            >
+              Log out
+            </a>
           </div>
-
-          <LessonTransferActions actions={lessonActions} />
         </aside>
 
         <section className={styles.workspace} aria-label={toolLabels[activeTool]}>
@@ -475,8 +479,8 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
               <button
                 className={styles.previewIconButton}
                 type="button"
-                aria-label="Present lesson"
-                title="Present lesson"
+                aria-label="Preview full lesson"
+                title="Preview full lesson"
                 onClick={() => void lessonActions.previewLesson(false)}
               >
                 ▶
@@ -490,8 +494,9 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
               >
                 ▤
               </button>
+              <LessonTransferActions actions={lessonActions} />
               <button
-                className={styles.previewIconButton}
+                className={`${styles.previewIconButton} ${styles.previewCollapseButton}`}
                 type="button"
                 aria-controls="v2-slide-list"
                 aria-expanded={!previewCollapsed}

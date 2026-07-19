@@ -1,8 +1,10 @@
 "use client";
 
-import { ImagePlus } from "lucide-react";
-import type { ClipboardEvent } from "react";
+import { ImagePlus, Pencil } from "lucide-react";
+import { type ClipboardEvent, useState } from "react";
+import localStyles from "./BuilderImageInput.module.css";
 import styles from "./BuilderShell.module.css";
+import { ImageDrawingEditor } from "./ImageDrawingEditor";
 import type { BuilderAsset } from "./schema";
 import { fileToBuilderAsset } from "./starter";
 
@@ -21,6 +23,8 @@ export function BuilderImageInput({
   onError,
   size = "default",
 }: BuilderImageInputProps) {
+  const [isDrawing, setIsDrawing] = useState(false);
+
   async function acceptFile(file: File | null | undefined) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -97,14 +101,37 @@ export function BuilderImageInput({
           }}
         />
       </label>
-      {asset ? (
+      <div className={localStyles.actions}>
         <button
-          className={styles.removeAssetButton}
+          className={localStyles.drawButton}
           type="button"
-          onClick={() => onChange(null)}
+          aria-label={`Draw ${label}`}
+          onClick={() => setIsDrawing(true)}
         >
-          Remove {label.toLowerCase()}
+          <Pencil size={14} aria-hidden />
+          {asset ? "Draw over image" : "Draw image"}
         </button>
+        {asset ? (
+          <button
+            className={styles.removeAssetButton}
+            type="button"
+            onClick={() => onChange(null)}
+          >
+            Remove {label.toLowerCase()}
+          </button>
+        ) : null}
+      </div>
+      {isDrawing ? (
+        <ImageDrawingEditor
+          asset={asset}
+          label={label}
+          onDone={(drawnAsset, file) => {
+            onChange(drawnAsset, file);
+            setIsDrawing(false);
+          }}
+          onCancel={() => setIsDrawing(false)}
+          onError={onError}
+        />
       ) : null}
     </div>
   );

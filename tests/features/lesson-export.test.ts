@@ -69,6 +69,16 @@ describe("standalone lesson export", () => {
         uploadEndpoint: "/api/builder-lessons/upload-url",
         completeEndpoint: "/api/builder-lessons/complete",
         taughtEndpoint: "/api/builder-lessons/taught",
+        studentSession: {
+          sessionId: "student-session",
+          code: "ABC-123",
+          viewerUrl: "https://preview.example/student",
+          expiresAt: "2026-07-19T18:00:00.000Z",
+        },
+        studentSessionUploadEndpoint:
+          "/api/presenter/student-session/upload-url",
+        studentSessionCompleteEndpoint:
+          "/api/presenter/student-session/complete",
       },
     });
 
@@ -82,6 +92,10 @@ describe("standalone lesson export", () => {
     );
     expect(html).toContain("showConfidencePollSlide");
     expect(html).toContain("savePresentedLesson");
+    expect(html).toContain('id="presenter-student-code"');
+    expect(html).toContain('"code":"ABC-123"');
+    expect(html).toContain("studentUploadButton.hidden = false");
+    expect(html).toContain("uploadStudentSnapshot");
   });
 
   it("uses the compact production LO styling without rendering LO text in starter cells", () => {

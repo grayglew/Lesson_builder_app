@@ -2,6 +2,7 @@
 
 import { useBuilderStore } from "./store";
 import {
+  createPresenterStudentSession,
   downloadPresenterPdf,
   saveCurrentLesson,
   syncBuilderDocument,
@@ -33,6 +34,7 @@ export function useLessonExportActions() {
     );
     try {
       let presenterLessonId = "";
+      let studentSession: PresenterStudentSession | null = null;
       if (!handout) {
         setStatus({
           tone: "working",
@@ -47,8 +49,20 @@ export function useLessonExportActions() {
           markLessonSaved(saved);
           presenterLessonId = saved.id;
         }
+        const createdSession =
+          await createPresenterStudentSession(presenterLessonId);
+        studentSession = {
+          sessionId: createdSession.sessionId,
+          code: createdSession.code,
+          viewerUrl: createdSession.viewerUrl,
+          expiresAt: createdSession.expiresAt,
+        };
       }
-      const html = await prepareStandaloneHtml(handout, presenterLessonId);
+      const html = await prepareStandaloneHtml(
+        handout,
+        presenterLessonId,
+        studentSession,
+      );
       const previewUrl = URL.createObjectURL(
         new Blob([html], { type: "text/html" }),
       );
@@ -114,29 +128,20 @@ export function useLessonExportActions() {
     }
   }
 
-  function exportJson(fullBackup = false) {
-    const payload = fullBackup
-      ? {
-          backupKind: "lesson-builder-full",
-          schemaVersion: document.schemaVersion,
-          lessonBuilder: document,
-          exportedAt: new Date().toISOString(),
-        }
-      : {
-          lessonBuilder: document,
-          exportedAt: new Date().toISOString(),
-        };
+  function exportJson() {
+    const payload = {
+      lessonBuilder: document,
+      exportedAt: new Date().toISOString(),
+    };
     downloadBlob(
       new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
       }),
-      `${safeFileName(document.title)}${fullBackup ? ".full-backup" : ".lesson"}.json`,
+      `${safeFileName(document.title)}.lesson.json`,
     );
     setStatus({
       tone: "success",
-      message: fullBackup
-        ? "Exported the full builder backup."
-        : "Exported the lesson JSON.",
+      message: "Exported the lesson JSON.",
     });
   }
 
@@ -188,7 +193,7 @@ export function useLessonExportActions() {
     if (
       document.slides.length &&
       !window.confirm(
-        "Import this file and replace the current lesson? Retrieval-bank data is preserved unless the file contains a full backup.",
+        "Import this file and replace the current lesson? Shared builder data is preserved unless it is explicitly included in the imported file.",
       )
     ) {
       return false;
@@ -200,6 +205,7 @@ export function useLessonExportActions() {
   async function prepareStandaloneHtml(
     handout: boolean,
     presenterLessonId = "",
+    studentSession: PresenterStudentSession | null = null,
   ) {
     const [runtimeCss, runtimeJavaScript, embeddedDocument] = await Promise.all([
       fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
@@ -233,6 +239,13 @@ export function useLessonExportActions() {
             uploadEndpoint: appEndpoint("/api/builder-lessons/upload-url"),
             completeEndpoint: appEndpoint("/api/builder-lessons/complete"),
             taughtEndpoint: appEndpoint("/api/builder-lessons/taught"),
+            studentSession,
+            studentSessionUploadEndpoint: appEndpoint(
+              "/api/presenter/student-session/upload-url",
+            ),
+            studentSessionCompleteEndpoint: appEndpoint(
+              "/api/presenter/student-session/complete",
+            ),
           }
         : null,
     });
@@ -264,6 +277,13 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+type PresenterStudentSession = {
+  sessionId: string;
+  code: string;
+  viewerUrl: string;
+  expiresAt: string;
+};
 
 function appEndpoint(path: string) {
   return new URL(path, window.location.origin).toString();

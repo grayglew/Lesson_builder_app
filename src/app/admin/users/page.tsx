@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAuthorizedAppContext } from "@/lib/auth/app-users";
+import { AdminRecoveryExport } from "./AdminRecoveryExport";
 import AdminUsersClient from "./AdminUsersClient";
 
 export default async function AdminUsersPage() {
@@ -29,6 +30,7 @@ export default async function AdminUsersPage() {
           </a>
         </div>
 
+        <AdminRecoveryExport />
         <AdminUsersClient currentUserId={context.actorUser.id} currentUserEmail={context.actorUser.email || ""} />
       </div>
     </main>

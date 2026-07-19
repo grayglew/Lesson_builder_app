@@ -280,8 +280,7 @@
   font-weight: 750;
 }
 
-.externalTools,
-.exportGroup {
+.externalTools {
   display: grid;
   gap: 8px;
 }
@@ -296,11 +295,6 @@
   font-size: 12px;
   font-weight: 750;
   text-align: center;
-}
-
-.exportGroup {
-  padding-top: 14px;
-  border-top: 1px solid var(--builder-line);
 }
 
 .toolPanel {
@@ -822,10 +816,85 @@
 }
 
 .previewHeadActions {
+  position: relative;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+}
+
+.transferMenu {
+  position: relative;
+}
+
+.transferMenuSummary {
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid var(--builder-line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--builder-ink);
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  list-style: none;
+}
+
+.transferMenuSummary::-webkit-details-marker {
+  display: none;
+}
+
+.transferMenuSummary:hover,
+.transferMenuSummary:focus-visible,
+.transferMenu[open] .transferMenuSummary {
+  border-color: var(--builder-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+.transferMenuContent {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: 190px;
+  overflow: hidden;
+  border: 1px solid var(--builder-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px;
+  box-shadow: var(--builder-shadow);
+}
+
+.transferMenuContent button,
+.transferMenuContent label {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--builder-ink);
+  padding: 8px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.transferMenuContent button:hover,
+.transferMenuContent button:focus-visible,
+.transferMenuContent label:hover,
+.transferMenuContent label:focus-within {
+  outline: none;
+  background: var(--builder-accent-soft);
+  color: var(--builder-accent-dark);
 }
 
 .previewIconButton,
@@ -1119,7 +1188,7 @@
 
 .previewCollapsed .previewTitle .eyebrow,
 .previewCollapsed .slideList,
-.previewCollapsed .previewHeadActions > button:not(:nth-child(3)) {
+.previewCollapsed .previewHeadActions > :not(.previewCollapseButton) {
   display: none;
 }
 
