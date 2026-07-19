@@ -226,6 +226,7 @@ export function SavedLessonLibrary({
       const html = await prepareSavedLessonHtml(opened.document, {
         lessonId: lesson.id,
         studentSession: session,
+        retrievalItems: document.retrievalItems,
       });
       const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
       previewWindow.location.replace(url);
@@ -245,7 +246,9 @@ export function SavedLessonLibrary({
         message: `Preparing "${lesson.title}" for download…`,
       });
       const opened = await fetchSavedLesson(lesson.id);
-      const html = await prepareSavedLessonHtml(opened.document);
+      const html = await prepareSavedLessonHtml(opened.document, {
+        retrievalItems: document.retrievalItems,
+      });
       downloadBlob(
         new Blob([html], { type: "text/html" }),
         `${safeFileName(lesson.title)}.html`,
@@ -264,7 +267,9 @@ export function SavedLessonLibrary({
         message: `Building the static PowerPoint bundle for "${lesson.title}"…`,
       });
       const opened = await fetchSavedLesson(lesson.id);
-      const bundle = await buildPowerPointBundleZip(opened.document);
+      const bundle = await buildPowerPointBundleZip(opened.document, {
+        retrievalItems: document.retrievalItems,
+      });
       downloadBlob(bundle, `${safeFileName(lesson.title)}-bundle.zip`);
       setStatus({
         tone: "success",

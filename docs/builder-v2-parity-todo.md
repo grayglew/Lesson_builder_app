@@ -21,7 +21,6 @@ behaviour. Items marked **missing** have no equivalent implementation.
 - [x] Starter authoring with four LO slots, question/answer images, due-LO
   suggestions, and starter slide creation.
 - [x] Hover-to-paste image inputs without requiring a click.
-- [x] Live starter presenter controls: `+1`, `-1`, and next retrieval image.
 - [x] Compact production-style example LO row; starter and revision cells no
   longer render oversized teal/green LO banners.
 - [x] Retrieval-bank add/edit/archive, select all/due/none, add selected slides,
@@ -44,6 +43,13 @@ behaviour. Items marked **missing** have no equivalent implementation.
 ## Remaining implementation to-do list
 
 ### P0 — required before replacing production
+
+- [ ] **Live starter quadrant controls - implemented, awaiting manual
+  verification.** The `+1`, `-1`, and next-image buttons already existed in
+  the hosted presenter. V2 now hydrates lesson-only saved starter slides from
+  the current global retrieval bank before rendering, restoring production's
+  ID/LO/class matching and current-image resolution for all four quadrants. We
+  keep this item open until it passes testing with a real legacy saved lesson.
 
 - [x] **Import/export menu relocation — completed.** Removed the
   individual Export HTML, Export PDF, Export JSON, Import HTML, and Import JSON

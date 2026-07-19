@@ -4,12 +4,13 @@ import {
   buildStandaloneLessonHtml,
   embedRemoteBuilderAssets,
 } from "./lesson-export";
+import { hydrateLiveStarterSlots } from "./live-starter";
 import {
   collectWorksheetFilesForBundle,
   createStaticExportDocument,
   describeStaticExportBehavior,
 } from "./saved-lesson-parity";
-import type { BuilderAsset, BuilderDocument } from "./schema";
+import type { BuilderAsset, BuilderDocument, RetrievalItem } from "./schema";
 
 export type PresenterStudentSession = {
   sessionId: string;
@@ -33,6 +34,7 @@ type BundleDependencies = {
     slides: readonly RenderedSlide[],
     title: string,
   ) => Promise<Blob>;
+  retrievalItems?: RetrievalItem[];
 };
 
 export async function prepareSavedLessonHtml(
@@ -40,13 +42,18 @@ export async function prepareSavedLessonHtml(
   options: {
     lessonId?: string;
     studentSession?: PresenterStudentSession | null;
+    retrievalItems?: RetrievalItem[];
   } = {},
 ) {
   const lessonId = options.lessonId || "";
+  const hydratedDocument = await hydrateLiveStarterSlots(
+    document,
+    options.retrievalItems,
+  );
   const [runtimeCss, runtimeJavaScript, embeddedDocument] = await Promise.all([
     fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
     fetchAssetText("/builder-v2-assets/presenter-runtime.js"),
-    embedRemoteBuilderAssets(document),
+    embedRemoteBuilderAssets(hydratedDocument),
   ]);
   return buildStandaloneLessonHtml(embeddedDocument, {
     runtimeCss,
@@ -90,7 +97,11 @@ export async function buildPowerPointBundleZip(
   if (!document.slides.length) {
     throw new Error("This saved lesson has no slides to export.");
   }
-  const embeddedDocument = await embedRemoteBuilderAssets(document);
+  const hydratedDocument = await hydrateLiveStarterSlots(
+    document,
+    dependencies.retrievalItems,
+  );
+  const embeddedDocument = await embedRemoteBuilderAssets(hydratedDocument);
   const staticDocument = createStaticExportDocument(embeddedDocument);
   const html = buildStandaloneLessonHtml(staticDocument);
   const renderedSlides = await (

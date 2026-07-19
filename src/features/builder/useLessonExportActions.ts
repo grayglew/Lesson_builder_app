@@ -13,6 +13,7 @@ import {
   normalizeImportedBuilderDocument,
   parseStandaloneLessonHtml,
 } from "./lesson-export";
+import { hydrateLiveStarterSlots } from "./live-starter";
 import {
   buildA4Handout,
   selectHandoutDocument,
@@ -226,10 +227,14 @@ export function useLessonExportActions() {
     presenterLessonId = "",
     studentSession: PresenterStudentSession | null = null,
   ) {
+    const hydratedDocument = await hydrateLiveStarterSlots(
+      document,
+      document.retrievalItems,
+    );
     const [runtimeCss, runtimeJavaScript, embeddedDocument] = await Promise.all([
       fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
       fetchAssetText("/builder-v2-assets/presenter-runtime.js"),
-      embedRemoteBuilderAssets(document),
+      embedRemoteBuilderAssets(hydratedDocument),
     ]);
     return buildStandaloneLessonHtml(embeddedDocument, {
       handout,
