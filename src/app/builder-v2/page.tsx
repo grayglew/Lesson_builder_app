@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { getAuthorizedAppContext } from "@/lib/auth/app-users";
+import {
+  getAuthorizedAppContext,
+  resolveEffectiveUser,
+} from "@/lib/auth/app-users";
 import {
   canAccessBuilderV2,
   getBuilderV2AccessMode,
@@ -31,10 +34,18 @@ export default async function BuilderV2Page({
     redirect("/builder/index.html");
   }
 
+  const effective = await resolveEffectiveUser(context);
+
   return (
     <BuilderShell
       accessMode={accessMode}
-      userEmail={context.actorUser.email || context.actorProfile.email}
+      actorEmail={context.actorUser.email || context.actorProfile.email}
+      isImpersonating={effective.isImpersonating}
+      userEmail={
+        effective.effectiveUser.email ||
+        context.actorUser.email ||
+        context.actorProfile.email
+      }
     />
   );
 }

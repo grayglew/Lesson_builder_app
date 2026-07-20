@@ -521,7 +521,7 @@ function standaloneInteractionScript() {
     const index = currentSlideIndex();
     const numericScale = Number(nextScale);
     zoomScale = Number.isFinite(numericScale)
-      ? Math.max(1, Math.min(3.5, numericScale))
+      ? Math.max(1, Math.min(3, numericScale))
       : 1;
     if (Math.abs(zoomScale - 1) < 0.04) zoomScale = 1;
     document.body.classList.toggle("presenter-zoom-mode", zoomScale > 1);
@@ -1086,6 +1086,15 @@ function standaloneInteractionScript() {
         : !control.classList.contains("is-hidden");
     });
     state.presentationState = { version: 1, reveals };
+    if (state.type === "drawing") {
+      const image = slide.querySelector("img");
+      state.image = image?.src ? imagePayload(image, state.image) : null;
+      if (slide.classList.contains("camera-slide")) {
+        state.presenterGeneratedType = "camera";
+        state.width = 1600;
+        state.height = 1000;
+      }
+    }
     if (state.type !== "starter" || !Array.isArray(state.slots)) return;
     slide.querySelectorAll(".starter-cell").forEach((cell, slotIndex) => {
       const slot = state.slots[slotIndex];
@@ -1529,6 +1538,13 @@ function standaloneInteractionScript() {
     setZoom(event.detail?.scale || 1);
   });
 
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "p" && (event.ctrlKey || event.metaKey)) return;
+    if (event.key === "f") {
+      document.body.classList.toggle("focus-mode");
+      updateFullscreenUi();
+    }
+  });
   window.addEventListener("resize", updatePresentationLayout);
   window.addEventListener("orientationchange", updatePresentationLayout);
   window.visualViewport?.addEventListener("resize", updatePresentationLayout);

@@ -44,12 +44,25 @@ export function builderSyncDocumentListFolder(userId: string, kind: BuilderSyncD
   return builderSyncDocumentFolder(userId, kind);
 }
 
-export function builderLessonStoragePath(userId: string, lessonId: string) {
-  return `${userId}/${BUILDER_LESSONS_FOLDER}/${lessonId}/lesson.json`;
+export function builderLessonStoragePath(
+  userId: string,
+  lessonId: string,
+  versionId = "",
+) {
+  const fileName = versionId ? `lesson-${versionId}.json` : "lesson.json";
+  return `${userId}/${BUILDER_LESSONS_FOLDER}/${lessonId}/${fileName}`;
 }
 
 export function isBuilderLessonPath(userId: string, lessonId: string, path: string) {
-  return path === builderLessonStoragePath(userId, lessonId);
+  const prefix = `${userId}/${BUILDER_LESSONS_FOLDER}/${lessonId}/`;
+  if (!path.startsWith(prefix)) return false;
+  const fileName = path.slice(prefix.length);
+  return (
+    fileName === "lesson.json" ||
+    /^lesson-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.json$/i.test(
+      fileName,
+    )
+  );
 }
 
 export function presenterPdfSnapshotStoragePath(userId: string, lessonId: string) {

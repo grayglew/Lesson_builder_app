@@ -145,15 +145,19 @@ behaviour. Items marked **missing** have no equivalent implementation.
   indices now shift when blank/camera/poll slides are inserted, and live starter
   capture now clears missing images and recaptures its current LO. Repeated-save
   reopen coverage for the complete upload/mark-taught sequence is still required.
+  Camera images are now recaptured from the live presenter on every save, and
+  each save uses an immutable versioned Storage object so reopening cannot return
+  a cached pre-camera lesson document. Manual save/reopen verification remains.
 
 - [ ] **Specialized slide rendering — partial.** Align Template, Placeholder
   and LaTeX presenter typography/layout with production. Verify revision’s
   two-question plus lower working-area layout and imported-HTML/taught camera
   slide rendering.
 
-- [ ] **Impersonation exit control — missing.** The V2 route accepts the admin
-  access mode but does not display production’s “Exit view-as” control while an
-  impersonation session is active.
+- [x] **Impersonation exit control - completed.** Builder V2 now resolves the
+  effective teacher on the server, displays the production Acting as identity
+  and Exit view-as control during an active session, then uses the existing
+  audited stop endpoint and reloads V2 into the administrator's own workspace.
 
 ### P2 — polish and secondary parity
 
@@ -163,15 +167,17 @@ behaviour. Items marked **missing** have no equivalent implementation.
   testing on 2026-07-19. Diagnose the publish/open flow later; this is no longer
   a blocker for the current P0 implementation sequence.
 
-- [ ] **Saved-lesson filter controls — partial.** Add a one-click Clear filters
-  action and match production’s planned-first, teaching-date, then title sort.
+- [x] **Saved-lesson filter controls — completed.** Added a one-click Clear
+  filters action covering title, class, status and both teaching-date bounds.
+  Results retain production's planned-first, teaching-date, then title sort.
 
-- [ ] **Presenter keyboard shortcut — missing.** Restore `F` to toggle focus
-  presentation mode while leaving browser print shortcuts untouched.
+- [x] **Presenter keyboard shortcut — completed.** Restored production's
+  lowercase `F` shortcut to toggle focus presentation mode while leaving the
+  browser's Ctrl/Cmd+P print shortcut untouched.
 
-- [ ] **Presenter zoom constants — mismatch.** Production clamps zoom at 3×;
-  V2 currently allows 3.5×. Decide which behaviour is desired and make the
-  runtime, button, pinch handling, and tests consistent.
+- [x] **Presenter zoom constants — completed.** V2 now matches production's
+  1× to 3× zoom clamp for button and pinch handling, with the 60% button still
+  toggling between fit and 1.6×.
 
 - [ ] **Offline/live capability messaging — partial.** Downloaded HTML
   correctly cannot call hosted Save/Poll/retrieval APIs, but it should explain

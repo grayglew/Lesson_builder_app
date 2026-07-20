@@ -13,6 +13,7 @@ import { CfuComposer } from "./CfuComposer";
 import { DrawComposer } from "./DrawComposer";
 import { ExampleComposer } from "./ExampleComposer";
 import { GlobalDataEditor } from "./GlobalDataEditor";
+import { ImpersonationControl } from "./ImpersonationControl";
 import latexStyles from "./LatexComposer.module.css";
 import { LatexComposer } from "./LatexComposer";
 import { LessonTransferActions } from "./LessonTransferActions";
@@ -35,6 +36,8 @@ import { renderLatexDocument } from "./latex";
 type BuilderShellProps = {
   userEmail: string;
   accessMode: "admin" | "all";
+  actorEmail?: string;
+  isImpersonating?: boolean;
 };
 
 type ToolName =
@@ -78,7 +81,11 @@ const toolLabels: Record<ToolName, string> = {
   math: "LaTeX",
 };
 
-export function BuilderShell({ userEmail }: BuilderShellProps) {
+export function BuilderShell({
+  actorEmail = "",
+  isImpersonating = false,
+  userEmail,
+}: BuilderShellProps) {
   const document = useBuilderStore(selectDocument);
   const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
   const selectedPreviewSlideIds = useBuilderStore(
@@ -243,7 +250,14 @@ export function BuilderShell({ userEmail }: BuilderShellProps) {
             <div className={styles.brandMark}>LB</div>
             <div className={styles.brandCopy}>
               <h1>Lesson Builder</h1>
-              <p>{userEmail}</p>
+              {isImpersonating ? (
+                <ImpersonationControl
+                  actorEmail={actorEmail}
+                  effectiveEmail={userEmail}
+                />
+              ) : (
+                <p>{userEmail}</p>
+              )}
             </div>
           </div>
 

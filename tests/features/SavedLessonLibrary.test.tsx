@@ -122,6 +122,40 @@ describe("SavedLessonLibrary production actions", () => {
     });
     expect((await screen.findAllByText("Year 10")).length).toBeGreaterThan(0);
   });
+
+  it("clears every saved-lesson filter in one action and restores production order", async () => {
+    const user = userEvent.setup();
+    render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
+
+    await screen.findByText("Confidence lesson");
+    const clearFilters = screen.getByRole("button", { name: "Clear filters" });
+    expect(clearFilters).toBeDisabled();
+
+    await user.type(screen.getByLabelText("Search title"), "already");
+    await user.selectOptions(screen.getByLabelText("Class"), "Year 9");
+    await user.selectOptions(screen.getByLabelText("Status"), "taught");
+    await user.type(screen.getByLabelText("From"), "2026-01-01");
+    await user.type(screen.getByLabelText("To"), "2026-01-01");
+
+    expect(screen.getByText(/1 of 3 lessons/)).toBeInTheDocument();
+    expect(screen.getByText("Already taught")).toBeInTheDocument();
+    expect(screen.queryByText("Active lesson *")).not.toBeInTheDocument();
+    expect(clearFilters).toBeEnabled();
+
+    await user.click(clearFilters);
+
+    expect(screen.getByLabelText("Search title")).toHaveValue("");
+    expect(screen.getByLabelText("Class")).toHaveValue("");
+    expect(screen.getByLabelText("Status")).toHaveValue("all");
+    expect(screen.getByLabelText("From")).toHaveValue("");
+    expect(screen.getByLabelText("To")).toHaveValue("");
+    expect(clearFilters).toBeDisabled();
+
+    const rows = screen.getAllByRole("row");
+    expect(within(rows[1]).getByText("Confidence lesson")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("Active lesson *")).toBeInTheDocument();
+    expect(within(rows[3]).getByText("Already taught")).toBeInTheDocument();
+  });
 });
 
 function lesson(

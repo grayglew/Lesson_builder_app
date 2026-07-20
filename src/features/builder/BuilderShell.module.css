@@ -114,6 +114,23 @@
   white-space: nowrap;
 }
 
+.impersonationIdentity {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.impersonationIdentity .tinyButton {
+  min-height: 28px;
+}
+
+.impersonationError {
+  color: var(--builder-danger);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

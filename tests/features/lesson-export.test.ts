@@ -46,6 +46,9 @@ describe("standalone lesson export", () => {
     expect(html).toContain('id="presenter-pdf"');
     expect(html).toContain('data-qa-toggle="replace"');
     expect(html).toContain("requestFullscreen");
+    expect(html).toContain('event.key === "f"');
+    expect(html).toContain('Math.min(3, numericScale)');
+    expect(html).not.toContain('Math.min(3.5, numericScale)');
     expect(html).toContain("overflow:auto");
     expect(html).toContain("@media print");
     expect(html).toContain('canvas.width = 1600');
@@ -54,6 +57,9 @@ describe("standalone lesson export", () => {
     expect(html).toContain("shiftSlideIndicesForInsert");
     expect(html).toContain(
       "slot.answerImage = answer?.src ? imagePayload(answer, slot.answerImage) : null",
+    );
+    expect(html).toContain(
+      "state.image = image?.src ? imagePayload(image, state.image) : null",
     );
     expect(html).toContain('pdfButton?.addEventListener("click", openPrintView)');
     expect(html).toContain("buildPresenterPrintHtml");
@@ -178,6 +184,42 @@ describe("standalone lesson export", () => {
     expect(html).toContain(
       ".lesson-slide.pdf-page-slide{max-height:none",
     );
+  });
+
+  it("round-trips a presenter-generated camera image as drawing slide data", () => {
+    const document = lessonDocument();
+    document.slides = [
+      {
+        id: "camera-slide",
+        type: "drawing",
+        title: "Camera photo 1",
+        width: 1600,
+        height: 1000,
+        presenterGeneratedType: "camera",
+        image: {
+          name: "camera-photo.jpg",
+          type: "image/jpeg",
+          size: 12,
+          dataUrl: "data:image/jpeg;base64,Y2FtZXJhLXBob3Rv",
+        },
+      },
+    ];
+
+    const reopened = parseStandaloneLessonHtml(
+      buildStandaloneLessonHtml(document),
+    );
+    const cameraSlide = reopened.slides[0] as BuilderDocument["slides"][number] & {
+      image?: { dataUrl?: string };
+      presenterGeneratedType?: string;
+    };
+
+    expect(cameraSlide).toMatchObject({
+      type: "drawing",
+      presenterGeneratedType: "camera",
+      image: {
+        dataUrl: "data:image/jpeg;base64,Y2FtZXJhLXBob3Rv",
+      },
+    });
   });
 
   it("preserves current global data when importing a lesson-only payload", () => {

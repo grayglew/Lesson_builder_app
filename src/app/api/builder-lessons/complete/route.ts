@@ -33,6 +33,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid saved lesson size." }, { status: 400 });
   }
 
+  const { data: previousLesson, error: previousLessonError } =
+    await auth.supabase
+      .from("builder_lessons")
+      .select("storage_path")
+      .eq("id", id)
+      .eq("owner_id", auth.user.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+  if (previousLessonError) {
+    return NextResponse.json(
+      { ok: false, error: previousLessonError.message },
+      { status: 500 },
+    );
+  }
+
   const lessonRow: Record<string, unknown> = {
     id,
     owner_id: auth.user.id,
@@ -59,6 +75,19 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  const previousPath = String(previousLesson?.storage_path || "");
+  if (
+    previousPath &&
+    previousPath !== path &&
+    isBuilderLessonPath(auth.user.id, id, previousPath)
+  ) {
+    // The new database row is already authoritative. Old version cleanup is
+    // best-effort so a transient Storage error never invalidates a good save.
+    await auth.supabase.storage
+      .from(BUILDER_SYNC_BUCKET)
+      .remove([previousPath]);
   }
 
   return NextResponse.json({

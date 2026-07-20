@@ -139,6 +139,18 @@ export function SavedLessonLibrary({
     }));
   }, [classFilter, dateFrom, dateTo, lessons, taughtFilter, titleFilter]);
 
+  const hasActiveFilters = Boolean(
+    titleFilter || classFilter || dateFrom || dateTo || taughtFilter !== "all",
+  );
+
+  function clearFilters() {
+    setTitleFilter("");
+    setClassFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setTaughtFilter("all");
+  }
+
   async function saveLesson(copy: boolean) {
     if (!document.className.trim()) {
       setStatus({
@@ -446,10 +458,20 @@ export function SavedLessonLibrary({
           <p className="text-sm text-slate-600">
             {filteredLessons.length} of {lessons.length} lessons · {formatBytes(lessons.reduce((total, lesson) => total + lesson.byteSize, 0))}
           </p>
-          <button className="secondary-action" type="button" disabled={loading} onClick={() => void refresh(true)}>
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
-            Refresh
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={!hasActiveFilters}
+              onClick={clearFilters}
+            >
+              Clear filters
+            </button>
+            <button className="secondary-action" type="button" disabled={loading} onClick={() => void refresh(true)}>
+              <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {loading ? (
