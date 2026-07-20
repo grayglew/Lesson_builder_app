@@ -219,6 +219,9 @@ try {
       clientY: 180,
     });
 
+    controller.shiftSlideIndicesForInsert(0);
+    const strokeCountAfterShift = controller.getAnnotations()["1"]?.length || 0;
+
     return {
       version: controller.version,
       mousePanStrokeCount,
@@ -232,8 +235,9 @@ try {
       pinchScale,
       svgPathCount: slide.querySelectorAll(".annotation-svg path").length,
       undoWorked: controller.undo(),
+      strokeCountAfterShift,
       strokeCountAfterUndo:
-        controller.getAnnotations()["0"]?.length || 0,
+        controller.getAnnotations()["1"]?.length || 0,
     };
   });
 
@@ -250,6 +254,10 @@ try {
   assert(result.touchScrollTop > 100, "One-finger touch must pan the lesson deck.");
   assert(result.pinchScale > 1, "Pinch input must request presenter zoom.");
   assert(result.svgPathCount === 3, "All live strokes must render as SVG paths.");
+  assert(
+    result.strokeCountAfterShift === 3,
+    "Inserted slides must shift later annotation indices.",
+  );
   assert(result.undoWorked, "Undo must report a completed action.");
   assert(result.strokeCountAfterUndo === 2, "Undo must remove the latest stroke.");
   console.log("Extracted presenter runtime browser checks passed.");

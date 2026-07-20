@@ -789,6 +789,33 @@ export function mountPresenterRuntime(
     }
   }
 
+  function shiftSlideIndicesForInsert(insertIndex: number): void {
+    const threshold = Math.max(0, Math.round(Number(insertIndex) || 0));
+    const shifted: PresenterAnnotations = {};
+    Object.entries(annotations).forEach(([slideIndex, strokes]) => {
+      const numericIndex = Number(slideIndex);
+      const nextIndex =
+        Number.isInteger(numericIndex) && numericIndex >= threshold
+          ? String(numericIndex + 1)
+          : slideIndex;
+      shifted[nextIndex] = strokes;
+    });
+    annotations = shifted;
+    history = history.map((entry) => {
+      const numericIndex = Number(entry.slideIndex);
+      return Number.isInteger(numericIndex) && numericIndex >= threshold
+        ? { ...entry, slideIndex: String(numericIndex + 1) }
+        : entry;
+    });
+    if (activePointer) {
+      const numericIndex = Number(activePointer.slideIndex);
+      if (Number.isInteger(numericIndex) && numericIndex >= threshold) {
+        activePointer.slideIndex = String(numericIndex + 1);
+      }
+    }
+    notifyChange();
+  }
+
   function refresh(): void {
     if (destroyed) return;
     const currentSlides = new Set(
@@ -851,6 +878,7 @@ export function mountPresenterRuntime(
   return {
     version: PRESENTER_RUNTIME_VERSION,
     refresh,
+    shiftSlideIndicesForInsert,
     destroy,
     setMode,
     getMode: () => mode,

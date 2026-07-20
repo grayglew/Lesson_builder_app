@@ -81,6 +81,13 @@ const resolvedRetrievalImageSchema = z
 const retrievalProgressResultSchema = z
   .object({
     id: z.string(),
+    itemId: z.string().optional(),
+    trackingId: z.string().optional(),
+    contentId: z.string().optional(),
+    retrieval_lo_id: z.string().optional(),
+    lo_text: z.string().optional(),
+    loCode: z.string().optional(),
+    class_name: z.string().optional(),
     seenCount: z.number().optional(),
     seen_count: z.number().optional(),
     lastTaught: z.string().optional(),

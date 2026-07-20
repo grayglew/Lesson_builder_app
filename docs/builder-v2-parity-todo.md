@@ -44,12 +44,11 @@ behaviour. Items marked **missing** have no equivalent implementation.
 
 ### P0 — required before replacing production
 
-- [ ] **Live starter quadrant controls - implemented, awaiting manual
-  verification.** The `+1`, `-1`, and next-image buttons already existed in
+- [x] **Live starter quadrant controls - completed and manually confirmed.** The `+1`, `-1`, and next-image buttons already existed in
   the hosted presenter. V2 now hydrates lesson-only saved starter slides from
   the current global retrieval bank before rendering, restoring production's
-  ID/LO/class matching and current-image resolution for all four quadrants. We
-  keep this item open until it passes testing with a real legacy saved lesson.
+  ID/LO/class matching and current-image resolution for all four quadrants.
+  The controls were manually confirmed with a newly authored starter in Preview.
 
 - [x] **Import/export menu relocation — completed.** Removed the
   individual Export HTML, Export PDF, Export JSON, Import HTML, and Import JSON
@@ -114,7 +113,10 @@ behaviour. Items marked **missing** have no equivalent implementation.
 ### P1 — important workflow and rendering parity
 
 - [ ] **Starter “Log retrieval” — missing.** The V2 button is present but
-  disabled. Wire it to the same retrieval logging behaviour as production.
+  implemented and awaiting manual verification. It now creates or updates
+  owner-scoped retrieval progress, increments seen, records the teaching date,
+  reconciles canonical database IDs, and links draft starter slots to those IDs
+  before slide creation.
 
 - [ ] **Legacy retrieval import — missing.** Restore `.xlsx` tracker import,
   image-folder selection, preview/validation, ID migration, and database update.
@@ -125,18 +127,24 @@ behaviour. Items marked **missing** have no equivalent implementation.
   startup is non-blocking while that separate P2 issue remains deprioritized.
 
 - [ ] **Presenter print/PDF view — partial.** V2 calls the browser print dialog
-  on the live document. Production builds a clean dedicated print document,
-  preserves annotations/reveals, handles portrait PDFs, and retries at bounded
-  render widths.
+  implementation is complete and awaiting manual verification. V2 now snapshots
+  the current live deck into a clean dedicated print window, preserves annotations
+  and reveal state, removes presenter-only controls, neutralises zoom, waits for
+  images, and prevents a trailing blank page.
 
 - [ ] **Presenter camera parity — partial.** V2 inserts the original camera
   file. Production downsizes and letterboxes it to a 1600×1000 JPEG before
   insertion, reducing memory and saved-lesson size.
 
+  **Implementation update (awaiting manual verification):** V2 now validates the
+  selected image and downsizes/letterboxes it onto a white 1600x1000 canvas as a
+  quality-0.88 JPEG before insertion, matching production.
 - [ ] **Generated-slide save fidelity — partial.** Verify that blank and camera
   slides, live starter image changes, reveal state, and annotation indices
-  survive repeated Save-to-Builder operations and reopening. Add end-to-end API
-  coverage for the complete upload/mark-taught sequence.
+  survive repeated Save-to-Builder operations and reopening. Annotation and undo
+  indices now shift when blank/camera/poll slides are inserted, and live starter
+  capture now clears missing images and recaptures its current LO. Repeated-save
+  reopen coverage for the complete upload/mark-taught sequence is still required.
 
 - [ ] **Specialized slide rendering — partial.** Align Template, Placeholder
   and LaTeX presenter typography/layout with production. Verify revision’s

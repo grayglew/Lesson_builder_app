@@ -413,6 +413,8 @@ function standaloneInteractionScript() {
   const zoomButton = document.getElementById("presenter-zoom");
   const fullscreenButton = document.getElementById("presenter-fullscreen");
   const cameraInput = document.getElementById("presenter-camera-input");
+  const cameraButton = document.getElementById("presenter-camera");
+  const pdfButton = document.getElementById("presenter-pdf");
   const pollButton = document.getElementById("presenter-poll");
   const saveBuilderButton = document.getElementById("presenter-save-builder");
   const studentUploadButton = document.getElementById("presenter-student-upload");
@@ -573,6 +575,11 @@ function standaloneInteractionScript() {
   function insertSlideAfterCurrent(slide) {
     refreshSlides();
     const current = slides[currentSlideIndex()];
+    const currentIndex = current ? slides.indexOf(current) : slides.length - 1;
+    const insertIndex = Math.max(0, currentIndex + 1);
+    window.__lessonPresenterRuntimeController?.shiftSlideIndicesForInsert(
+      insertIndex,
+    );
     if (current?.parentNode === deck) {
       deck.insertBefore(slide, current.nextSibling);
     } else {
@@ -597,24 +604,175 @@ function standaloneInteractionScript() {
     insertSlideAfterCurrent(slide);
   }
 
-  function addCameraSlide(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      const slide = document.createElement("section");
-      slide.className = "lesson-slide camera-slide";
-      slide.dataset.builderSlideId = "camera_" + Date.now().toString(36);
-      slide.dataset.builderSlideType = "camera";
-      slide.dataset.slideAspect = String(16 / 10);
-      slide.style.setProperty("--slide-aspect", String(16 / 10));
-      const image = document.createElement("img");
-      image.className = "slide-image-fit";
-      image.alt = file.name || "Camera image";
-      image.src = String(reader.result || "");
-      slide.appendChild(image);
-      insertSlideAfterCurrent(slide);
+  function downscaleCameraImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener("error", () => {
+        reject(reader.error || new Error("Could not read camera image."));
+      });
+      reader.addEventListener("load", () => {
+        const source = new Image();
+        source.addEventListener("load", () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = 1600;
+            canvas.height = 1000;
+            const context = canvas.getContext("2d");
+            if (!context) throw new Error("Canvas is not available.");
+            context.fillStyle = "#fff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            const naturalWidth = source.naturalWidth || source.width || canvas.width;
+            const naturalHeight = source.naturalHeight || source.height || canvas.height;
+            const scale = Math.min(
+              canvas.width / naturalWidth,
+              canvas.height / naturalHeight,
+            );
+            const drawWidth = Math.max(1, Math.round(naturalWidth * scale));
+            const drawHeight = Math.max(1, Math.round(naturalHeight * scale));
+            const drawX = Math.round((canvas.width - drawWidth) / 2);
+            const drawY = Math.round((canvas.height - drawHeight) / 2);
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = "high";
+            context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+            resolve(canvas.toDataURL("image/jpeg", 0.88));
+          } catch (error) {
+            reject(error);
+          }
+        });
+        source.addEventListener("error", () => {
+          reject(new Error("Could not decode camera image."));
+        });
+        source.src = String(reader.result || "");
+      });
+      reader.readAsDataURL(file);
     });
-    reader.readAsDataURL(file);
+  }
+
+  function addCameraSlide(dataUrl, fileName) {
+    const slide = document.createElement("section");
+    slide.className = "lesson-slide camera-slide";
+    slide.dataset.builderSlideId =
+      "camera_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+    slide.dataset.builderSlideType = "camera";
+    slide.dataset.slideAspect = String(16 / 10);
+    slide.style.setProperty("--slide-aspect", String(16 / 10));
+    const image = document.createElement("img");
+    image.className = "slide-image-fit";
+    image.alt = fileName || "Camera photo";
+    image.src = String(dataUrl || "");
+    slide.appendChild(image);
+    insertSlideAfterCurrent(slide);
+  }
+
+  async function handleCameraCapture(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    if (!/^image\//i.test(file.type || "") && !/\.(png|jpe?g|webp|gif)$/i.test(file.name || "")) {
+      alert("Choose an image from the camera.");
+      return;
+    }
+    if (cameraButton) cameraButton.disabled = true;
+    try {
+      const dataUrl = await downscaleCameraImage(file);
+      addCameraSlide(dataUrl, file.name || "camera-photo.jpg");
+    } catch (error) {
+      console.error(error);
+      alert("Could not add the camera photo. Try taking the photo again.");
+    } finally {
+      if (cameraButton) cameraButton.disabled = false;
+    }
+  }
+
+  function syncAnnotationsForSnapshot() {
+    const dataElement = document.getElementById("lesson-annotations-data");
+    const annotations = window.__lessonPresenterRuntimeController?.getAnnotations();
+    if (dataElement && annotations) {
+      dataElement.textContent = JSON.stringify(annotations);
+    }
+  }
+
+  function openPrintView() {
+    if (!pdfButton) return;
+    refreshSlides();
+    if (!slides.length) return;
+    pdfButton.disabled = true;
+    pdfButton.setAttribute("aria-busy", "true");
+    try {
+      syncBuilderStateForSave();
+      syncAnnotationsForSnapshot();
+      const html = buildPresenterPrintHtml();
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        alert("The browser blocked the print view. Allow pop-ups for this site and try again.");
+        return;
+      }
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || "Could not open the print view.");
+    } finally {
+      pdfButton.disabled = false;
+      pdfButton.removeAttribute("aria-busy");
+    }
+  }
+
+  function buildPresenterPrintHtml() {
+    const snapshot = document.implementation.createHTMLDocument(document.title || "Lesson");
+    const meta = snapshot.createElement("meta");
+    meta.setAttribute("charset", "utf-8");
+    snapshot.head.appendChild(meta);
+    const viewport = snapshot.createElement("meta");
+    viewport.setAttribute("name", "viewport");
+    viewport.setAttribute("content", "width=device-width, initial-scale=1");
+    snapshot.head.appendChild(viewport);
+    const title = snapshot.createElement("title");
+    title.textContent = (document.title || "Lesson") + " print";
+    snapshot.head.appendChild(title);
+
+    Array.from(document.querySelectorAll("style")).forEach((sourceStyle) => {
+      const style = snapshot.createElement("style");
+      style.textContent = sourceStyle.textContent || "";
+      snapshot.head.appendChild(style);
+    });
+    const printStyle = snapshot.createElement("style");
+    printStyle.textContent = printViewCss();
+    snapshot.head.appendChild(printStyle);
+
+    const printBar = snapshot.createElement("div");
+    printBar.className = "print-window-bar";
+    printBar.innerHTML = '<button type="button" onclick="window.print()">Print / Save PDF</button><button type="button" onclick="window.close()">Close</button>';
+    snapshot.body.appendChild(printBar);
+    const header = document.querySelector(".lesson-header");
+    if (header) snapshot.body.appendChild(header.cloneNode(true));
+    if (deck) snapshot.body.appendChild(deck.cloneNode(true));
+    snapshot
+      .querySelectorAll(".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation]")
+      .forEach((node) => node.remove());
+
+    const autoPrint = snapshot.createElement("script");
+    autoPrint.textContent = printViewAutoPrintScript();
+    snapshot.body.appendChild(autoPrint);
+    snapshot.body.className = "presenter-print-view";
+    return "<!doctype html>\\n" + snapshot.documentElement.outerHTML;
+  }
+
+  function printViewCss() {
+    return [
+      "html,body{margin:0;padding:0;background:#f4f7f6;color:#111827;}",
+      ".print-window-bar{position:sticky;top:0;z-index:1000;display:flex;justify-content:center;gap:10px;padding:10px;background:#fff;border-bottom:1px solid #cad7d7;box-shadow:0 2px 10px rgba(19,37,42,.12);}",
+      ".print-window-bar button{border:1px solid #0f766e;border-radius:7px;background:#0f766e;color:#fff;padding:9px 13px;font:700 15px system-ui,sans-serif;}",
+      ".print-window-bar button+button{background:#fff;color:#172124;border-color:#cad7d7;}",
+      "body.presenter-print-view .lesson-header{max-width:1120px;margin:14px auto 0;padding:8px 12px;box-sizing:border-box;}",
+      "body.presenter-print-view .lesson-deck{display:grid;gap:14px;place-items:center;max-width:none;margin:0;padding:14px;box-sizing:border-box;}",
+      "body.presenter-print-view .lesson-slide{width:min(1120px,calc(100vw - 28px));height:auto;aspect-ratio:16/10;margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);zoom:1!important;}",
+      "@media print{.print-window-bar{display:none!important;}html,body{background:#fff!important;}body.presenter-print-view .lesson-header{display:none!important;}body.presenter-print-view .lesson-deck{display:block!important;margin:0!important;padding:0!important;}body.presenter-print-view .lesson-slide{width:16in!important;height:10in!important;max-width:none!important;max-height:none!important;margin:0!important;border:0!important;box-shadow:none!important;break-after:page;page-break-after:always;overflow:hidden!important;}body.presenter-print-view .lesson-slide:last-child{break-after:auto;page-break-after:auto;}.annotation-svg{pointer-events:none!important;}}",
+    ].join("\\n");
+  }
+
+  function printViewAutoPrintScript() {
+    return "(function(){function waitForImages(){var images=Array.prototype.slice.call(document.querySelectorAll('img'));return Promise.all(images.map(function(image){if(image.complete&&image.naturalWidth>0)return Promise.resolve();if(typeof image.decode==='function')return image.decode().catch(function(){});return new Promise(function(resolve){image.addEventListener('load',resolve,{once:true});image.addEventListener('error',resolve,{once:true});});}));}function openPrintDialog(){waitForImages().then(function(){setTimeout(function(){window.print();},350);});}if(document.readyState==='complete')openPrintDialog();else window.addEventListener('load',openPrintDialog,{once:true});})();";
   }
 
   async function handleLiveRetrieval(button) {
@@ -949,12 +1107,13 @@ function standaloneInteractionScript() {
           slot.retrievalItemId = control.dataset.liveItemId;
         }
         slot.lockImageSlot = true;
+        if (control.dataset.liveLo) slot.lo = control.dataset.liveLo;
       }
       const question = cell.querySelector(".qa-question-layer img")
         || cell.querySelector("[data-live-image-host] > img");
       const answer = cell.querySelector(".qa-answer-layer img");
-      if (question?.src) slot.image = imagePayload(question, slot.image);
-      if (answer?.src) slot.answerImage = imagePayload(answer, slot.answerImage);
+      slot.image = question?.src ? imagePayload(question, slot.image) : null;
+      slot.answerImage = answer?.src ? imagePayload(answer, slot.answerImage) : null;
     });
   }
 
@@ -1348,17 +1507,17 @@ function standaloneInteractionScript() {
   pollButton?.addEventListener("click", showConfidencePollSlide);
   saveBuilderButton?.addEventListener("click", () => void savePresentedLesson());
   studentUploadButton?.addEventListener("click", () => void uploadStudentSnapshot());
-  document.getElementById("presenter-camera")?.addEventListener("click", () => {
+  cameraButton?.addEventListener("click", () => {
     if (cameraInput) {
       cameraInput.value = "";
       cameraInput.click();
     }
   });
-  cameraInput?.addEventListener("change", (event) => addCameraSlide(event.target.files?.[0]));
+  cameraInput?.addEventListener("change", (event) => void handleCameraCapture(event));
   zoomButton?.addEventListener("click", () => setZoom(zoomScale > 1 ? 1 : 1.6));
   fullscreenButton?.addEventListener("click", () => void toggleFullscreen());
   document.getElementById("presenter-download")?.addEventListener("click", downloadAnnotatedHtml);
-  document.getElementById("presenter-pdf")?.addEventListener("click", () => window.print());
+  pdfButton?.addEventListener("click", openPrintView);
 
   const pickerButton = document.getElementById("presenter-color-picker");
   const customColor = document.getElementById("presenter-custom-color");

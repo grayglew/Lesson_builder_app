@@ -2,10 +2,10 @@
 
 import { LoaderCircle, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { resolveStarterImages } from "./api-client";
+import { logRetrievalItems, resolveStarterImages } from "./api-client";
 import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
-import { type StarterSlot } from "./schema";
+import { type RetrievalItem, type StarterSlot } from "./schema";
 import { selectDueStarterItems } from "./starter";
 import { selectDocument, useBuilderStore } from "./store";
 
@@ -21,11 +21,13 @@ export function StarterComposer() {
   const document = useBuilderStore(selectDocument);
   const addStarterSlide = useBuilderStore((state) => state.addStarterSlide);
   const updateMetadata = useBuilderStore((state) => state.updateMetadata);
+  const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const setStatus = useBuilderStore((state) => state.setStatus);
   const [slots, setSlots] = useState<StarterSlot[]>(() =>
     Array.from({ length: 4 }, emptySlot),
   );
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isLogging, setIsLogging] = useState(false);
 
   function updateSlot(index: number, patch: Partial<StarterSlot>) {
     setSlots((current) =>
@@ -89,6 +91,123 @@ export function StarterComposer() {
     }
   }
 
+  async function logStarterRetrieval() {
+    const normalize = (value: string) =>
+      value.replace(/\s+/g, " ").trim().toLowerCase();
+    const normalizedClassName = normalize(document.className);
+    const uniqueLos = Array.from(
+      new Map(
+        slots
+          .map((slot) => slot.lo.replace(/\s+/g, " ").trim())
+          .filter(Boolean)
+          .map((lo) => [normalize(lo), lo]),
+      ).values(),
+    );
+    if (!uniqueLos.length) {
+      setStatus({
+        tone: "error",
+        message: "Enter at least one learning objective to log.",
+      });
+      return;
+    }
+
+    const existingByLo = new Map<string, RetrievalItem>();
+    document.retrievalItems.forEach((item) => {
+      const itemClass = normalize(item.className);
+      if (itemClass && itemClass !== normalizedClassName) return;
+      existingByLo.set(normalize(item.lo), item);
+    });
+    const entries = uniqueLos.map((lo) => ({
+      itemId: existingByLo.get(normalize(lo))?.id || "",
+      lo,
+      className: document.className,
+      teachingDate: document.teachingDate,
+      deltaSeen: 1 as const,
+    }));
+
+    setIsLogging(true);
+    setStatus({ tone: "working", message: "Logging starter retrieval..." });
+    try {
+      const results = await logRetrievalItems(entries);
+      const resultByLo = new Map(
+        results.map((result, index) => [
+          normalize(entries[index]?.lo || ""),
+          result,
+        ]),
+      );
+      const loggedIds = new Set([
+        ...results.map((result) => result.id),
+        ...entries.map((entry) => entry.itemId).filter(Boolean),
+      ]);
+      const nextItems = document.retrievalItems
+        .filter((item) => !loggedIds.has(item.id))
+        .concat(
+          results.map((result, index): RetrievalItem => {
+            const entry = entries[index];
+            const existing = existingByLo.get(normalize(entry.lo));
+            return {
+              ...(existing || {}),
+              id: result.id,
+              trackingId: result.trackingId || result.itemId || result.id,
+              contentId:
+                result.contentId ||
+                result.retrieval_lo_id ||
+                existing?.contentId,
+              lo: result.lo_text || entry.lo,
+              loCode: result.loCode || existing?.loCode,
+              className: result.class_name ?? entry.className,
+              spacingFactor: existing?.spacingFactor ?? 1.3,
+              currentImageSlot:
+                result.currentImageSlot ??
+                result.current_image_slot ??
+                existing?.currentImageSlot ??
+                1,
+              seenCount:
+                result.seenCount ??
+                result.seen_count ??
+                (existing?.seenCount || 0) + 1,
+              lastTaught:
+                result.lastTaught ||
+                result.last_taught ||
+                entry.teachingDate,
+              selected: existing?.selected ?? false,
+              images: existing?.images || Array(8).fill(null),
+              answerImages: existing?.answerImages || Array(8).fill(null),
+            };
+          }),
+        );
+
+      updateGlobalData({ retrievalItems: nextItems });
+      setSlots((current) =>
+        current.map((slot) => {
+          const result = resultByLo.get(normalize(slot.lo));
+          return result
+            ? {
+                ...slot,
+                retrievalItemId: result.id,
+                currentImageSlot:
+                  result.currentImageSlot ?? result.current_image_slot ?? 1,
+              }
+            : slot;
+        }),
+      );
+      setStatus({
+        tone: "success",
+        message: `Logged ${results.length} starter retrieval item${results.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message:
+          error instanceof Error
+            ? `Could not log starter retrieval: ${error.message}`
+            : "Could not log starter retrieval.",
+      });
+    } finally {
+      setIsLogging(false);
+    }
+  }
+
   function addToLesson() {
     const prepared = slots.map((slot) => ({
       ...slot,
@@ -116,7 +235,7 @@ export function StarterComposer() {
         <button
           className={`${styles.secondaryButton} ${styles.compactButton}`}
           type="button"
-          disabled={isSuggesting}
+          disabled={isSuggesting || isLogging}
           onClick={() => void suggestDueItems()}
         >
           {isSuggesting ? (
@@ -191,12 +310,24 @@ export function StarterComposer() {
       </div>
 
       <div className={styles.actionRow}>
-        <button className={styles.primaryButton} type="button" onClick={addToLesson}>
+        <button
+          className={styles.primaryButton}
+          type="button"
+          onClick={addToLesson}
+        >
           <Plus className="size-4" aria-hidden />
           Add starter slide
         </button>
-        <button className={styles.secondaryButton} type="button" disabled>
-          Log retrieval
+        <button
+          className={styles.secondaryButton}
+          type="button"
+          disabled={isSuggesting || isLogging}
+          onClick={() => void logStarterRetrieval()}
+        >
+          {isLogging && (
+            <LoaderCircle className="size-4 animate-spin" aria-hidden />
+          )}
+          {isLogging ? "Logging..." : "Log retrieval"}
         </button>
       </div>
     </section>

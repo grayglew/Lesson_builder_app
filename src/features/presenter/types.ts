@@ -57,6 +57,7 @@ export interface PresenterRuntimeOptions {
 export interface PresenterRuntimeController {
   readonly version: string;
   refresh(): void;
+  shiftSlideIndicesForInsert(insertIndex: number): void;
   destroy(): void;
   setMode(mode: PresenterAnnotationMode): void;
   getMode(): PresenterAnnotationMode;

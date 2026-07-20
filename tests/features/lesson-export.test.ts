@@ -48,6 +48,22 @@ describe("standalone lesson export", () => {
     expect(html).toContain("requestFullscreen");
     expect(html).toContain("overflow:auto");
     expect(html).toContain("@media print");
+    expect(html).toContain('canvas.width = 1600');
+    expect(html).toContain('canvas.height = 1000');
+    expect(html).toContain('canvas.toDataURL("image/jpeg", 0.88)');
+    expect(html).toContain("shiftSlideIndicesForInsert");
+    expect(html).toContain(
+      "slot.answerImage = answer?.src ? imagePayload(answer, slot.answerImage) : null",
+    );
+    expect(html).toContain('pdfButton?.addEventListener("click", openPrintView)');
+    expect(html).toContain("buildPresenterPrintHtml");
+    expect(html).toContain(
+      '.presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation]',
+    );
+    expect(html).toContain("zoom:1!important");
+    expect(html).toContain(".lesson-slide:last-child{break-after:auto");
+    expect(html).toContain("function waitForImages()");
+    expect(html).toContain("window.print();},350");
   });
 
   it("enables production live starter controls, Poll, and Save for hosted presenters", () => {
