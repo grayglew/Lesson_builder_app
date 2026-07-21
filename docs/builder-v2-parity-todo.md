@@ -112,8 +112,8 @@ behaviour. Items marked **missing** have no equivalent implementation.
 
 ### P1 — important workflow and rendering parity
 
-- [ ] **Starter “Log retrieval” — implemented, awaiting manual verification.**
-  It now creates or updates
+- [x] **Starter “Log retrieval” — completed and manually confirmed.** It
+  creates or updates
   owner-scoped retrieval progress, increments seen, records the teaching date,
   reconciles canonical database IDs, and links draft starter slots to those IDs
   before slide creation.
@@ -130,8 +130,8 @@ behaviour. Items marked **missing** have no equivalent implementation.
   directly without replacing the current builder workspace. Student-session
   startup is non-blocking while that separate P2 issue remains deprioritized.
 
-- [ ] **Presenter print/PDF view — implemented, awaiting manual verification.**
-  V2 now snapshots
+- [x] **Presenter print/PDF view — completed and manually confirmed.** V2
+  snapshots
   the current live deck into a clean dedicated print window, preserves annotations
   and reveal state, removes presenter-only controls, neutralises zoom, waits for
   images, and prevents a trailing blank page.
@@ -146,8 +146,8 @@ behaviour. Items marked **missing** have no equivalent implementation.
   recaptured from the live presenter on every save, and immutable versioned
   Storage objects prevent cached pre-camera lesson documents from reopening.
 
-- [ ] **Specialized slide rendering - implemented, awaiting manual
-  verification.** Template, Placeholder and LaTeX presenters now use
+- [x] **Specialized slide rendering - completed and manually confirmed.**
+  Template, Placeholder and LaTeX presenters use
   production markup and typography; revision slides
   retain two question cells plus the lower working area; imported HTML and
   both legacy and presenter-generated camera slides render with their saved
@@ -178,13 +178,15 @@ behaviour. Items marked **missing** have no equivalent implementation.
   1× to 3× zoom clamp for button and pinch handling, with the 60% button still
   toggling between fit and 1.6×.
 
-- [x] **Offline/live capability messaging — completed.** Downloaded HTML shows
+- [x] **Offline/live capability messaging — completed and manually
+  confirmed.** Downloaded HTML shows
   an expandable Offline copy explanation: local drawing, reveal, print and
   download remain available, while Save to Builder, Poll and live retrieval
   require opening the saved lesson with the hosted Present action. Hosted
   presenters are unchanged and the notice is excluded from print output.
 
-- [x] **Accessibility and responsive parity audit - completed.** Builder V2 now
+- [x] **Accessibility and responsive parity audit - completed and manually
+  confirmed on tablet.** Builder V2 now
   uses a single-column mobile flow, scrollable labelled action toolbars, visible
   keyboard focus, and one accessible tab stop per custom upload control. Shared
   modal focus trapping restores the invoking control after Escape or close. The
