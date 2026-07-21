@@ -6,8 +6,9 @@ import {
   normalizeBuilderDocument,
 } from "./schema";
 
-export const V2_LOCAL_STORAGE_KEY = "lesson-builder-v2:recovery:v1";
-export const V2_DATABASE_NAME = "lesson-builder-v2-recovery";
+// Keep the stored values stable so existing browser recovery data remains readable.
+export const RECOVERY_LOCAL_STORAGE_KEY = "lesson-builder-v2:recovery:v1";
+export const RECOVERY_DATABASE_NAME = "lesson-builder-v2-recovery";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "documents";
 const CURRENT_DOCUMENT_ID = "current";
@@ -42,7 +43,7 @@ export async function saveV2CachedDocument(document: BuilderDocument) {
 
 function loadFromLocalStorage(): BuilderDocument | null {
   try {
-    const raw = window.localStorage.getItem(V2_LOCAL_STORAGE_KEY);
+    const raw = window.localStorage.getItem(RECOVERY_LOCAL_STORAGE_KEY);
     return raw ? normalizeBuilderDocument(JSON.parse(raw) as unknown) : null;
   } catch {
     return null;
@@ -58,7 +59,10 @@ function saveToLocalStorage(document: BuilderDocument) {
       slideTemplates: [],
       recoveryCopy: "lightweight",
     };
-    window.localStorage.setItem(V2_LOCAL_STORAGE_KEY, JSON.stringify(lightweight));
+    window.localStorage.setItem(
+      RECOVERY_LOCAL_STORAGE_KEY,
+      JSON.stringify(lightweight),
+    );
   } catch {
     // IndexedDB remains the authoritative v2 recovery cache.
   }
@@ -107,7 +111,10 @@ async function saveToIndexedDb(document: BuilderDocument) {
 
 function openDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = window.indexedDB.open(V2_DATABASE_NAME, DATABASE_VERSION);
+    const request = window.indexedDB.open(
+      RECOVERY_DATABASE_NAME,
+      DATABASE_VERSION,
+    );
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE_NAME)) {

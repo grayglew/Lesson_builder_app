@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAuthorizedAppContext } from "@/lib/auth/app-users";
-import { BUILDER_ENTRY_PATH } from "@/lib/builder-v2/access";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder/access";
 import { AdminRecoveryExport } from "./AdminRecoveryExport";
 import AdminUsersClient from "./AdminUsersClient";
 

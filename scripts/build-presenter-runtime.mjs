@@ -3,7 +3,13 @@ import { dirname, resolve } from "node:path";
 import process from "node:process";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const entryPoint = "./src/features/presenter/runtime.ts";
+const entryPoint = resolve(
+  projectRoot,
+  "src",
+  "features",
+  "presenter",
+  "runtime.ts",
+);
 const cssSource = resolve(
   projectRoot,
   "src",

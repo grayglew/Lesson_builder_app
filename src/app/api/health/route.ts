@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getBuilderV2AccessMode } from "@/lib/builder-v2/access";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder/access";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export function GET() {
         process.env.VERCEL_ENV ||
         process.env.NODE_ENV ||
         "local",
-      builderV2Access: getBuilderV2AccessMode(),
+      builderPath: BUILDER_ENTRY_PATH,
       builderDocumentSchemaVersion: 2,
       schemaCompatibility: {
         reads: [1, 2],

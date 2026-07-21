@@ -1,10 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getAppUserProfile, isActiveProfile } from "@/lib/auth/app-users";
-import {
-  BUILDER_ENTRY_PATH,
-  shouldRedirectLegacyBuilderToV2,
-} from "@/lib/builder-v2/access";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder/access";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -12,11 +9,9 @@ export async function updateSession(request: NextRequest) {
   });
 
   const pathname = request.nextUrl.pathname;
-  const isBuilder = pathname === "/builder" || pathname === "/builder/" || pathname === "/builder/index.html";
-  const isBuilderV2 = pathname === "/builder-v2" || pathname.startsWith("/builder-v2/");
-  const isLegacyLessonsRoute = pathname.startsWith("/lessons");
+  const isBuilder = pathname === "/builder" || pathname.startsWith("/builder/");
   const isAdminRoute = pathname.startsWith("/admin");
-  const isProtected = isBuilder || isBuilderV2 || isLegacyLessonsRoute || isAdminRoute;
+  const isProtected = isBuilder || isAdminRoute;
 
   if (!isProtected) {
     return supabaseResponse;
@@ -66,21 +61,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (isBuilder && shouldRedirectLegacyBuilderToV2(profile)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/builder-v2";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
   if (isAdminRoute && profile.role !== "admin") {
-    const url = request.nextUrl.clone();
-    url.pathname = BUILDER_ENTRY_PATH;
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
-  if (isLegacyLessonsRoute) {
     const url = request.nextUrl.clone();
     url.pathname = BUILDER_ENTRY_PATH;
     url.search = "";

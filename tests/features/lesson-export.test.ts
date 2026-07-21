@@ -12,7 +12,7 @@ import {
 } from "@/features/builder/schema";
 
 describe("standalone lesson export", () => {
-  it("embeds a round-trippable Builder v2 document", () => {
+  it("embeds a round-trippable builder document", () => {
     const document = lessonDocument();
     const html = buildStandaloneLessonHtml(document, {
       runtimeCss: ".annotation-svg{}",

@@ -62,25 +62,43 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       PRODUCTION_SUPABASE_PROJECT_REF: ${{ secrets.PRODUCTION_SUPABASE_PROJECT_REF }}
     steps:
+      - name: Check staging deployment configuration
+        id: staging_config
+        shell: bash
+        run: |
+          if [[ -z "$VERCEL_ORG_ID" || -z "$VERCEL_PROJECT_ID" || -z "$VERCEL_TOKEN" || -z "$PRODUCTION_SUPABASE_PROJECT_REF" ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "### Staging preview skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "Configure the staging environment secrets documented in docs/operations/production-release.md to enable preview deployment." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out source
+        if: steps.staging_config.outputs.enabled == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.staging_config.outputs.enabled == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
 
       - name: Install dependencies
+        if: steps.staging_config.outputs.enabled == 'true'
         run: npm ci
 
       - name: Install pinned Vercel CLI
+        if: steps.staging_config.outputs.enabled == 'true'
         run: npm install --global vercel@56.3.1
 
       - name: Pull staging configuration
+        if: steps.staging_config.outputs.enabled == 'true'
         run: vercel pull --yes --environment=preview --token "$VERCEL_TOKEN"
 
       - name: Assert staging is isolated from production
+        if: steps.staging_config.outputs.enabled == 'true'
         shell: bash
         run: |
           set -a
@@ -89,9 +107,11 @@ jobs:
           node scripts/assert-preview-environment.mjs
 
       - name: Build preview artifact
+        if: steps.staging_config.outputs.enabled == 'true'
         run: vercel build --token "$VERCEL_TOKEN"
 
       - name: Deploy preview artifact
+        if: steps.staging_config.outputs.enabled == 'true'
         id: deploy
         shell: bash
         run: |
@@ -105,9 +125,11 @@ jobs:
           echo "$deployment_url" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install Playwright browser
+        if: steps.staging_config.outputs.enabled == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Run browser smoke tests
+        if: steps.staging_config.outputs.enabled == 'true'
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.deploy.outputs.deployment_url }}
         shell: bash
@@ -118,7 +140,7 @@ jobs:
           npm run test:e2e
 
       - name: Upload Playwright report on failure
-        if: failure()
+        if: steps.staging_config.outputs.enabled == 'true' && failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-pr-${{ github.event.pull_request.number }}
@@ -127,7 +149,7 @@ jobs:
           retention-days: 14
 
       - name: Comment with preview URL
-        if: success()
+        if: steps.staging_config.outputs.enabled == 'true' && success()
         uses: actions/github-script@v7
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}

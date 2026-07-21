@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { BUILDER_ENTRY_PATH } from "@/lib/builder-v2/access";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder/access";
 import { createClient } from "@/lib/supabase/server";
 
 export async function updatePassword(formData: FormData) {

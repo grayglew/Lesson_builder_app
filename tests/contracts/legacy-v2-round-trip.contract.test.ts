@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const defaultContractPath = resolve("src/lib/builder-v2/contracts.ts");
+const defaultContractPath = resolve("src/lib/builder/contracts.ts");
 const contractPath = process.env.BUILDER_V2_CONTRACT_MODULE
   ? resolve(process.env.BUILDER_V2_CONTRACT_MODULE)
   : defaultContractPath;

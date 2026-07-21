@@ -1,13 +1,6 @@
 import { redirect } from "next/navigation";
-import { getAuthorizedAppContext } from "@/lib/auth/app-users";
-import { preferredBuilderPath } from "@/lib/builder-v2/access";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder/access";
 
-export default async function Home() {
-  const context = await getAuthorizedAppContext();
-
-  if ("response" in context) {
-    redirect("/login");
-  }
-
-  redirect(preferredBuilderPath(context.actorProfile));
+export default function Home() {
+  redirect(BUILDER_ENTRY_PATH);
 }

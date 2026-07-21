@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Database, RefreshCcw, Trash2 } from "lucide-react";
-import { BUILDER_ENTRY_PATH } from "@/lib/builder-v2/access";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder/access";
 
 type CleanupFile = {
   name: string;
