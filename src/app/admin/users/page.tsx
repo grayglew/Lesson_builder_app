@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { getAuthorizedAppContext } from "@/lib/auth/app-users";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder-v2/access";
 import { AdminRecoveryExport } from "./AdminRecoveryExport";
 import AdminUsersClient from "./AdminUsersClient";
 
 export default async function AdminUsersPage() {
   const context = await getAuthorizedAppContext();
   if ("response" in context) redirect("/login?next=/admin/users");
-  if (context.actorProfile.role !== "admin") redirect("/builder/index.html");
+  if (context.actorProfile.role !== "admin") redirect(BUILDER_ENTRY_PATH);
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8 text-slate-950">
@@ -24,7 +25,7 @@ export default async function AdminUsersPage() {
           </div>
           <a
             className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400"
-            href="/builder/index.html"
+            href={BUILDER_ENTRY_PATH}
           >
             Back to builder
           </a>

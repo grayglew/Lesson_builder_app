@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppUserProfile } from "@/lib/auth/app-users";
 import {
+  BUILDER_ENTRY_PATH,
   canAccessBuilderV2,
   getBuilderV2AccessMode,
+  normalizeBuilderReturnPath,
   preferredBuilderPath,
   shouldRedirectLegacyBuilderToV2,
 } from "@/lib/builder-v2/access";
@@ -46,6 +48,19 @@ describe("builder v2 access gate", () => {
 
     expect(canAccessBuilderV2(teacher)).toBe(true);
     expect(preferredBuilderPath(teacher)).toBe("/builder-v2");
+  });
+
+  it("routes normal authentication through the access-controlled builder entry", () => {
+    expect(BUILDER_ENTRY_PATH).toBe("/");
+    expect(normalizeBuilderReturnPath(undefined)).toBe(BUILDER_ENTRY_PATH);
+    expect(normalizeBuilderReturnPath("https://example.com")).toBe(BUILDER_ENTRY_PATH);
+    expect(normalizeBuilderReturnPath("//example.com/path")).toBe(BUILDER_ENTRY_PATH);
+    expect(normalizeBuilderReturnPath("/builder-v2?from=login")).toBe(
+      "/builder-v2?from=login",
+    );
+    expect(normalizeBuilderReturnPath("/builder/index.html")).toBe(
+      "/builder/index.html",
+    );
   });
 
   it("redirects eligible preview users away from the legacy builder only in Preview", () => {

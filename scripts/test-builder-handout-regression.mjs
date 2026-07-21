@@ -39,9 +39,10 @@ assert(
 
 assert(
   indexHtml.includes('id="handout-lesson"') &&
-    indexHtml.includes(">Hand out</button>") &&
+    indexHtml.includes('aria-label="Open handout"') &&
+    indexHtml.includes('title="Open handout"') &&
     indexHtml.indexOf('id="handout-lesson"') < indexHtml.indexOf('id="preview-collapse-toggle"'),
-  "Deck preview header should include a Hand out button before collapse/reset controls.",
+  "Deck preview header should include an accessible Hand out control before collapse/reset controls.",
 );
 
 for (const functionName of [

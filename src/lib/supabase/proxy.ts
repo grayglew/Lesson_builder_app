@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getAppUserProfile, isActiveProfile } from "@/lib/auth/app-users";
-import { shouldRedirectLegacyBuilderToV2 } from "@/lib/builder-v2/access";
+import {
+  BUILDER_ENTRY_PATH,
+  shouldRedirectLegacyBuilderToV2,
+} from "@/lib/builder-v2/access";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -72,14 +75,14 @@ export async function updateSession(request: NextRequest) {
 
   if (isAdminRoute && profile.role !== "admin") {
     const url = request.nextUrl.clone();
-    url.pathname = "/builder/index.html";
+    url.pathname = BUILDER_ENTRY_PATH;
     url.search = "";
     return NextResponse.redirect(url);
   }
 
   if (isLegacyLessonsRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/builder/index.html";
+    url.pathname = BUILDER_ENTRY_PATH;
     url.search = "";
     return NextResponse.redirect(url);
   }

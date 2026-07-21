@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const uploadRoutePath = resolve(root, "src", "app", "api", "presenter", "pdf-snapshot", "upload-url", "route.ts");
 const pdfRoutePath = resolve(root, "src", "app", "api", "presenter", "pdf", "route.ts");
+const presenterPdfPath = resolve(root, "src", "features", "builder", "presenter-pdf.ts");
 const authPath = resolve(root, "src", "lib", "builder-sync", "auth.ts");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const nextConfig = readFileSync(resolve(root, "next.config.ts"), "utf8");
@@ -14,9 +15,11 @@ function assert(condition, message) {
 
 assert(existsSync(uploadRoutePath), "Presenter PDF snapshot upload route should exist.");
 assert(existsSync(pdfRoutePath), "Presenter server PDF route should exist.");
+assert(existsSync(presenterPdfPath), "Presenter PDF document helper should exist.");
 
 const uploadRoute = readFileSync(uploadRoutePath, "utf8");
 const pdfRoute = readFileSync(pdfRoutePath, "utf8");
+const presenterPdf = readFileSync(presenterPdfPath, "utf8");
 const auth = readFileSync(authPath, "utf8");
 
 assert(
@@ -67,26 +70,30 @@ assert(
 );
 assert(
   pdfRoute.includes("puppeteer-core") &&
-    pdfRoute.includes("@sparticuz/chromium") &&
+  pdfRoute.includes("@sparticuz/chromium") &&
     pdfRoute.includes("chromium.setGraphicsMode = false") &&
     pdfRoute.includes("puppeteer.defaultArgs") &&
     pdfRoute.includes('headless: "shell"') &&
-    pdfRoute.includes("page.setContent") &&
-    pdfRoute.includes("htmlWithPresenterPdfCss") &&
+    pdfRoute.includes("createPresenterPdfSlideDocuments") &&
+    pdfRoute.includes("PDFDocument.create()") &&
+    pdfRoute.includes("for (const [index, slideHtml] of slideDocuments.entries())") &&
+    pdfRoute.includes("page.goto(pathToFileURL(snapshotFile).href") &&
+    pdfRoute.includes("await page?.close()") &&
     pdfRoute.includes("printBackground: true") &&
     pdfRoute.includes("application/pdf"),
-  "PDF route should render the uploaded snapshot with stable serverless Chromium settings.",
+  "PDF route should render isolated uploaded-snapshot slides with stable serverless Chromium settings.",
 );
 assert(
-  !pdfRoute.includes("page.addStyleTag"),
+  !pdfRoute.includes("page.addStyleTag") && !presenterPdf.includes("page.addStyleTag"),
   "PDF route should inject print CSS into the HTML string instead of mutating the page after load.",
 );
 assert(
-  pdfRoute.includes(".presenter-tools") &&
-    pdfRoute.includes("display:none!important") &&
-    pdfRoute.includes(".lesson-slide") &&
-    pdfRoute.includes("break-after:page"),
-  "PDF route should hide presenter controls and print each lesson slide as a page.",
+  presenterPdf.includes(".presenter-tools") &&
+    presenterPdf.includes("display:none!important") &&
+    presenterPdf.includes(".lesson-slide") &&
+    presenterPdf.includes("break-after:page") &&
+    presenterPdf.includes("createPresenterPdfSlideDocuments"),
+  "PDF helper should hide presenter controls and isolate each lesson slide as a page.",
 );
 assert(
   pdfRoute.includes(".remove([snapshotPath])"),

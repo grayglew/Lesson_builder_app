@@ -40,7 +40,7 @@ behaviour. Items marked **missing** have no equivalent implementation.
 - [x] Local recovery cache, writable Preview Supabase data, and saved-lesson
   CRUD.
 
-## Remaining implementation to-do list
+## Completed implementation checklist
 
 ### P0 — required before replacing production
 
@@ -160,15 +160,16 @@ behaviour. Items marked **missing** have no equivalent implementation.
 
 ### P2 — polish and secondary parity
 
-- [ ] **Student presenter sharing — implemented; awaiting manual confirmation.**
+- [x] **Student presenter sharing — completed and manually confirmed.**
   Hosted V2 presenters now publish the initial stripped read-only snapshot
   automatically, retain an Update students control for later changes, and
   provide a code plus direct `/student?code=...` link. The public student view
   opens the private signed snapshot in a sandbox and checks automatically for
   newer published versions. The code lookup is uncached and can sign only the
   exact session-owned Storage path. Automated API, viewer, presenter-regression,
-  and security-path tests pass; complete the Preview teacher/student device
-  check before ticking this item off.
+  and security-path tests pass. Teacher/student device testing, including
+  tablet scrolling initiated directly over slide content, was manually
+  confirmed in Preview on 2026-07-21.
 
 - [x] **Saved-lesson filter controls — completed.** Added a one-click Clear
   filters action covering title, class, status and both teaching-date bounds.
@@ -198,7 +199,7 @@ behaviour. Items marked **missing** have no equivalent implementation.
   horizontally scrollable touch controls with larger mobile targets, and
   disables smooth motion when the operating system requests reduced motion.
 
-## Verification required for each remaining slice
+## Release verification gate
 
 - Unit test the state transformation and emitted presenter markup.
 - Browser-test the full user interaction, not only control visibility.

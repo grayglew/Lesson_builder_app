@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder-v2/access";
 
 type AdminUser = {
   id: string;
@@ -130,7 +131,7 @@ export default function AdminUsersClient({ currentUserId, currentUserEmail }: Ad
       });
       const data = (await response.json()) as ApiResult;
       if (!response.ok || !data.ok) throw new Error(data.error || "Could not start teacher view.");
-      window.location.href = "/builder/index.html";
+      window.location.href = BUILDER_ENTRY_PATH;
     } catch (viewError) {
       setError(viewError instanceof Error ? viewError.message : "Could not start teacher view.");
       setBusy(null);

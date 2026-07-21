@@ -1,6 +1,9 @@
 import type { AppUserProfile } from "@/lib/auth/app-users";
 
 export const BUILDER_V2_ACCESS_MODES = ["off", "admin", "all"] as const;
+export const BUILDER_ENTRY_PATH = "/";
+export const BUILDER_V2_PATH = "/builder-v2";
+export const LEGACY_BUILDER_PATH = "/builder/index.html";
 
 export type BuilderV2AccessMode = (typeof BUILDER_V2_ACCESS_MODES)[number];
 
@@ -24,7 +27,14 @@ export function canAccessBuilderV2(
 }
 
 export function preferredBuilderPath(profile: AppUserProfile) {
-  return canAccessBuilderV2(profile) ? "/builder-v2" : "/builder/index.html";
+  return canAccessBuilderV2(profile) ? BUILDER_V2_PATH : LEGACY_BUILDER_PATH;
+}
+
+export function normalizeBuilderReturnPath(value: unknown) {
+  const path = String(value || "").trim();
+  return path.startsWith("/") && !path.startsWith("//") && !path.includes("\\")
+    ? path
+    : BUILDER_ENTRY_PATH;
 }
 
 export function shouldRedirectLegacyBuilderToV2(

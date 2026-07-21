@@ -37,7 +37,16 @@ Required Production variables:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY`
-- `BUILDER_V2_ACCESS=admin` until cutover; `admin` is also the application default
+- `BUILDER_V2_ACCESS=admin` until the candidate is ready; set it to `all` on
+  the production candidate used for cutover. `admin` remains the safe
+  application default.
+
+Normal login, password-reset, authentication-confirmation and Admin “Back to
+builder” flows enter through `/`. The server then chooses Builder V2 or the
+legacy builder from `BUILDER_V2_ACCESS` and the active user profile. The direct
+`/builder/index.html` URL remains available in Production during stabilisation,
+so the legacy application can still be opened deliberately without weakening
+the V2 access gate.
 
 Required GitHub Actions secrets:
 
@@ -54,7 +63,9 @@ Pull-request workflows must run `scripts/assert-preview-environment.mjs` after p
 2. Check out the exact release commit.
 3. Pull Production variables and run a production prebuild.
 4. Deploy the prebuilt artifact with the Production target and `--skip-domain`.
-5. Verify `/api/health`, login, legacy builder access and admin-only `/builder-v2` at the immutable candidate URL.
+5. Verify `/api/health`, normal login routing, direct legacy builder access and
+   `/builder-v2` at the immutable candidate URL. The candidate health response
+   must report `builderV2Access: "all"` for the final cutover artifact.
 6. Inspect runtime errors, then promote that exact URL with `vercel promote`.
 7. Verify the production alias and monitor errors after promotion.
 

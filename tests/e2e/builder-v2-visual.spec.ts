@@ -1,4 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function setAcceptedBaselineDate(page: Page) {
+  await page.getByLabel("Date of teaching").evaluate((element) => {
+    (element as HTMLInputElement).value = "2026-07-19";
+  });
+}
 
 test.skip(
   Boolean(process.env.PLAYWRIGHT_BASE_URL) &&
@@ -132,6 +138,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await expect(page.getByLabel("Image drawing canvas")).toBeVisible();
     await page.getByRole("button", { name: "Cancel drawing" }).click();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-starter.png", {
       animations: "disabled",
       fullPage: true,
@@ -148,6 +155,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
       page.locator("thead").getByText("Learning objective", { exact: true }),
     ).toBeVisible();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-retrieval.png", {
       animations: "disabled",
       fullPage: true,
@@ -170,6 +178,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
       page.getByRole("button", { name: "Add LO to retrieval bank" }),
     ).toBeVisible();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-example.png", {
       animations: "disabled",
       fullPage: true,
@@ -181,9 +190,12 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await page.getByRole("button", { name: "Worksheet", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Worksheet slide" })).toBeVisible();
-    await expect(page.getByLabel("Worksheet file")).toBeAttached();
-    await expect(page.getByLabel("Answers file")).toBeAttached();
+    await expect(
+      page.getByLabel("Worksheet file", { exact: true }),
+    ).toBeAttached();
+    await expect(page.getByLabel("Answers file", { exact: true })).toBeAttached();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-worksheet.png", {
       animations: "disabled",
       fullPage: true,
@@ -198,6 +210,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await expect(page.getByLabel("PDF file")).toBeAttached();
     await expect(page.getByLabel("Render width")).toBeVisible();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-pdf.png", {
       animations: "disabled",
       fullPage: true,
@@ -214,6 +227,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await expect(page.getByLabel("Placement")).toBeVisible();
     await expect(page.getByLabel("CFU image", { exact: true })).toBeAttached();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-cfu.png", {
       animations: "disabled",
       fullPage: true,
@@ -230,6 +244,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
     await expect(page.getByLabel("Drawing canvas")).toBeVisible();
     await expect(page.getByLabel("Drawing resolution")).toBeVisible();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-draw.png", {
       animations: "disabled",
       fullPage: true,
@@ -250,6 +265,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
       page.getByRole("region", { name: "Answers preview" }),
     ).toBeVisible();
 
+    await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-latex.png", {
       animations: "disabled",
       fullPage: true,
@@ -265,7 +281,7 @@ test.describe("Builder v2 accepted UI baseline", () => {
 
     await expect(presenter).toHaveTitle("Untitled lesson");
     await expect(
-      presenter.getByRole("navigation", { name: "Presenter tools" }),
+      presenter.getByRole("toolbar", { name: "Presenter tools" }),
     ).toBeVisible();
     await expect(
       presenter.getByRole("button", { name: "Save to Builder" }),
@@ -533,11 +549,13 @@ test.describe("Builder v2 accepted UI baseline", () => {
       presenter.getByRole("button", { name: "Save to Builder" }),
     ).toBeEnabled();
     await expect(presenter.getByText("Student code: ABC-123")).toBeVisible();
-    await presenter.getByRole("button", { name: "Upload" }).click();
+    await presenter.getByRole("button", { name: "Update students" }).click();
     await expect.poll(() => liveApiRequests).toContain(
       "http://127.0.0.1:3100/api/presenter/student-session/complete",
     );
-    await expect(presenter.getByRole("button", { name: "Upload" })).toBeEnabled();
+    await expect(
+      presenter.getByRole("button", { name: "Update students" }),
+    ).toBeEnabled();
     await expect(
       presenter.getByRole("button", { name: "Previous slide" }),
     ).toHaveCount(0);

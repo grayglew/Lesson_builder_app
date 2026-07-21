@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Database, RefreshCcw, Trash2 } from "lucide-react";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder-v2/access";
 
 type CleanupFile = {
   name: string;
@@ -162,7 +163,7 @@ export default function CleanupStorageClient() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <a
             className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-500"
-            href="/builder/index.html"
+            href={BUILDER_ENTRY_PATH}
           >
             <ArrowLeft size={17} />
             Back to builder

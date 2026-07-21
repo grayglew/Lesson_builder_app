@@ -1,4 +1,5 @@
 import { BookOpen, LogIn } from "lucide-react";
+import { normalizeBuilderReturnPath } from "@/lib/builder-v2/access";
 import { signIn } from "./actions";
 
 type LoginPageProps = {
@@ -58,7 +59,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           ) : null}
 
           <form action={signIn} className="mt-6 grid gap-4">
-            <input type="hidden" name="next" value={params.next || "/builder/index.html"} />
+            <input type="hidden" name="next" value={normalizeBuilderReturnPath(params.next)} />
             <label className="grid gap-2 text-sm font-medium text-slate-700">
               Email
               <input
