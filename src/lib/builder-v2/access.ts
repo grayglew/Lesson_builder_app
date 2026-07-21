@@ -26,3 +26,10 @@ export function canAccessBuilderV2(
 export function preferredBuilderPath(profile: AppUserProfile) {
   return canAccessBuilderV2(profile) ? "/builder-v2" : "/builder/index.html";
 }
+
+export function shouldRedirectLegacyBuilderToV2(
+  profile: AppUserProfile,
+  environment = process.env.VERCEL_ENV,
+) {
+  return environment === "preview" && canAccessBuilderV2(profile);
+}

@@ -4,6 +4,7 @@ import {
   canAccessBuilderV2,
   getBuilderV2AccessMode,
   preferredBuilderPath,
+  shouldRedirectLegacyBuilderToV2,
 } from "@/lib/builder-v2/access";
 
 const admin: AppUserProfile = {
@@ -45,5 +46,13 @@ describe("builder v2 access gate", () => {
 
     expect(canAccessBuilderV2(teacher)).toBe(true);
     expect(preferredBuilderPath(teacher)).toBe("/builder-v2");
+  });
+
+  it("redirects eligible preview users away from the legacy builder only in Preview", () => {
+    vi.stubEnv("BUILDER_V2_ACCESS", "admin");
+
+    expect(shouldRedirectLegacyBuilderToV2(admin, "preview")).toBe(true);
+    expect(shouldRedirectLegacyBuilderToV2(admin, "production")).toBe(false);
+    expect(shouldRedirectLegacyBuilderToV2(teacher, "preview")).toBe(false);
   });
 });

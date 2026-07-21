@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getAppUserProfile, isActiveProfile } from "@/lib/auth/app-users";
+import { shouldRedirectLegacyBuilderToV2 } from "@/lib/builder-v2/access";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -59,6 +60,13 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/login";
     url.searchParams.delete("next");
     url.searchParams.set("message", "This Lesson Builder account is not active.");
+    return NextResponse.redirect(url);
+  }
+
+  if (isBuilder && shouldRedirectLegacyBuilderToV2(profile)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/builder-v2";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 
