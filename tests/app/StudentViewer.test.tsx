@@ -54,6 +54,9 @@ describe("StudentViewer", () => {
       "sandbox",
       "",
     );
+    expect(screen.getByTitle("Shared algebra").getAttribute("srcdoc")).toContain(
+      '.lesson-deck,.lesson-slide,.lesson-slide *{touch-action:pan-y pinch-zoom!important}',
+    );
     expect(
       screen.getByText("Lesson opened. Updates will appear automatically."),
     ).toBeInTheDocument();

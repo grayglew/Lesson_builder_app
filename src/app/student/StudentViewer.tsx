@@ -10,6 +10,8 @@ import {
 } from "react";
 
 const REFRESH_INTERVAL_MS = 5_000;
+const TOUCH_SCROLL_OVERRIDE =
+  '<style id="student-touch-scroll-override">html,body{touch-action:pan-y pinch-zoom!important;overscroll-behavior-y:auto;-webkit-overflow-scrolling:touch}.lesson-deck,.lesson-slide,.lesson-slide *{touch-action:pan-y pinch-zoom!important}</style>';
 
 type StudentOpenResponse = {
   ok?: boolean;
@@ -57,6 +59,13 @@ function isStudentSnapshot(value: unknown): value is StudentSnapshot {
     typeof snapshot.html === "string" &&
     snapshot.html.trim().length > 0
   );
+}
+
+function withTouchScrolling(html: string) {
+  if (html.includes('id="student-touch-scroll-override"')) return html;
+  const closingHead = html.match(/<\/head\s*>/i);
+  if (closingHead?.index === undefined) return `${html}${TOUCH_SCROLL_OVERRIDE}`;
+  return `${html.slice(0, closingHead.index)}${TOUCH_SCROLL_OVERRIDE}${html.slice(closingHead.index)}`;
 }
 
 export default function StudentViewer({ initialCode = "" }: { initialCode?: string }) {
@@ -133,7 +142,7 @@ export default function StudentViewer({ initialCode = "" }: { initialCode?: stri
         }
 
         if (activeCodeRef.current !== nextCode) return;
-        setSnapshotHtml(snapshot.html || "");
+        setSnapshotHtml(withTouchScrolling(snapshot.html || ""));
         hasSnapshotRef.current = true;
         setSnapshotTitle(snapshot.title || "Shared lesson");
         versionRef.current = nextVersion;
