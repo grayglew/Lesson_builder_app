@@ -139,6 +139,9 @@ describe("standalone lesson export", () => {
     expect(html).toContain('"code":"ABC-123"');
     expect(html).toContain("studentUploadButton.hidden = false");
     expect(html).toContain("uploadStudentSnapshot");
+    expect(html).toContain(
+      "body.student-shared-view .lesson-slide,body.student-shared-view .lesson-slide *{touch-action:pan-y pinch-zoom!important}",
+    );
   });
 
   it("uses the compact production LO styling without rendering LO text in starter cells", () => {

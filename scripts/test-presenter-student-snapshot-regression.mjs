@@ -92,6 +92,7 @@ for (const expected of [
   "function buildStudentSnapshotHtml()",
   "syncBuilderStateForSave()",
   ".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation],button",
+  "body.student-shared-view .lesson-slide,body.student-shared-view .lesson-slide *{touch-action:pan-y pinch-zoom!important;}",
   "studentUploadBtn.addEventListener(\"click\", uploadStudentSnapshot)",
 ]) {
   assert(presenterScript.includes(expected), `Expected student presenter marker: ${expected}`);
