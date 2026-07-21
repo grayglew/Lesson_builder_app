@@ -132,22 +132,15 @@ behaviour. Items marked **missing** have no equivalent implementation.
   and reveal state, removes presenter-only controls, neutralises zoom, waits for
   images, and prevents a trailing blank page.
 
-- [ ] **Presenter camera parity — partial.** V2 inserts the original camera
-  file. Production downsizes and letterboxes it to a 1600×1000 JPEG before
-  insertion, reducing memory and saved-lesson size.
+- [x] **Presenter camera parity — completed and manually confirmed.** V2
+  validates the selected image, downsizes and letterboxes it onto a white
+  1600×1000 canvas, and stores it as a quality-0.88 JPEG before insertion.
 
-  **Implementation update (awaiting manual verification):** V2 now validates the
-  selected image and downsizes/letterboxes it onto a white 1600x1000 canvas as a
-  quality-0.88 JPEG before insertion, matching production.
-- [ ] **Generated-slide save fidelity — partial.** Verify that blank and camera
-  slides, live starter image changes, reveal state, and annotation indices
-  survive repeated Save-to-Builder operations and reopening. Annotation and undo
-  indices now shift when blank/camera/poll slides are inserted, and live starter
-  capture now clears missing images and recaptures its current LO. Repeated-save
-  reopen coverage for the complete upload/mark-taught sequence is still required.
-  Camera images are now recaptured from the live presenter on every save, and
-  each save uses an immutable versioned Storage object so reopening cannot return
-  a cached pre-camera lesson document. Manual save/reopen verification remains.
+- [x] **Generated-slide save fidelity — completed and manually confirmed.**
+  Blank and camera slides, live starter image changes, reveal state, and
+  annotation indices survive Save-to-Builder and reopening. Camera images are
+  recaptured from the live presenter on every save, and immutable versioned
+  Storage objects prevent cached pre-camera lesson documents from reopening.
 
 - [ ] **Specialized slide rendering — partial.** Align Template, Placeholder
   and LaTeX presenter typography/layout with production. Verify revision’s
