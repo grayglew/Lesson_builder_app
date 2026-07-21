@@ -1,7 +1,7 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
-import { normalizeBuilderReturnPath } from "@/lib/builder-v2/access";
+import { normalizeBuilderReturnPath } from "@/lib/builder/access";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {

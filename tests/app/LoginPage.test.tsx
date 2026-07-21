@@ -9,21 +9,19 @@ vi.mock("@/app/login/actions", () => ({
 afterEach(cleanup);
 
 describe("LoginPage builder routing", () => {
-  it("uses the access-controlled builder entry for a normal login", async () => {
+  it("uses the unified builder for a normal login", async () => {
     render(await LoginPage({ searchParams: Promise.resolve({}) }));
 
-    expect(document.querySelector('input[name="next"]')).toHaveValue("/");
+    expect(document.querySelector('input[name="next"]')).toHaveValue("/builder");
   });
 
-  it("preserves an explicit direct legacy-builder return path", async () => {
+  it("canonicalises an old builder return path", async () => {
     render(
       await LoginPage({
         searchParams: Promise.resolve({ next: "/builder/index.html" }),
       }),
     );
 
-    expect(document.querySelector('input[name="next"]')).toHaveValue(
-      "/builder/index.html",
-    );
+    expect(document.querySelector('input[name="next"]')).toHaveValue("/builder");
   });
 });

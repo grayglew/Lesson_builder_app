@@ -9,14 +9,14 @@ type ImpersonationControlProps = {
   onStopped?: () => void;
 };
 
-function returnToBuilderV2() {
-  window.location.assign("/builder-v2");
+function returnToBuilder() {
+  window.location.assign("/builder");
 }
 
 export function ImpersonationControl({
   actorEmail,
   effectiveEmail,
-  onStopped = returnToBuilderV2,
+  onStopped = returnToBuilder,
 }: ImpersonationControlProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

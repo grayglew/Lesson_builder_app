@@ -1,5 +1,5 @@
 import { BookOpen, LogIn } from "lucide-react";
-import { normalizeBuilderReturnPath } from "@/lib/builder-v2/access";
+import { normalizeBuilderReturnPath } from "@/lib/builder/access";
 import { signIn } from "./actions";
 
 type LoginPageProps = {

@@ -35,7 +35,6 @@ import { renderLatexDocument } from "./latex";
 
 type BuilderShellProps = {
   userEmail: string;
-  accessMode: "admin" | "all";
   actorEmail?: string;
   isImpersonating?: boolean;
 };
@@ -53,18 +52,18 @@ type ToolName =
   | "placeholder"
   | "math";
 
-const tools: Array<{ name: ToolName; label: string; available: boolean }> = [
-  { name: "starter", label: "Starter", available: true },
-  { name: "saved-lessons", label: "Saved lessons", available: true },
-  { name: "retrieval", label: "Retrieval", available: true },
-  { name: "example", label: "Example", available: true },
-  { name: "worksheet", label: "Worksheet", available: true },
-  { name: "pdf", label: "PDF", available: true },
-  { name: "cfu", label: "CFU", available: true },
-  { name: "draw", label: "Draw", available: true },
-  { name: "templates", label: "Templates", available: true },
-  { name: "placeholder", label: "Placeholder", available: true },
-  { name: "math", label: "LaTeX", available: true },
+const tools: Array<{ name: ToolName; label: string }> = [
+  { name: "starter", label: "Starter" },
+  { name: "saved-lessons", label: "Saved lessons" },
+  { name: "retrieval", label: "Retrieval" },
+  { name: "example", label: "Example" },
+  { name: "worksheet", label: "Worksheet" },
+  { name: "pdf", label: "PDF" },
+  { name: "cfu", label: "CFU" },
+  { name: "draw", label: "Draw" },
+  { name: "templates", label: "Templates" },
+  { name: "placeholder", label: "Placeholder" },
+  { name: "math", label: "LaTeX" },
 ];
 
 const toolLabels: Record<ToolName, string> = {
@@ -352,9 +351,6 @@ export function BuilderShell({
                 onClick={() => setActiveTool(tool.name)}
               >
                 {tool.label}
-                {!tool.available ? (
-                  <span className={styles.pendingDot} aria-label="Migration pending" />
-                ) : null}
               </button>
             ))}
           </nav>
@@ -458,22 +454,6 @@ export function BuilderShell({
             </section>
           ) : null}
           {activeTool === "math" ? <LatexComposer /> : null}
-          {!tools.find((tool) => tool.name === activeTool)?.available ? (
-            <section className={styles.toolPanel}>
-              <div className={styles.panelHead}>
-                <h3>{toolLabels[activeTool]}</h3>
-              </div>
-              <div className={styles.migrationNotice}>
-                <strong>{toolLabels[activeTool]} is not migrated yet.</strong>
-                <p>
-                  Its position and navigation are retained so the Builder v2
-                  workflow matches the original. Feature migration is paused
-                  until this UI-parity pass is accepted.
-                </p>
-                <a href="/builder/index.html">Use this tool in the original builder</a>
-              </div>
-            </section>
-          ) : null}
         </section>
 
         <aside className={styles.previewPane} aria-label="Lesson preview">

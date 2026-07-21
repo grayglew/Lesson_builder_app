@@ -38,7 +38,7 @@ describe("BuilderShell legacy UI parity", () => {
   });
 
   it("uses the original three-region workflow and tool order", async () => {
-    render(<BuilderShell accessMode="admin" userEmail="teacher@example.com" />);
+    render(<BuilderShell userEmail="teacher@example.com" />);
 
     expect(
       await screen.findByRole("complementary", {
@@ -101,7 +101,7 @@ describe("BuilderShell legacy UI parity", () => {
 
   it("keeps placeholder authoring in the central tool panel", async () => {
     const user = userEvent.setup();
-    render(<BuilderShell accessMode="admin" userEmail="teacher@example.com" />);
+    render(<BuilderShell userEmail="teacher@example.com" />);
 
     await user.click(screen.getByRole("button", { name: "Placeholder" }));
     await user.clear(screen.getByLabelText("Placeholder text"));
@@ -139,7 +139,7 @@ describe("BuilderShell legacy UI parity", () => {
     useBuilderStore.getState().hydrate(document);
     vi.mocked(loadBuilderDocument).mockResolvedValue(document);
 
-    render(<BuilderShell accessMode="admin" userEmail="teacher@example.com" />);
+    render(<BuilderShell userEmail="teacher@example.com" />);
 
     await user.click(
       screen.getAllByRole("button", {

@@ -1,59 +1,87 @@
 # Lesson Builder Online
 
-Next.js + Supabase version of the Lesson Builder app. It uses the existing Supabase project:
+The production Lesson Builder is a unified Next.js application backed by
+Supabase. It preserves the established lesson-building and presenter workflow
+while providing cloud persistence, saved lessons, retrieval practice, exports,
+polling, camera slides, administration, and student sharing.
 
-- Production URL: `https://lesson-builder-online.vercel.app`
-- Project ref: `fjrukfawhmbdmrztznlf`
-- Supabase URL: `https://fjrukfawhmbdmrztznlf.supabase.co`
-- Private storage bucket: `lesson-assets`
+- Production: <https://lesson-builder-online.vercel.app>
+- Builder: `/builder`
+- Student view: `/student`
+- Administration: `/admin/users`
+- Health check: `/api/health`
 
-## What Is Implemented
+Old `/builder-v2`, `/builder/index.html`, and `/lessons/*` bookmarks redirect to
+the unified builder. They are not separate applications.
 
-- Supabase Auth sign-up, sign-in, sign-out, and email confirmation route.
-- Protected lesson dashboard.
-- Lesson editor with slide types, metadata, autosave, manual save, and version snapshots.
-- Retrieval practice bank with due-item scoring, pasted LO import, taught logging, and image attachments.
-- Private asset uploads through Supabase Storage.
-- Exports for standalone HTML, full JSON backup, and browser print-to-PDF.
-- Supabase RLS schema and storage policies in `supabase/migrations`.
+## Architecture
 
-## Local Setup
+- Next.js 16 App Router and React 19
+- Supabase Auth, Postgres, and the private `lesson-assets` Storage bucket
+- Zustand for the interactive builder workspace
+- Versioned builder documents that read schema versions 1 and 2 and write
+  schema version 2
+- Vitest for unit and contract coverage
+- Playwright for browser smoke and accepted visual regression coverage
+- Vercel immutable production candidates followed by explicit promotion
+
+The active workspace uses `/api/builder-sync`; saved lessons use
+`/api/builder-lessons`; relational retrieval and template data use
+`/api/builder-global`. These are all current application APIs.
+
+## Local setup
 
 Install dependencies:
 
 ```powershell
-npm.cmd install
+npm.cmd ci
 ```
 
-Create `.env.local`:
+Create `.env.local` from `.env.example` and set:
 
-```powershell
-NEXT_PUBLIC_SUPABASE_URL=https://fjrukfawhmbdmrztznlf.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+```text
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+STUDENT_SESSION_CODE_SECRET=your-long-random-secret
 ```
 
-Run the dev server:
+`SUPABASE_SECRET_KEY` can be used instead of
+`SUPABASE_SERVICE_ROLE_KEY` when the project provides the newer secret-key
+format. Never expose either server key through a `NEXT_PUBLIC_` variable.
+
+Run the app:
 
 ```powershell
 npm.cmd run dev -- --port 3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open <http://localhost:3000>. Authenticated users are routed to `/builder`.
 
-## Verify
+## Verification
 
 ```powershell
 npm.cmd run lint
+npm.cmd run typecheck
+npm.cmd test
+npm.cmd run test:presenter-runtime
 npm.cmd run build
 ```
 
-## Vercel Environment Variables
+Run the local Playwright suite with `npm.cmd run test:e2e`. To smoke-test a
+deployed artifact, set `PLAYWRIGHT_BASE_URL` to its immutable URL first.
 
-Set these in the Vercel project for Production, Preview, and Development:
+## Production and data safety
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+Production continues to use Supabase project `fjrukfawhmbdmrztznlf`; the
+refactor did not move or rewrite the production dataset. Preview deployments
+must use the isolated staging project and must pass
+`scripts/assert-preview-environment.mjs` before mutation tests.
 
-No service role key is required by the app.
+Database backups do not contain Storage object bodies. A recoverable backup
+therefore consists of both a database export and a separate export of the
+`lesson-assets` bucket. Local backup artifacts live under the ignored
+`backups/` directory and must not be committed.
 
-Production and Development are configured on the linked Vercel project. Add the same two variables to Preview after the app is attached to a Git branch/repository.
+See [the production release runbook](docs/operations/production-release.md)
+for candidate deployment, promotion, verification, and rollback steps.

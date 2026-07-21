@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getAppUserProfile, isActiveProfile } from "@/lib/auth/app-users";
-import { normalizeBuilderReturnPath } from "@/lib/builder-v2/access";
+import { normalizeBuilderReturnPath } from "@/lib/builder/access";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signIn(formData: FormData) {
