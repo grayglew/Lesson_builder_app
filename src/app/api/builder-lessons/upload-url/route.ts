@@ -45,7 +45,13 @@ export async function POST(request: Request) {
     }
   }
 
-  const path = builderLessonStoragePath(auth.user.id, lessonId);
+  // Every save gets a new object path. Reusing lesson.json can make Supabase's
+  // CDN return the previous lesson immediately after an upsert.
+  const path = builderLessonStoragePath(
+    auth.user.id,
+    lessonId,
+    crypto.randomUUID(),
+  );
   const { data, error } = await auth.supabase.storage.from(BUILDER_SYNC_BUCKET).createSignedUploadUrl(path, {
     upsert: true,
   });

@@ -2,13 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { getAppUserProfile, isActiveProfile } from "@/lib/auth/app-users";
+import { normalizeBuilderReturnPath } from "@/lib/builder-v2/access";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signIn(formData: FormData) {
   const supabase = await createClient();
   const email = String(formData.get("email") || "");
   const password = String(formData.get("password") || "");
-  const next = String(formData.get("next") || "/builder/index.html");
+  const next = normalizeBuilderReturnPath(formData.get("next"));
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -25,7 +26,7 @@ export async function signIn(formData: FormData) {
     redirect("/login?message=This Lesson Builder account is not active.");
   }
 
-  redirect(next.startsWith("/") ? next : "/builder/index.html");
+  redirect(next);
 }
 
 export async function signUp() {

@@ -92,6 +92,7 @@ for (const expected of [
   "function buildStudentSnapshotHtml()",
   "syncBuilderStateForSave()",
   ".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation],button",
+  "body.student-shared-view .lesson-slide,body.student-shared-view .lesson-slide *{touch-action:pan-y pinch-zoom!important;}",
   "studentUploadBtn.addEventListener(\"click\", uploadStudentSnapshot)",
 ]) {
   assert(presenterScript.includes(expected), `Expected student presenter marker: ${expected}`);
@@ -106,6 +107,7 @@ assert(
 
 assert(
   helper.includes("hashStudentSessionCode") &&
+    helper.includes('createHmac("sha256", secret)') &&
     helper.includes("normalizeStudentSessionCode") &&
     helper.includes("randomStudentSessionCode") &&
     helper.includes("STUDENT_SESSION_SECONDS"),
@@ -140,6 +142,7 @@ assert(
 assert(
   openRoute.includes("createAdminClient()") &&
     openRoute.includes("hashStudentSessionCode") &&
+    openRoute.includes("isStudentSessionSnapshotPath") &&
     openRoute.includes(".from(\"presentation_sessions\")") &&
     openRoute.includes("createSignedUrl") &&
     !openRoute.includes("getAuthorizedBuilderSyncClient()"),
@@ -150,8 +153,9 @@ assert(
   studentClient.includes('fetch("/api/student/session/open"') &&
     studentClient.includes("snapshotUrl") &&
     studentClient.includes("srcDoc") &&
-    studentClient.includes("Refresh latest upload"),
-  "Student page should submit a code, fetch the snapshot URL, and render view-only HTML without polling.",
+    studentClient.includes("REFRESH_INTERVAL_MS") &&
+    studentClient.includes("Updates will appear automatically"),
+  "Student page should submit a code, fetch the snapshot URL, render view-only HTML, and poll for updates.",
 );
 
 assert(

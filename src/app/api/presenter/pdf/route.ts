@@ -1,26 +1,30 @@
 import { NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium";
+import { PDFDocument } from "pdf-lib";
 import puppeteer from "puppeteer-core";
+import { randomUUID } from "node:crypto";
+import { writeFile, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   BUILDER_SYNC_BUCKET,
   getAuthorizedBuilderSyncClient,
   isPresenterPdfSnapshotPath,
 } from "@/lib/builder-sync/auth";
-import { isUuid, safeLessonDownloadName } from "@/lib/builder-sync/saved-lessons";
+import {
+  assertValidLessonSize,
+  isUuid,
+  safeLessonDownloadName,
+} from "@/lib/builder-sync/saved-lessons";
+import {
+  createPresenterPdfSlideDocuments,
+  presenterPdfError,
+} from "@/features/builder/presenter-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
-const PRESENTER_PDF_PRINT_CSS = `
-@page{size:16in 10in;margin:0;}
-html,body{margin:0!important;padding:0!important;background:#fff!important;}
-.lesson-header,.presenter-tools{display:none!important;}
-.lesson-deck{display:block!important;margin:0!important;padding:0!important;background:#fff!important;}
-.lesson-slide{width:16in!important;height:10in!important;max-width:none!important;max-height:none!important;margin:0!important;box-shadow:none!important;border:0!important;break-after:page;page-break-after:always;overflow:hidden!important;}
-.lesson-slide:last-child{break-after:auto;page-break-after:auto;}
-.annotation-svg{pointer-events:none!important;}
-`;
+export const maxDuration = 300;
 
 chromium.setGraphicsMode = false;
 
@@ -69,6 +73,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!assertValidLessonSize(snapshot.size)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "The PDF snapshot is empty or too large to render.",
+        },
+        { status: 413 },
+      );
+    }
+
     const html = await snapshot.text();
     const pdf = await renderPresenterSnapshotToPdf(html);
     const pdfBody = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
@@ -81,50 +95,80 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not render presenter PDF.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    const failure = presenterPdfError(error);
+    return NextResponse.json(
+      { ok: false, error: failure.message },
+      { status: failure.status },
+    );
   } finally {
-    await auth.supabase.storage.from(BUILDER_SYNC_BUCKET).remove([snapshotPath]);
+    await auth.supabase.storage
+      .from(BUILDER_SYNC_BUCKET)
+      .remove([snapshotPath])
+      .catch(() => undefined);
   }
 }
 
-async function renderPresenterSnapshotToPdf(html: string) {
-  const browser = await puppeteer.launch({
-    args: await puppeteer.defaultArgs({ args: chromium.args, headless: "shell" }),
-    defaultViewport: {
-      width: 1600,
-      height: 1000,
-      deviceScaleFactor: 1,
-      isLandscape: true,
-      isMobile: false,
-      hasTouch: false,
-    },
-    executablePath: await chromium.executablePath(),
-    headless: "shell",
-    protocolTimeout: 60000,
-  });
+export async function renderPresenterSnapshotToPdf(html: string) {
+  const slideDocuments = createPresenterPdfSlideDocuments(html);
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
 
   try {
-    const page = await browser.newPage();
-    await page.setContent(htmlWithPresenterPdfCss(html), {
-      waitUntil: "load",
-      timeout: 60000,
-    });
-    return page.pdf({
-      printBackground: true,
-      preferCSSPageSize: true,
-      width: "16in",
-      height: "10in",
-      margin: {
-        top: "0",
-        right: "0",
-        bottom: "0",
-        left: "0",
+    browser = await puppeteer.launch({
+      args: await puppeteer.defaultArgs({
+        args: chromium.args,
+        headless: "shell",
+      }),
+      defaultViewport: {
+        width: 1600,
+        height: 1000,
+        deviceScaleFactor: 1,
+        isLandscape: true,
+        isMobile: false,
+        hasTouch: false,
       },
-      timeout: 60000,
+      executablePath: await chromium.executablePath(),
+      headless: "shell",
+      protocolTimeout: 180000,
     });
+    const merged = await PDFDocument.create();
+
+    for (const [index, slideHtml] of slideDocuments.entries()) {
+      const snapshotFile = join(
+        tmpdir(),
+        `lesson-builder-presenter-${randomUUID()}-${index + 1}.html`,
+      );
+      let page: Awaited<ReturnType<typeof browser.newPage>> | undefined;
+      try {
+        await writeFile(snapshotFile, slideHtml, "utf8");
+        page = await browser.newPage();
+        await page.goto(pathToFileURL(snapshotFile).href, {
+          waitUntil: "load",
+          timeout: 120000,
+        });
+        await page.emulateMediaType("print");
+        await page.evaluate(async () => {
+          await document.fonts?.ready;
+          await Promise.all(
+            Array.from(document.images, (image) =>
+              typeof image.decode === "function"
+                ? image.decode().catch(() => undefined)
+                : Promise.resolve(),
+            ),
+          );
+        });
+        const onePagePdf = await page.pdf(pdfPageOptions());
+        const source = await PDFDocument.load(onePagePdf);
+        const [copiedPage] = await merged.copyPages(source, [0]);
+        merged.addPage(copiedPage);
+      } finally {
+        await page?.close().catch(() => undefined);
+        await unlink(snapshotFile).catch(() => undefined);
+      }
+    }
+
+    return merged.save();
   } finally {
-    await browser.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
   }
 }
 
@@ -132,10 +176,18 @@ function safePdfDownloadName(title: string) {
   return safeLessonDownloadName(title).replace(/\.lesson\.json$/, ".pdf");
 }
 
-function htmlWithPresenterPdfCss(html: string) {
-  const printStyle = `<style id="presenter-pdf-print-css">${PRESENTER_PDF_PRINT_CSS}</style>`;
-  if (/<\/head>/i.test(html)) {
-    return html.replace(/<\/head>/i, `${printStyle}</head>`);
-  }
-  return `<!doctype html><html><head>${printStyle}</head><body>${html}</body></html>`;
+function pdfPageOptions() {
+  return {
+    printBackground: true,
+    preferCSSPageSize: true,
+    width: "16in",
+    height: "10in",
+    margin: {
+      top: "0",
+      right: "0",
+      bottom: "0",
+      left: "0",
+    },
+    timeout: 120000,
+  } as const;
 }

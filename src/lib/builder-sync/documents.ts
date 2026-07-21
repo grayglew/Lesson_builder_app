@@ -30,6 +30,14 @@ export function builderSyncDocumentPath(userId: string, kind: BuilderSyncDocumen
   return `${builderSyncDocumentFolder(userId, kind)}/${timestamp}-${crypto.randomUUID()}.json`;
 }
 
+export function builderSyncSnapshotRevision(
+  userId: string,
+  kind: BuilderSyncDocumentKind,
+  snapshotName: string,
+) {
+  return `${builderSyncDocumentFolder(userId, kind)}/${snapshotName}`;
+}
+
 export function isBuilderSyncDocumentPath(userId: string, kind: BuilderSyncDocumentKind, path: string) {
   return path.startsWith(`${builderSyncDocumentFolder(userId, kind)}/`) && path.endsWith(".json");
 }
@@ -69,4 +77,39 @@ export function oldBuilderSyncSnapshotPaths(
   return sortBuilderSyncSnapshots(snapshots)
     .slice(Math.max(0, retainedCount))
     .map((snapshot) => `${builderSyncDocumentFolder(userId, kind)}/${snapshot.name}`);
+}
+
+export function builderSyncCompletionConflict(options: {
+  userId: string;
+  kind: BuilderSyncDocumentKind;
+  path: string;
+  expectedRevision: string;
+  snapshots: StorageSnapshot[];
+}) {
+  const sorted = sortBuilderSyncSnapshots(options.snapshots);
+  const currentName = options.path.slice(options.path.lastIndexOf("/") + 1);
+  const currentIndex = sorted.findIndex((snapshot) => snapshot.name === currentName);
+
+  if (currentIndex < 0) {
+    return "The uploaded workspace snapshot could not be verified.";
+  }
+  if (currentIndex !== 0) {
+    return "A newer workspace snapshot was uploaded before this save completed.";
+  }
+
+  const previous = sorted[1];
+  const previousRevision = previous
+    ? builderSyncSnapshotRevision(options.userId, options.kind, previous.name)
+    : "";
+  const expectedLegacyRevision = options.expectedRevision.startsWith("legacy:");
+
+  if (expectedLegacyRevision) {
+    return previous
+      ? "The cloud workspace changed after this browser started saving."
+      : "";
+  }
+
+  return previousRevision === options.expectedRevision
+    ? ""
+    : "The cloud workspace changed after this browser started saving.";
 }

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 2,
+  "source": "relational-shared-retrieval",
+  "classNames": ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"],
+  "retrievalItems": [
+    {
+      "id": "00000000-0000-4000-8000-000000000201",
+      "trackingId": "00000000-0000-4000-8000-000000000201",
+      "contentId": "00000000-0000-4000-8000-000000000202",
+      "retrieval_lo_id": "00000000-0000-4000-8000-000000000202",
+      "loCode": "9a1",
+      "codeSource": "prefix",
+      "className": "Year 9",
+      "legacyLoId": "ALG101",
+      "legacyJsonId": "",
+      "lo": "9a1: Expand a single bracket",
+      "spacingFactor": 1.3,
+      "seenCount": 2,
+      "currentImageSlot": 2,
+      "lastTaught": "2026-07-10",
+      "images": [
+        null,
+        {
+          "name": "question-2.png",
+          "type": "image/png",
+          "size": 512,
+          "assetId": "00000000-0000-4000-8000-000000000301",
+          "storagePath": "synthetic/retrieval/question-2.png",
+          "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "answerImages": [
+        null,
+        {
+          "name": "answer-2.png",
+          "type": "image/png",
+          "size": 512,
+          "assetId": "00000000-0000-4000-8000-000000000302",
+          "storagePath": "synthetic/retrieval/answer-2.png",
+          "checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "selected": false
+    }
+  ],
+  "slideTemplates": [
+    {
+      "id": "template_synthetic_independent",
+      "title": "Independent practice expectations",
+      "bullets": [
+        "Show each algebraic step",
+        "Check the solution by substitution"
+      ]
+    }
+  ],
+  "updatedAt": "2026-07-15T08:15:00.000Z"
+}

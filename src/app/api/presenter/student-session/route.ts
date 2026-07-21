@@ -36,23 +36,40 @@ export async function POST(request: Request) {
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = randomStudentSessionCode();
+    let codeHash = "";
+    try {
+      codeHash = hashStudentSessionCode(code);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Student sharing is not configured.",
+        },
+        { status: 503 },
+      );
+    }
     const { data, error } = await auth.supabase
       .from("presentation_sessions")
       .insert({
         owner_id: auth.user.id,
         source_lesson_id: lessonId,
-        code_hash: hashStudentSessionCode(code),
+        code_hash: codeHash,
         expires_at: studentSessionExpiresAt(),
       })
       .select("id, expires_at")
       .single();
 
     if (!error && data?.id) {
+      const viewerUrl = new URL("/student", request.url);
+      viewerUrl.searchParams.set("code", code);
       return NextResponse.json({
         ok: true,
         sessionId: data.id,
         code,
-        viewerUrl: new URL("/student", request.url).toString(),
+        viewerUrl: viewerUrl.toString(),
         expiresAt: data.expires_at,
       });
     }

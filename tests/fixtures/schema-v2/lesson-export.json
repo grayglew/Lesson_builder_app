@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 2,
+  "title": "Synthetic algebra lesson",
+  "className": "Year 9",
+  "teachingDate": "2026-07-15",
+  "overallLessonLo": "Solve linear equations with an unknown on both sides",
+  "classNames": ["Year 9", "Year 7", "Year 8", "Year 10", "Year 11"],
+  "slides": [
+    {
+      "id": "slide_synthetic_starter",
+      "createdAt": "2026-07-15T08:00:00.000Z",
+      "type": "starter",
+      "title": "Starter",
+      "slots": [
+        {
+          "lo": "Expand 3(x + 2)",
+          "retrievalItemId": "00000000-0000-4000-8000-000000000201",
+          "currentImageSlot": 2,
+          "lockImageSlot": true,
+          "image": null,
+          "answerImage": null
+        }
+      ]
+    },
+    {
+      "id": "slide_synthetic_template",
+      "createdAt": "2026-07-15T08:02:00.000Z",
+      "type": "template",
+      "title": "Independent practice expectations",
+      "bullets": [
+        "Show each algebraic step",
+        "Check the solution by substitution"
+      ]
+    }
+  ],
+  "retrievalItems": [],
+  "retrievalBankOmitted": true,
+  "slideTemplates": [],
+  "exportScope": "lesson-only",
+  "updatedAt": "2026-07-15T08:15:00.000Z"
+}

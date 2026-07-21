@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 2,
+  "title": "Synthetic algebra lesson",
+  "className": "Year 9",
+  "teachingDate": "2026-07-15",
+  "overallLessonLo": "Solve linear equations with an unknown on both sides",
+  "activeLessonId": "00000000-0000-4000-8000-000000000101",
+  "activeLessonSavedAt": "2026-07-15T08:15:00.000Z",
+  "lessonUpdatedAt": "2026-07-15T08:15:00.000Z",
+  "classNames": ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"],
+  "slides": [
+    {
+      "id": "slide_synthetic_starter",
+      "createdAt": "2026-07-15T08:00:00.000Z",
+      "type": "starter",
+      "title": "Starter",
+      "slots": [
+        {
+          "lo": "Expand 3(x + 2)",
+          "retrievalItemId": "00000000-0000-4000-8000-000000000201",
+          "currentImageSlot": 2,
+          "lockImageSlot": true,
+          "image": {
+            "name": "question-2.png",
+            "type": "image/png",
+            "size": 512,
+            "assetId": "00000000-0000-4000-8000-000000000301",
+            "storagePath": "synthetic/retrieval/question-2.png",
+            "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "answerImage": {
+            "name": "answer-2.png",
+            "type": "image/png",
+            "size": 512,
+            "assetId": "00000000-0000-4000-8000-000000000302",
+            "storagePath": "synthetic/retrieval/answer-2.png",
+            "checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      ]
+    },
+    {
+      "id": "slide_synthetic_example",
+      "createdAt": "2026-07-15T08:01:00.000Z",
+      "type": "example",
+      "title": "Example",
+      "lo": "Solve 5x + 3 = 2x + 18",
+      "image1": null,
+      "image2": null,
+      "answerImage1": null,
+      "answerImage2": null,
+      "annotations": [
+        {
+          "mode": "pen",
+          "color": "#1d4ed8",
+          "sizeRatio": 0.006,
+          "points": [
+            { "x": 0.2, "y": 0.3 },
+            { "x": 0.35, "y": 0.4 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "slide_synthetic_template",
+      "createdAt": "2026-07-15T08:02:00.000Z",
+      "type": "template",
+      "title": "Independent practice expectations",
+      "bullets": [
+        "Show each algebraic step",
+        "Check the solution by substitution"
+      ]
+    }
+  ],
+  "retrievalItems": [
+    {
+      "id": "00000000-0000-4000-8000-000000000201",
+      "trackingId": "00000000-0000-4000-8000-000000000201",
+      "contentId": "00000000-0000-4000-8000-000000000202",
+      "retrieval_lo_id": "00000000-0000-4000-8000-000000000202",
+      "loCode": "9a1",
+      "codeSource": "prefix",
+      "className": "Year 9",
+      "legacyLoId": "ALG101",
+      "legacyJsonId": "",
+      "lo": "9a1: Expand a single bracket",
+      "spacingFactor": 1.3,
+      "seenCount": 2,
+      "currentImageSlot": 2,
+      "lastTaught": "2026-07-10",
+      "images": [
+        null,
+        {
+          "name": "question-2.png",
+          "type": "image/png",
+          "size": 512,
+          "assetId": "00000000-0000-4000-8000-000000000301",
+          "storagePath": "synthetic/retrieval/question-2.png",
+          "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "answerImages": [
+        null,
+        {
+          "name": "answer-2.png",
+          "type": "image/png",
+          "size": 512,
+          "assetId": "00000000-0000-4000-8000-000000000302",
+          "storagePath": "synthetic/retrieval/answer-2.png",
+          "checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "selected": false
+    }
+  ],
+  "slideTemplates": [
+    {
+      "id": "template_synthetic_independent",
+      "title": "Independent practice expectations",
+      "bullets": [
+        "Show each algebraic step",
+        "Check the solution by substitution"
+      ]
+    }
+  ],
+  "updatedAt": "2026-07-15T08:15:00.000Z"
+}

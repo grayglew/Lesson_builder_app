@@ -153,17 +153,17 @@ set public = excluded.public,
 
 create policy "lesson assets owner select" on storage.objects
 for select to authenticated
-using (bucket_id = 'lesson-assets' and storage.foldername(name)[1] = (select auth.uid())::text);
+using (bucket_id = 'lesson-assets' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 create policy "lesson assets owner insert" on storage.objects
 for insert to authenticated
-with check (bucket_id = 'lesson-assets' and storage.foldername(name)[1] = (select auth.uid())::text);
+with check (bucket_id = 'lesson-assets' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 create policy "lesson assets owner update" on storage.objects
 for update to authenticated
-using (bucket_id = 'lesson-assets' and storage.foldername(name)[1] = (select auth.uid())::text)
-with check (bucket_id = 'lesson-assets' and storage.foldername(name)[1] = (select auth.uid())::text);
+using (bucket_id = 'lesson-assets' and (storage.foldername(name))[1] = (select auth.uid())::text)
+with check (bucket_id = 'lesson-assets' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 create policy "lesson assets owner delete" on storage.objects
 for delete to authenticated
-using (bucket_id = 'lesson-assets' and storage.foldername(name)[1] = (select auth.uid())::text);
+using (bucket_id = 'lesson-assets' and (storage.foldername(name))[1] = (select auth.uid())::text);

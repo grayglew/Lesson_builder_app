@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { BUILDER_ENTRY_PATH } from "@/lib/builder-v2/access";
 import { createClient } from "@/lib/supabase/server";
 
 export async function updatePassword(formData: FormData) {
@@ -20,5 +21,5 @@ export async function updatePassword(formData: FormData) {
     redirect(`/account/update-password?message=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/builder/index.html");
+  redirect(BUILDER_ENTRY_PATH);
 }

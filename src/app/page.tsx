@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthorizedAppContext } from "@/lib/auth/app-users";
+import { preferredBuilderPath } from "@/lib/builder-v2/access";
 
 export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const context = await getAuthorizedAppContext();
 
-  redirect(user ? "/builder/index.html" : "/login");
+  if ("response" in context) {
+    redirect("/login");
+  }
+
+  redirect(preferredBuilderPath(context.actorProfile));
 }

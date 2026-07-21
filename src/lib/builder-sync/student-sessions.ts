@@ -1,4 +1,4 @@
-import { createHash, randomInt } from "node:crypto";
+import { createHmac, randomInt } from "node:crypto";
 import { PRESENTER_SIGNED_URL_SECONDS } from "@/lib/builder-sync/signed-url-expiry";
 
 const STUDENT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -45,8 +45,11 @@ export function randomStudentSessionCode() {
 
 export function hashStudentSessionCode(value: unknown) {
   const normalized = normalizeStudentSessionCode(value);
-  const secret = process.env.STUDENT_SESSION_CODE_SECRET || "";
-  return createHash("sha256").update(`${secret}:${normalized}`).digest("hex");
+  const secret = String(process.env.STUDENT_SESSION_CODE_SECRET || "").trim();
+  if (!secret) {
+    throw new Error("Student sharing is not configured.");
+  }
+  return createHmac("sha256", secret).update(normalized).digest("hex");
 }
 
 export function studentSessionExpiresAt(now = new Date()) {

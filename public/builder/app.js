@@ -9211,12 +9211,13 @@ function standalonePresenterHtml(initialAnnotations) {
 
   function studentSnapshotCss() {
     return [
-      "html,body{margin:0;padding:0;min-height:100%;background:#eef5f3;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}",
+      "html,body{margin:0;padding:0;min-height:100%;background:#eef5f3;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;touch-action:pan-y pinch-zoom;overscroll-behavior-y:auto;-webkit-overflow-scrolling:touch;}",
       "body.student-shared-view .lesson-header{position:static;display:flex;justify-content:space-between;gap:18px;max-width:1120px;margin:12px auto 0;padding:10px 14px;box-sizing:border-box;background:#fff;border:1px solid #cad7d7;border-radius:8px;box-shadow:0 4px 14px rgba(19,37,42,.08);}",
       "body.student-shared-view .lesson-header h1{margin:2px 0 0;font-size:22px;line-height:1.1;}",
       "body.student-shared-view .lesson-header span{font-size:12px;font-weight:800;text-transform:uppercase;color:#5f6f72;}",
-      "body.student-shared-view .lesson-deck{display:grid;gap:16px;place-items:center;margin:0;padding:16px;box-sizing:border-box;}",
+      "body.student-shared-view .lesson-deck{display:grid;gap:16px;place-items:center;margin:0;padding:16px;box-sizing:border-box;touch-action:pan-y pinch-zoom;}",
       "body.student-shared-view .lesson-slide{width:min(1120px,calc(100vw - 32px));height:auto;aspect-ratio:16/10;margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);zoom:1!important;}",
+      "body.student-shared-view .lesson-slide,body.student-shared-view .lesson-slide *{touch-action:pan-y pinch-zoom!important;}",
       "body.student-shared-view .annotation-svg{pointer-events:none!important;}",
       "body.student-shared-view button,body.student-shared-view input,body.student-shared-view select,body.student-shared-view textarea{display:none!important;}",
       "@media (max-width:760px){body.student-shared-view .lesson-header{margin:8px 8px 0;}body.student-shared-view .lesson-deck{padding:8px;}body.student-shared-view .lesson-slide{width:calc(100vw - 16px);}}"

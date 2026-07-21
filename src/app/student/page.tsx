@@ -5,6 +5,12 @@ export const metadata = {
   description: "Open a shared Lesson Builder presentation with a classroom code.",
 };
 
-export default function StudentPage() {
-  return <StudentViewer />;
+export default async function StudentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const initialCode = Array.isArray(params.code) ? params.code[0] : params.code;
+  return <StudentViewer initialCode={initialCode || ""} />;
 }
