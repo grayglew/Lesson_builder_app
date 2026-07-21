@@ -4,11 +4,11 @@
 
 - Production domain: `https://lesson-builder-online.vercel.app`
 - Unified builder route: `/builder`
-- Current cutover commit: `d756598ca9b8d8d0c7f1b71c82907783e3acb955`
+- Current production commit: `2ce40590740fbde4b539412ac92e113e1bb08bed`
 - Current immutable deployment:
-  `https://lesson-builder-online-8zktw69jq-grayglew-8338s-projects.vercel.app`
+  `https://lesson-builder-online-peayciemg-grayglew-8338s-projects.vercel.app`
 - Previous rollback deployment:
-  `https://lesson-builder-online-5y433n08m-grayglew-8338s-projects.vercel.app`
+  `https://lesson-builder-online-olj1q9o61-grayglew-8338s-projects.vercel.app`
 
 Update this section whenever a newer production deployment is promoted.
 
@@ -58,6 +58,27 @@ job records a clear skip instead of failing during Vercel authentication.
 
 The manual GitHub workflows under `.github/workflows` implement the candidate
 and promotion split. A normal Preview build must never be promoted.
+
+## Manual off-site application backup
+
+1. Sign in as an administrator and open `/admin/users`.
+2. Download the **recovery export** and the **Storage manifest**. The recovery
+   export contains the Builder workspace and saved lesson documents; the
+   manifest contains one-hour signed URLs for every owned `lesson-assets`
+   object.
+3. Before the manifest expires, download and checksum the Storage objects:
+
+   ```powershell
+   node scripts/download-storage-backup.mjs --manifest=<storage-manifest.json> --backup-dir=backups/<backup-name>
+   ```
+
+4. Copy the recovery JSON into the same backup directory. Verify that
+   `storage-download.json` reports the expected object count and byte total and
+   that every entry in `storage-index.json` has a SHA-256 checksum.
+
+Supabase-managed database backups remain the authoritative whole-project
+database restore point. The Admin exports are the portable, account-scoped
+application recovery set and include Storage bodies that database backups omit.
 
 ## Data compatibility
 
