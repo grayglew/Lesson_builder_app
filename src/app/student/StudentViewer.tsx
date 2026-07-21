@@ -1,6 +1,15 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+const REFRESH_INTERVAL_MS = 5_000;
 
 type StudentOpenResponse = {
   ok?: boolean;
@@ -12,6 +21,7 @@ type StudentOpenResponse = {
 };
 
 type StudentSnapshot = {
+  schemaVersion?: number;
   snapshotKind?: string;
   title?: string;
   className?: string;
@@ -38,8 +48,23 @@ function formatDateTime(value: string) {
   });
 }
 
-export default function StudentViewer() {
-  const [code, setCode] = useState("");
+function isStudentSnapshot(value: unknown): value is StudentSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const snapshot = value as StudentSnapshot;
+  return (
+    snapshot.snapshotKind === "student-presentation-snapshot" &&
+    snapshot.schemaVersion === 1 &&
+    typeof snapshot.html === "string" &&
+    snapshot.html.trim().length > 0
+  );
+}
+
+export default function StudentViewer({ initialCode = "" }: { initialCode?: string }) {
+  const initialNormalizedCode = normalizeCode(initialCode);
+  const [code, setCode] = useState(initialNormalizedCode);
+  const [activeCode, setActiveCode] = useState(
+    initialNormalizedCode.length === 7 ? initialNormalizedCode : "",
+  );
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,53 +72,131 @@ export default function StudentViewer() {
   const [snapshotTitle, setSnapshotTitle] = useState("");
   const [version, setVersion] = useState(0);
   const [uploadedAt, setUploadedAt] = useState("");
+  const activeCodeRef = useRef(
+    initialNormalizedCode.length === 7 ? initialNormalizedCode : "",
+  );
+  const versionRef = useRef(0);
+  const hasSnapshotRef = useRef(false);
+  const requestInFlightRef = useRef(false);
 
   const normalizedCode = useMemo(() => normalizeCode(code), [code]);
+
+  const loadLesson = useCallback(
+    async (
+      requestedCode: string,
+      options: { background?: boolean; force?: boolean } = {},
+    ) => {
+      const nextCode = normalizeCode(requestedCode);
+      if (nextCode.length !== 7 || requestInFlightRef.current) return;
+
+      requestInFlightRef.current = true;
+      const background = Boolean(options.background);
+      if (!background) {
+        setBusy(true);
+        setError("");
+        setStatus("Opening lesson...");
+      }
+
+      try {
+        const response = await fetch("/api/student/session/open", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: nextCode }),
+          cache: "no-store",
+        });
+        const data = (await response.json().catch(() => ({}))) as StudentOpenResponse;
+        if (!response.ok || data.ok === false || !data.snapshotUrl) {
+          throw new Error(data.error || "Could not open that lesson.");
+        }
+
+        const nextVersion = Number(data.version) || 0;
+        if (
+          background &&
+          !options.force &&
+          nextVersion > 0 &&
+          nextVersion <= versionRef.current
+        ) {
+          setStatus("Up to date. Updates are checked automatically.");
+          return;
+        }
+
+        const snapshotResponse = await fetch(data.snapshotUrl, {
+          cache: "no-store",
+          referrerPolicy: "no-referrer",
+        });
+        if (!snapshotResponse.ok) {
+          throw new Error(`Could not download the lesson (${snapshotResponse.status}).`);
+        }
+        const snapshot = (await snapshotResponse.json().catch(() => null)) as unknown;
+        if (!isStudentSnapshot(snapshot)) {
+          throw new Error("The shared lesson is invalid or empty.");
+        }
+
+        if (activeCodeRef.current !== nextCode) return;
+        setSnapshotHtml(snapshot.html || "");
+        hasSnapshotRef.current = true;
+        setSnapshotTitle(snapshot.title || "Shared lesson");
+        versionRef.current = nextVersion;
+        setVersion(nextVersion);
+        setUploadedAt(data.uploadedAt || snapshot.uploadedAt || "");
+        setError("");
+        setStatus(
+          background
+            ? "Lesson updated automatically."
+            : "Lesson opened. Updates will appear automatically.",
+        );
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not open that lesson.";
+        if (background && hasSnapshotRef.current) {
+          setStatus(`${message} Retrying automatically...`);
+        } else {
+          setSnapshotHtml("");
+          hasSnapshotRef.current = false;
+          setSnapshotTitle("");
+          versionRef.current = 0;
+          setVersion(0);
+          setUploadedAt("");
+          setStatus("");
+          setError(message);
+        }
+      } finally {
+        requestInFlightRef.current = false;
+        if (!background) setBusy(false);
+      }
+    },
+    [],
+  );
 
   async function openLesson(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const nextCode = normalizeCode(code);
+    if (nextCode.length !== 7) return;
     setCode(nextCode);
-    setBusy(true);
-    setError("");
-    setStatus("Opening lesson...");
-
-    try {
-      const response = await fetch("/api/student/session/open", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: nextCode }),
-      });
-      const data = (await response.json().catch(() => ({}))) as StudentOpenResponse;
-      if (!response.ok || data.ok === false || !data.snapshotUrl) {
-        throw new Error(data.error || "Could not open that lesson.");
-      }
-
-      const snapshotResponse = await fetch(data.snapshotUrl, { cache: "no-store" });
-      if (!snapshotResponse.ok) {
-        throw new Error(`Could not download the lesson (${snapshotResponse.status}).`);
-      }
-      const snapshot = (await snapshotResponse.json()) as StudentSnapshot;
-      if (!snapshot || typeof snapshot.html !== "string" || !snapshot.html.trim()) {
-        throw new Error("The shared lesson is empty.");
-      }
-
-      setSnapshotHtml(snapshot.html);
-      setSnapshotTitle(snapshot.title || "Shared lesson");
-      setVersion(Number(data.version) || 0);
-      setUploadedAt(data.uploadedAt || snapshot.uploadedAt || "");
-      setStatus("Lesson opened.");
-    } catch (err) {
-      setSnapshotHtml("");
-      setSnapshotTitle("");
-      setVersion(0);
-      setUploadedAt("");
-      setStatus("");
-      setError(err instanceof Error ? err.message : "Could not open that lesson.");
-    } finally {
-      setBusy(false);
-    }
+    activeCodeRef.current = nextCode;
+    versionRef.current = 0;
+    setActiveCode(nextCode);
+    window.history.replaceState(null, "", `/student?code=${encodeURIComponent(nextCode)}`);
+    await loadLesson(nextCode, { force: true });
   }
+
+  useEffect(() => {
+    if (initialNormalizedCode.length !== 7) return;
+    const timeout = window.setTimeout(
+      () => void loadLesson(initialNormalizedCode, { force: true }),
+      0,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [initialNormalizedCode, loadLesson]);
+
+  useEffect(() => {
+    if (!activeCode) return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      void loadLesson(activeCode, { background: true });
+    }, REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [activeCode, loadLesson]);
 
   return (
     <main className="min-h-screen bg-[#eef5f3] text-slate-950">
@@ -118,11 +221,11 @@ export default function StudentViewer() {
                 />
               </label>
               <button className="primary-action h-11" type="submit" disabled={busy || normalizedCode.length < 7}>
-                {snapshotHtml ? "Refresh latest upload" : "Open lesson"}
+                {busy ? "Opening..." : snapshotHtml ? "Check now" : "Open lesson"}
               </button>
             </form>
           </div>
-          <div className="mt-3 min-h-6 text-sm font-semibold">
+          <div className="mt-3 min-h-6 text-sm font-semibold" aria-live="polite">
             {error ? <p className="text-red-700">{error}</p> : null}
             {!error && status ? <p className="text-teal-800">{status}</p> : null}
             {!error && snapshotHtml ? (
@@ -141,12 +244,13 @@ export default function StudentViewer() {
             title={snapshotTitle || "Shared lesson"}
             srcDoc={snapshotHtml}
             sandbox=""
+            referrerPolicy="no-referrer"
           />
         ) : (
           <div className="grid min-h-[60vh] place-items-center rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
             <div>
               <p className="text-lg font-bold text-slate-800">Enter the code from your teacher&apos;s screen.</p>
-              <p className="mt-2">When your teacher uploads a new version, press Refresh latest upload.</p>
+              <p className="mt-2">The shared lesson will update automatically.</p>
             </div>
           </div>
         )}

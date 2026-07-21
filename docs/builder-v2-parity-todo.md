@@ -160,11 +160,15 @@ behaviour. Items marked **missing** have no equivalent implementation.
 
 ### P2 — polish and secondary parity
 
-- [ ] **Student presenter sharing — incomplete and deprioritized.** V2 creates
-  a student session, shows the code and Upload control, and attempts to publish
-  a stripped read-only snapshot, but the end-to-end student view failed manual
-  testing on 2026-07-19. Diagnose the publish/open flow later; this is no longer
-  a blocker for the current P0 implementation sequence.
+- [ ] **Student presenter sharing — implemented; awaiting manual confirmation.**
+  Hosted V2 presenters now publish the initial stripped read-only snapshot
+  automatically, retain an Update students control for later changes, and
+  provide a code plus direct `/student?code=...` link. The public student view
+  opens the private signed snapshot in a sandbox and checks automatically for
+  newer published versions. The code lookup is uncached and can sign only the
+  exact session-owned Storage path. Automated API, viewer, presenter-regression,
+  and security-path tests pass; complete the Preview teacher/student device
+  check before ticking this item off.
 
 - [x] **Saved-lesson filter controls — completed.** Added a one-click Clear
   filters action covering title, class, status and both teaching-date bounds.

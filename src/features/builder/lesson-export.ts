@@ -1307,6 +1307,13 @@ function standaloneInteractionScript() {
     viewport.setAttribute("name", "viewport");
     viewport.setAttribute("content", "width=device-width, initial-scale=1");
     snapshot.head.appendChild(viewport);
+    const contentSecurityPolicy = snapshot.createElement("meta");
+    contentSecurityPolicy.setAttribute("http-equiv", "Content-Security-Policy");
+    contentSecurityPolicy.setAttribute(
+      "content",
+      "default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline'; font-src data:; media-src data: blob: https:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+    );
+    snapshot.head.appendChild(contentSecurityPolicy);
     document.querySelectorAll("style").forEach((sourceStyle) => {
       const style = snapshot.createElement("style");
       style.textContent = sourceStyle.textContent || "";
@@ -1338,9 +1345,16 @@ function standaloneInteractionScript() {
     });
     snapshot
       .querySelectorAll(
-        ".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation],button",
+        ".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation],button,iframe,object,embed,form,base,link,meta[http-equiv='refresh']",
       )
       .forEach((node) => node.remove());
+    snapshot.querySelectorAll("*").forEach((node) => {
+      Array.from(node.attributes).forEach((attribute) => {
+        if (attribute.name.toLowerCase().startsWith("on")) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+    });
     snapshot
       .querySelectorAll("[data-bound],[data-pointer-input-bound],[contenteditable]")
       .forEach((node) => {
@@ -1374,14 +1388,15 @@ function standaloneInteractionScript() {
     };
   }
 
-  async function uploadStudentSnapshot() {
+  async function uploadStudentSnapshot(options) {
+    const silent = Boolean(options?.silent);
     if (!hasStudentSessionConfig()) {
       alert("This presenter does not have a student sharing session.");
       return null;
     }
     if (studentUploadButton) {
       studentUploadButton.disabled = true;
-      studentUploadButton.textContent = "Uploading...";
+      studentUploadButton.textContent = "Publishing...";
     }
     try {
       const snapshot = studentSnapshotDocument();
@@ -1436,19 +1451,32 @@ function standaloneInteractionScript() {
         completeResponse,
         "Could not publish the student view.",
       );
-      alert(
-        "Student view uploaded. Code: " +
-          (presenterConfig.studentSession.code || ""),
-      );
+      if (studentCodeBadge) {
+        studentCodeBadge.title =
+          "Student view published. Open " +
+          (presenterConfig.studentSession.viewerUrl || "/student");
+      }
+      if (!silent) {
+        alert(
+          "Student view updated. Code: " +
+            (presenterConfig.studentSession.code || ""),
+        );
+      }
       return completed;
     } catch (error) {
       console.error(error);
-      alert(error?.message || "Could not upload the student view.");
-      throw error;
+      if (studentCodeBadge) {
+        studentCodeBadge.title =
+          error?.message || "Could not publish the student view.";
+      }
+      if (!silent) {
+        alert(error?.message || "Could not upload the student view.");
+      }
+      return null;
     } finally {
       if (studentUploadButton) {
         studentUploadButton.disabled = false;
-        studentUploadButton.textContent = "Upload";
+        studentUploadButton.textContent = "Update students";
       }
     }
   }
@@ -1558,6 +1586,12 @@ function standaloneInteractionScript() {
   pollButton?.addEventListener("click", showConfidencePollSlide);
   saveBuilderButton?.addEventListener("click", () => void savePresentedLesson());
   studentUploadButton?.addEventListener("click", () => void uploadStudentSnapshot());
+  if (hasStudentSessionConfig()) {
+    window.setTimeout(
+      () => void uploadStudentSnapshot({ silent: true }),
+      350,
+    );
+  }
   cameraButton?.addEventListener("click", () => {
     if (cameraInput) {
       cameraInput.value = "";
