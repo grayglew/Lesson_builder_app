@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium";
+import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
-import puppeteer from "puppeteer-core";
+import puppeteer, { type Page } from "puppeteer-core";
 import { randomUUID } from "node:crypto";
 import { writeFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const lessonId = String(body.lessonId || "").trim();
   const snapshotPath = String(body.snapshotPath || "").trim();
+  const output = body.output === "slide-images" ? "slide-images" : "pdf";
 
   if (!isUuid(lessonId) || !isPresenterPdfSnapshotPath(auth.user.id, lessonId, snapshotPath)) {
     return NextResponse.json({ ok: false, error: "Invalid presenter PDF snapshot path." }, { status: 400 });
@@ -84,6 +86,38 @@ export async function POST(request: Request) {
     }
 
     const html = await snapshot.text();
+    if (output === "slide-images") {
+      const images = await renderPresenterSnapshotToSlideImages(html);
+      const archive = new JSZip();
+      const slides = images.map((image, index) => {
+        const file = `slides/${String(index + 1).padStart(3, "0")}.jpg`;
+        archive.file(file, image);
+        return {
+          file,
+          width: 1600,
+          height: 1000,
+          imageWidth: 1536,
+          imageHeight: 960,
+        };
+      });
+      archive.file("manifest.json", JSON.stringify({ version: 1, slides }));
+      const zip = await archive.generateAsync({
+        type: "uint8array",
+        compression: "DEFLATE",
+      });
+      const zipBody = zip.buffer.slice(
+        zip.byteOffset,
+        zip.byteOffset + zip.byteLength,
+      ) as ArrayBuffer;
+      return new NextResponse(zipBody, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/zip",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     const pdf = await renderPresenterSnapshotToPdf(html);
     const pdfBody = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
     return new NextResponse(pdfBody, {
@@ -109,8 +143,39 @@ export async function POST(request: Request) {
 }
 
 export async function renderPresenterSnapshotToPdf(html: string) {
+  const pagePdfs = await renderPresenterSnapshotPages(html, async (page) => {
+    await page.emulateMediaType("print");
+    return page.pdf(pdfPageOptions());
+  });
+  const merged = await PDFDocument.create();
+  for (const onePagePdf of pagePdfs) {
+    const source = await PDFDocument.load(onePagePdf);
+    const [copiedPage] = await merged.copyPages(source, [0]);
+    merged.addPage(copiedPage);
+  }
+  return merged.save();
+}
+
+export function renderPresenterSnapshotToSlideImages(html: string) {
+  return renderPresenterSnapshotPages(html, async (page) => {
+    await page.emulateMediaType("screen");
+    const image = await page.screenshot({
+      type: "jpeg",
+      quality: 90,
+      captureBeyondViewport: false,
+      clip: { x: 0, y: 0, width: 1536, height: 960 },
+    });
+    return new Uint8Array(image);
+  });
+}
+
+async function renderPresenterSnapshotPages<T>(
+  html: string,
+  renderPage: (page: Page) => Promise<T>,
+) {
   const slideDocuments = createPresenterPdfSlideDocuments(html);
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
+  const rendered: T[] = [];
 
   try {
     browser = await puppeteer.launch({
@@ -130,14 +195,13 @@ export async function renderPresenterSnapshotToPdf(html: string) {
       headless: "shell",
       protocolTimeout: 180000,
     });
-    const merged = await PDFDocument.create();
 
     for (const [index, slideHtml] of slideDocuments.entries()) {
       const snapshotFile = join(
         tmpdir(),
         `lesson-builder-presenter-${randomUUID()}-${index + 1}.html`,
       );
-      let page: Awaited<ReturnType<typeof browser.newPage>> | undefined;
+      let page: Page | undefined;
       try {
         await writeFile(snapshotFile, slideHtml, "utf8");
         page = await browser.newPage();
@@ -145,7 +209,6 @@ export async function renderPresenterSnapshotToPdf(html: string) {
           waitUntil: "load",
           timeout: 120000,
         });
-        await page.emulateMediaType("print");
         await page.evaluate(async () => {
           await document.fonts?.ready;
           await Promise.all(
@@ -156,17 +219,13 @@ export async function renderPresenterSnapshotToPdf(html: string) {
             ),
           );
         });
-        const onePagePdf = await page.pdf(pdfPageOptions());
-        const source = await PDFDocument.load(onePagePdf);
-        const [copiedPage] = await merged.copyPages(source, [0]);
-        merged.addPage(copiedPage);
+        rendered.push(await renderPage(page));
       } finally {
         await page?.close().catch(() => undefined);
         await unlink(snapshotFile).catch(() => undefined);
       }
     }
-
-    return merged.save();
+    return rendered;
   } finally {
     await browser?.close().catch(() => undefined);
   }

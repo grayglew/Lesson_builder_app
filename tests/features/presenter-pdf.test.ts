@@ -6,7 +6,9 @@ import {
 import {
   BuilderApiError,
   downloadPresenterPdf,
+  downloadPresenterSlideImages,
 } from "@/features/builder/api-client";
+import JSZip from "jszip";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("presenter PDF snapshots", () => {
@@ -144,6 +146,62 @@ describe("presenter PDF snapshots", () => {
       }),
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("uploads a static snapshot and reads server-rendered JPEG slides", async () => {
+    const archive = new JSZip();
+    archive.file(
+      "manifest.json",
+      JSON.stringify({
+        version: 1,
+        slides: [
+          {
+            file: "slides/001.jpg",
+            width: 1600,
+            height: 1000,
+            imageWidth: 1536,
+            imageHeight: 960,
+          },
+        ],
+      }),
+    );
+    archive.file("slides/001.jpg", new Uint8Array([0xff, 0xd8, 0xff, 0xd9]));
+    const zip = await archive.generateAsync({ type: "uint8array" });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          path: "user/presenter-pdf/lesson/snapshot.html",
+          signedUrl: "https://storage.example.test/upload",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(zip.buffer as ArrayBuffer, {
+          status: 200,
+          headers: { "Content-Type": "application/zip" },
+        }),
+      );
+
+    const slides = await downloadPresenterSlideImages(
+      "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c",
+      '<!doctype html><section class="lesson-slide">Lesson</section>',
+    );
+
+    expect(slides).toEqual([
+      expect.objectContaining({
+        width: 1600,
+        height: 1000,
+        imageWidth: 1536,
+        imageHeight: 960,
+        imageBytes: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]),
+        dataUrl: "data:image/jpeg;base64,/9j/2Q==",
+      }),
+    ]);
+    expect(fetchMock.mock.calls[2]?.[1]?.body).toContain(
+      '"output":"slide-images"',
+    );
   });
 });
 

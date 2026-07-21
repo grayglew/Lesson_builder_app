@@ -3,9 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SavedLessonLibrary } from "@/features/builder/SavedLessonLibrary";
 import {
+  downloadPresenterSlideImages,
   listSavedLessons,
+  openSavedLesson,
   updateSavedLessonMetadata,
 } from "@/features/builder/api-client";
+import {
+  buildPowerPointBundleZip,
+  downloadBlob,
+} from "@/features/builder/saved-lesson-export";
 import { createInitialBuilderDocument } from "@/features/builder/schema";
 import { useBuilderStore } from "@/features/builder/store";
 
@@ -14,7 +20,9 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
     await importOriginal<typeof import("@/features/builder/api-client")>();
   return {
     ...original,
+    downloadPresenterSlideImages: vi.fn(),
     listSavedLessons: vi.fn(),
+    openSavedLesson: vi.fn(),
     updateSavedLessonMetadata: vi.fn(),
   };
 });
@@ -121,6 +129,44 @@ describe("SavedLessonLibrary production actions", () => {
       teachingDate: "2026-04-02",
     });
     expect((await screen.findAllByText("Year 10")).length).toBeGreaterThan(0);
+  });
+
+  it("renders PowerPoint slides on the authenticated server to avoid tainted canvases", async () => {
+    const user = userEvent.setup();
+    const savedDocument = createInitialBuilderDocument(
+      "2026-07-19T01:00:00.000Z",
+    );
+    savedDocument.slides = [
+      { id: "slide-1", type: "placeholder", title: "Slide", text: "Test" },
+    ];
+    vi.mocked(openSavedLesson).mockResolvedValue({
+      document: savedDocument,
+      lesson: lesson("active", "Active lesson", "2026-04-02", false),
+    });
+    vi.mocked(buildPowerPointBundleZip).mockResolvedValue(
+      new Blob(["bundle"], { type: "application/zip" }),
+    );
+    vi.mocked(downloadPresenterSlideImages).mockResolvedValue([]);
+    render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
+
+    const row = (await screen.findAllByRole("row"))[2];
+    await user.click(
+      within(row).getByRole("button", {
+        name: "Download PowerPoint bundle",
+      }),
+    );
+
+    const dependencies = vi.mocked(buildPowerPointBundleZip).mock.calls[0]?.[1];
+    expect(dependencies?.renderSlides).toEqual(expect.any(Function));
+    await dependencies?.renderSlides?.("<!doctype html><p>static slides</p>");
+    expect(downloadPresenterSlideImages).toHaveBeenCalledWith(
+      "active",
+      "<!doctype html><p>static slides</p>",
+    );
+    expect(downloadBlob).toHaveBeenCalledWith(
+      expect.any(Blob),
+      "Active lesson-bundle.zip",
+    );
   });
 
   it("clears every saved-lesson filter in one action and restores production order", async () => {

@@ -27,6 +27,7 @@ import {
 import {
   deleteSavedLesson,
   createPresenterStudentSession,
+  downloadPresenterSlideImages,
   listSavedLessons,
   openSavedLesson as fetchSavedLesson,
   saveCurrentLesson,
@@ -282,6 +283,8 @@ export function SavedLessonLibrary({
       const opened = await fetchSavedLesson(lesson.id);
       const bundle = await buildPowerPointBundleZip(opened.document, {
         retrievalItems: document.retrievalItems,
+        renderSlides: (html) =>
+          downloadPresenterSlideImages(lesson.id, html),
       });
       downloadBlob(bundle, `${safeFileName(lesson.title)}-bundle.zip`);
       setStatus({

@@ -30,7 +30,10 @@ vi.mock("@/lib/builder-sync/auth", () => ({
   isPresenterPdfSnapshotPath: vi.fn(),
 }));
 
-import { renderPresenterSnapshotToPdf } from "@/app/api/presenter/pdf/route";
+import {
+  renderPresenterSnapshotToPdf,
+  renderPresenterSnapshotToSlideImages,
+} from "@/app/api/presenter/pdf/route";
 
 describe("presenter PDF route renderer", () => {
   beforeEach(() => {
@@ -135,6 +138,37 @@ describe("presenter PDF route renderer", () => {
         '<!doctype html><main class="lesson-deck"><section class="lesson-slide">Lesson</section></main>',
       ),
     ).rejects.toThrow("Failed to launch browser process");
+  });
+
+  it("screenshots slide images server-side without using a browser canvas", async () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+    const screenshot = vi.fn().mockResolvedValue(jpeg);
+    const closePage = vi.fn().mockResolvedValue(undefined);
+    const closeBrowser = vi.fn().mockResolvedValue(undefined);
+    const newPage = vi.fn().mockResolvedValue({
+      goto: vi.fn().mockResolvedValue(undefined),
+      emulateMediaType: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(undefined),
+      screenshot,
+      close: closePage,
+    });
+    mocks.launch.mockResolvedValue({ newPage, close: closeBrowser });
+
+    const images = await renderPresenterSnapshotToSlideImages(
+      '<!doctype html><main class="lesson-deck"><section class="lesson-slide"><img src="https://cross-origin.example/image.png"></section></main>',
+    );
+
+    expect(images).toHaveLength(1);
+    expect(images[0]).toEqual(jpeg);
+    expect(screenshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "jpeg",
+        quality: 90,
+        captureBeyondViewport: false,
+      }),
+    );
+    expect(closePage).toHaveBeenCalledOnce();
+    expect(closeBrowser).toHaveBeenCalledOnce();
   });
 });
 
