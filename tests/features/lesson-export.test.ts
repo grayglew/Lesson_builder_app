@@ -44,6 +44,13 @@ describe("standalone lesson export", () => {
     expect(html).toContain('data-presenter-color');
     expect(html).toContain('id="presenter-download"');
     expect(html).toContain('id="presenter-pdf"');
+    expect(html).toContain('aria-label="Lesson slides"');
+    expect(html).toContain('role="toolbar"');
+    expect(html).toContain('aria-label="Slide 1: Starter"');
+    expect(html).toContain('role="status" aria-live="polite"');
+    expect(html).toContain("prefers-reduced-motion:reduce");
+    expect(html).toContain('reduceMotion ? "auto" : "smooth"');
+    expect(html).toContain("scrollbar-width:thin");
     expect(html).toContain('data-qa-toggle="replace"');
     expect(html).toContain("requestFullscreen");
     expect(html).toContain('event.key === "f"');
@@ -70,6 +77,20 @@ describe("standalone lesson export", () => {
     expect(html).toContain(".lesson-slide:last-child{break-after:auto");
     expect(html).toContain("function waitForImages()");
     expect(html).toContain("window.print();},350");
+  });
+
+  it("explains which controls require the hosted presenter in downloaded HTML", () => {
+    const offlineHtml = buildStandaloneLessonHtml(lessonDocument(), {
+      offlineCapabilities: true,
+    });
+    const hostedHtml = buildStandaloneLessonHtml(lessonDocument());
+
+    expect(offlineHtml).toContain("Offline copy");
+    expect(offlineHtml).toContain(
+      "Save to Builder, Poll and live retrieval require the hosted presenter",
+    );
+    expect(offlineHtml).toContain(".presenter-capability-note");
+    expect(hostedHtml).not.toContain('<details class="presenter-capability-note"');
   });
 
   it("enables production live starter controls, Poll, and Save for hosted presenters", () => {
@@ -220,6 +241,80 @@ describe("standalone lesson export", () => {
         dataUrl: "data:image/jpeg;base64,Y2FtZXJhLXBob3Rv",
       },
     });
+  });
+
+  it("matches production specialized slide markup and camera rendering", () => {
+    const document = lessonDocument();
+    document.slides = [
+      {
+        id: "revision",
+        type: "revision",
+        title: "Revision",
+        items: [
+          {
+            lo: "101a: Expand brackets",
+            image: testImage("revision-question.png", "cmV2aXNpb24="),
+            answerImage: null,
+          },
+        ],
+      },
+      {
+        id: "template",
+        type: "template",
+        title: "Worked example",
+        bullets: ["First step", "Second step"],
+      },
+      {
+        id: "placeholder",
+        type: "placeholder",
+        title: "Placeholder",
+        text: "Discuss with your partner",
+      },
+      {
+        id: "math",
+        type: "math",
+        title: "Ignored title",
+        mode: "Question",
+        latex: "\\\\[x^2\\\\]",
+      },
+      {
+        id: "camera-drawing",
+        type: "drawing",
+        title: "Camera photo",
+        presenterGeneratedType: "camera",
+        image: testImage("camera.jpg", "Y2FtZXJh"),
+      },
+      {
+        id: "legacy-camera",
+        type: "imported-html",
+        title: "Imported camera",
+        className: "lesson-slide camera-slide",
+        html: '<img class="camera-slide-image" src="data:image/jpeg;base64,bGVnYWN5" alt="Camera image 2">',
+      },
+    ];
+
+    const html = buildStandaloneLessonHtml(document);
+
+    expect(html.match(/class="revision-question-cell"/g)).toHaveLength(2);
+    expect(html).toContain('class="revision-working-area"');
+    expect(html).toContain(
+      'class="template-slide-inner"><h4>Worked example</h4>',
+    );
+    expect(html).toContain(
+      '<p>Discuss with your partner</p><span class="slide-label">Placeholder</span>',
+    );
+    expect(html).toContain(
+      'class="lesson-slide math-slide rendered-math-slide"',
+    );
+    expect(html).toContain('<div class="math-slide-inner"><h4>Question</h4>');
+    expect(html).toContain('class="lesson-slide drawing-slide camera-slide"');
+    expect(html).toContain('class="camera-slide-image"');
+    expect(html).toContain('data-builder-slide-id="legacy-camera"');
+    expect(html).toContain('alt="Camera image 2"');
+    expect(html).toContain('.revision-working-area{grid-column:1/-1}');
+    expect(html).toContain('.template-slide-inner{width:min(76%,940px)');
+    expect(html).toContain('.placeholder-slide p{max-width:84%;font-size:36px');
+    expect(html).toContain('.math-slide-inner{max-height:82%;width:86%');
   });
 
   it("preserves current global data when importing a lesson-only payload", () => {
@@ -401,4 +496,13 @@ function lessonDocument(): BuilderDocument {
     },
   ];
   return document;
+}
+
+function testImage(name: string, base64: string) {
+  return {
+    name,
+    type: name.endsWith(".jpg") ? "image/jpeg" : "image/png",
+    size: base64.length,
+    dataUrl: `data:${name.endsWith(".jpg") ? "image/jpeg" : "image/png"};base64,${base64}`,
+  };
 }

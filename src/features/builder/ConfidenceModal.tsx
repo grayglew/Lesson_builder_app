@@ -1,8 +1,8 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect } from "react";
 import type { ConfidenceSummary } from "./saved-lesson-parity";
+import { useDialogFocus } from "./useDialogFocus";
 
 const confidenceColors = [
   "bg-red-500",
@@ -21,13 +21,7 @@ export function ConfidenceModal({
   summary: ConfidenceSummary;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useDialogFocus<HTMLElement>(onClose);
 
   const maximum = Math.max(...Object.values(summary.counts), 1);
 
@@ -40,10 +34,12 @@ export function ConfidenceModal({
       }}
     >
       <section
+        ref={dialogRef}
         aria-labelledby="confidence-modal-title"
         aria-modal="true"
         className="w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl"
         role="dialog"
+        tabIndex={-1}
       >
         <div className="flex items-start justify-between gap-4">
           <div>

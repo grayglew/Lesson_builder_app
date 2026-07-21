@@ -14,8 +14,15 @@ describe("BuilderImageInput", () => {
       />,
     );
 
-    const target = screen.getByText("Paste or drop image").closest("label");
+    const target = screen.getByText("Paste or drop image").closest("button");
     expect(target).not.toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Choose or paste Question image" }),
+    ).toBe(target);
+    expect(screen.getByLabelText("Question image")).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
 
     fireEvent.mouseEnter(target!);
     expect(document.activeElement).toBe(target);

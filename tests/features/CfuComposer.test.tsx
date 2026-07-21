@@ -55,11 +55,12 @@ describe("CfuComposer", () => {
     const user = userEvent.setup();
     render(<CfuComposer />);
     const image = new File(["pasted"], "pasted.png", { type: "image/png" });
-    const input = screen.getByLabelText("CFU image");
-    const dropZone = input.closest("label");
+    const dropZone = screen.getByRole("button", {
+      name: "Choose or paste CFU image",
+    });
 
     expect(dropZone).not.toBeNull();
-    fireEvent.paste(dropZone as HTMLLabelElement, {
+    fireEvent.paste(dropZone, {
       clipboardData: {
         items: [
           {

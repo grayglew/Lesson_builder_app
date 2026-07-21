@@ -112,22 +112,26 @@ behaviour. Items marked **missing** have no equivalent implementation.
 
 ### P1 — important workflow and rendering parity
 
-- [ ] **Starter “Log retrieval” — missing.** The V2 button is present but
-  implemented and awaiting manual verification. It now creates or updates
+- [ ] **Starter “Log retrieval” — implemented, awaiting manual verification.**
+  It now creates or updates
   owner-scoped retrieval progress, increments seen, records the teaching date,
   reconciles canonical database IDs, and links draft starter slots to those IDs
   before slide creation.
 
-- [ ] **Legacy retrieval import — missing.** Restore `.xlsx` tracker import,
-  image-folder selection, preview/validation, ID migration, and database update.
+- [x] **Legacy retrieval import — retired.** A read-only audit on 2026-07-21
+  confirmed that the production retrieval bank already exists in the same
+  relational Supabase tables consumed by V2. The guarded clone process backs
+  up and verifies those rows together with the private `lesson-assets` Storage
+  objects, so the old `.xlsx` tracker and image-folder importer is not required
+  for cutover.
 
 - [x] **Saved-lesson direct presenter lifecycle — completed.** The saved-library
   row downloads the selected saved version and opens its hosted presenter
   directly without replacing the current builder workspace. Student-session
   startup is non-blocking while that separate P2 issue remains deprioritized.
 
-- [ ] **Presenter print/PDF view — partial.** V2 calls the browser print dialog
-  implementation is complete and awaiting manual verification. V2 now snapshots
+- [ ] **Presenter print/PDF view — implemented, awaiting manual verification.**
+  V2 now snapshots
   the current live deck into a clean dedicated print window, preserves annotations
   and reveal state, removes presenter-only controls, neutralises zoom, waits for
   images, and prevents a trailing blank page.
@@ -142,10 +146,12 @@ behaviour. Items marked **missing** have no equivalent implementation.
   recaptured from the live presenter on every save, and immutable versioned
   Storage objects prevent cached pre-camera lesson documents from reopening.
 
-- [ ] **Specialized slide rendering — partial.** Align Template, Placeholder
-  and LaTeX presenter typography/layout with production. Verify revision’s
-  two-question plus lower working-area layout and imported-HTML/taught camera
-  slide rendering.
+- [ ] **Specialized slide rendering - implemented, awaiting manual
+  verification.** Template, Placeholder and LaTeX presenters now use
+  production markup and typography; revision slides
+  retain two question cells plus the lower working area; imported HTML and
+  both legacy and presenter-generated camera slides render with their saved
+  classes and image content.
 
 - [x] **Impersonation exit control - completed.** Builder V2 now resolves the
   effective teacher on the server, displays the production Acting as identity
@@ -172,13 +178,19 @@ behaviour. Items marked **missing** have no equivalent implementation.
   1× to 3× zoom clamp for button and pinch handling, with the 60% button still
   toggling between fit and 1.6×.
 
-- [ ] **Offline/live capability messaging — partial.** Downloaded HTML
-  correctly cannot call hosted Save/Poll/retrieval APIs, but it should explain
-  this distinction consistently instead of only hiding controls.
+- [x] **Offline/live capability messaging — completed.** Downloaded HTML shows
+  an expandable Offline copy explanation: local drawing, reveal, print and
+  download remain available, while Save to Builder, Poll and live retrieval
+  require opening the saved lesson with the hosted Present action. Hosted
+  presenters are unchanged and the notice is excluded from print output.
 
-- [ ] **Accessibility and responsive parity audit.** Recheck keyboard access,
-  focus order, mobile toolbar overflow, reduced motion, and screen-reader labels
-  after all missing controls are restored.
+- [x] **Accessibility and responsive parity audit - completed.** Builder V2 now
+  uses a single-column mobile flow, scrollable labelled action toolbars, visible
+  keyboard focus, and one accessible tab stop per custom upload control. Shared
+  modal focus trapping restores the invoking control after Escape or close. The
+  presenter exposes labelled slides, toolbar/groups and live status, retains
+  horizontally scrollable touch controls with larger mobile targets, and
+  disables smooth motion when the operating system requests reduced motion.
 
 ## Verification required for each remaining slice
 

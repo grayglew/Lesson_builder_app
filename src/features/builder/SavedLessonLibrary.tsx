@@ -260,6 +260,7 @@ export function SavedLessonLibrary({
       const opened = await fetchSavedLesson(lesson.id);
       const html = await prepareSavedLessonHtml(opened.document, {
         retrievalItems: document.retrievalItems,
+        offlineCapabilities: true,
       });
       downloadBlob(
         new Blob([html], { type: "text/html" }),

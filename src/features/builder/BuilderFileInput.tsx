@@ -1,6 +1,7 @@
 "use client";
 
 import { FilePlus2 } from "lucide-react";
+import { useRef } from "react";
 import styles from "./BuilderShell.module.css";
 import type { BuilderAsset } from "./schema";
 import { fileToBuilderAsset } from "./starter";
@@ -18,6 +19,8 @@ export function BuilderFileInput({
   onChange,
   onError,
 }: BuilderFileInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   async function acceptFile(file: File | null | undefined) {
     if (!file) return;
     try {
@@ -30,19 +33,16 @@ export function BuilderFileInput({
   return (
     <div className={styles.assetEditor}>
       <span className={styles.assetLabel}>{label}</span>
-      <label
+      <button
         className={styles.imageDrop}
+        type="button"
+        aria-label={`Choose ${label}`}
+        onClick={() => inputRef.current?.click()}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
           void acceptFile(event.dataTransfer.files[0]);
         }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          event.currentTarget.querySelector("input")?.click();
-        }}
-        tabIndex={0}
       >
         <span className={styles.imageDropMessage}>
           <FilePlus2 aria-hidden />
@@ -53,16 +53,18 @@ export function BuilderFileInput({
               : "Any file type is supported."}
           </small>
         </span>
-        <input
-          className="sr-only"
-          type="file"
-          aria-label={label}
-          onChange={(event) => {
-            void acceptFile(event.target.files?.[0]);
-            event.target.value = "";
-          }}
-        />
-      </label>
+      </button>
+      <input
+        ref={inputRef}
+        className="sr-only"
+        type="file"
+        aria-label={label}
+        tabIndex={-1}
+        onChange={(event) => {
+          void acceptFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+      />
       {asset ? (
         <button
           className={styles.removeAssetButton}

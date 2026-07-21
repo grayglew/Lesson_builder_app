@@ -107,7 +107,7 @@ export function useLessonExportActions() {
   async function exportHtml() {
     setStatus({ tone: "working", message: "Preparing standalone lesson HTML..." });
     try {
-      const html = await prepareStandaloneHtml(false);
+      const html = await prepareStandaloneHtml(false, "", null, true);
       downloadBlob(
         new Blob([html], { type: "text/html" }),
         `${safeFileName(document.title)}.html`,
@@ -226,6 +226,7 @@ export function useLessonExportActions() {
     handout: boolean,
     presenterLessonId = "",
     studentSession: PresenterStudentSession | null = null,
+    offlineCapabilities = false,
   ) {
     const hydratedDocument = await hydrateLiveStarterSlots(
       document,
@@ -238,6 +239,7 @@ export function useLessonExportActions() {
     ]);
     return buildStandaloneLessonHtml(embeddedDocument, {
       handout,
+      offlineCapabilities,
       runtimeCss,
       runtimeJavaScript: runtimeJavaScript.replace(
         /<\/script/gi,

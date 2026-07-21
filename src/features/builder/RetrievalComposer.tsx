@@ -13,6 +13,7 @@ import {
 } from "./api-client";
 import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
+import { useDialogFocus } from "./useDialogFocus";
 import {
   compareRetrievalItems,
   countRetrievalImages,
@@ -735,6 +736,8 @@ function RetrievalEditor({
   onError: (message: string) => void;
   onSave: () => void;
 }) {
+  const dialogRef = useDialogFocus<HTMLElement>(onClose);
+
   function updateImage(
     role: "questions" | "answers",
     index: number,
@@ -752,10 +755,12 @@ function RetrievalEditor({
   return (
     <div className={styles.modalBackdrop} role="presentation">
       <section
+        ref={dialogRef}
         className={styles.retrievalEditorPanel}
         role="dialog"
         aria-modal="true"
         aria-labelledby="retrieval-editor-title"
+        tabIndex={-1}
       >
         <div className={styles.modalHead}>
           <div>

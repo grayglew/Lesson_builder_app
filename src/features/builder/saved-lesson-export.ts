@@ -43,6 +43,7 @@ export async function prepareSavedLessonHtml(
     lessonId?: string;
     studentSession?: PresenterStudentSession | null;
     retrievalItems?: RetrievalItem[];
+    offlineCapabilities?: boolean;
   } = {},
 ) {
   const lessonId = options.lessonId || "";
@@ -56,6 +57,7 @@ export async function prepareSavedLessonHtml(
     embedRemoteBuilderAssets(hydratedDocument),
   ]);
   return buildStandaloneLessonHtml(embeddedDocument, {
+    offlineCapabilities: options.offlineCapabilities,
     runtimeCss,
     runtimeJavaScript: runtimeJavaScript.replace(/<\/script/gi, "<\\/script"),
     liveRetrieval: lessonId

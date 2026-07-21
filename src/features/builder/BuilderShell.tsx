@@ -485,7 +485,11 @@ export function BuilderShell({
                 {document.slides.length === 1 ? "" : "s"}
               </h2>
             </div>
-            <div className={styles.previewHeadActions}>
+            <div
+              className={styles.previewHeadActions}
+              role="toolbar"
+              aria-label="Deck preview actions"
+            >
               <button
                 className={styles.previewIconButton}
                 type="button"
@@ -561,11 +565,15 @@ export function BuilderShell({
                     </span>
                     {index + 1}. {slide.title || slide.type}
                   </button>
-                  <div className={styles.slideActions}>
+                  <div
+                    className={styles.slideActions}
+                    role="group"
+                    aria-label={`Slide ${index + 1} actions`}
+                  >
                     <button
                       className={styles.miniButton}
                       type="button"
-                      aria-label="Move slide up"
+                      aria-label={`Move slide ${index + 1} up`}
                       disabled={index === 0}
                       onClick={() => moveSlide(slide.id, -1)}
                     >
@@ -574,7 +582,7 @@ export function BuilderShell({
                     <button
                       className={styles.miniButton}
                       type="button"
-                      aria-label="Move slide down"
+                      aria-label={`Move slide ${index + 1} down`}
                       disabled={index === document.slides.length - 1}
                       onClick={() => moveSlide(slide.id, 1)}
                     >
@@ -583,7 +591,7 @@ export function BuilderShell({
                     <button
                       className={`${styles.miniButton} ${styles.dangerMini}`}
                       type="button"
-                      aria-label="Delete slide"
+                      aria-label={`Delete slide ${index + 1}`}
                       onClick={() => removeSlide(slide.id)}
                     >
                       ×

@@ -84,6 +84,9 @@ describe("BuilderShell legacy UI parity", () => {
     expect(
       screen.getByRole("heading", { name: "0 slides" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("toolbar", { name: "Deck preview actions" }),
+    ).toBeInTheDocument();
 
     await userEvent.setup().click(
       screen.getByText("Import or export lesson").closest("summary")!,
@@ -157,6 +160,12 @@ describe("BuilderShell legacy UI parity", () => {
       screen.getByRole("button", {
         name: "Open handout from 2 selected slides",
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Slide 2 actions" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Move slide 2 up" }),
     ).toBeInTheDocument();
 
     await user.click(

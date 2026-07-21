@@ -9,6 +9,7 @@ type StandaloneLessonOptions = {
   runtimeCss?: string;
   runtimeJavaScript?: string;
   handout?: boolean;
+  offlineCapabilities?: boolean;
   liveRetrieval?: {
     enabled: boolean;
     endpoint: string;
@@ -78,10 +79,10 @@ export function buildStandaloneLessonHtml(
   <div><span>${escapeHtml(document.className || "Class")}</span><h1>${title}</h1></div>
   <div>${escapeHtml(document.teachingDate || "")}</div>
 </header>
-<main class="lesson-deck">
-  ${slides || '<section class="lesson-slide empty-slide"><p>No slides exported.</p></section>'}
+<main class="lesson-deck" aria-label="Lesson slides">
+  ${slides || '<section class="lesson-slide empty-slide" aria-label="Empty lesson"><p>No slides exported.</p></section>'}
 </main>
-<nav class="presenter-tools" aria-label="Presenter tools">
+<nav class="presenter-tools" aria-label="Presenter tools" role="toolbar">
   <button id="presenter-pan" class="presenter-tool is-active" type="button" aria-pressed="true">Pan</button>
   <button id="presenter-pen" class="presenter-tool" type="button" aria-pressed="false">Pen</button>
   <button id="presenter-highlighter" class="presenter-tool" type="button" aria-pressed="false">Highlighter</button>
@@ -92,7 +93,7 @@ export function buildStandaloneLessonHtml(
   <button id="presenter-poll" class="presenter-tool primary" type="button" hidden>Poll</button>
   <button id="presenter-zoom" class="presenter-tool" type="button" aria-label="Zoom in 60 percent" aria-pressed="false">60%</button>
   <button id="presenter-fullscreen" class="presenter-tool" type="button" aria-label="Toggle full screen" aria-pressed="false">Full</button>
-  <div class="presenter-colors" aria-label="Pen colours">
+  <div class="presenter-colors" aria-label="Pen colours" role="group">
     <button class="presenter-color" type="button" aria-label="Black pen colour" data-presenter-color data-color="#111827" style="--swatch-color:#111827"></button>
     <button class="presenter-color is-active" type="button" aria-label="Blue pen colour" data-presenter-color data-color="#2563eb" style="--swatch-color:#2563eb"></button>
     <button class="presenter-color" type="button" aria-label="Red pen colour" data-presenter-color data-color="#dc2626" style="--swatch-color:#dc2626"></button>
@@ -109,7 +110,11 @@ export function buildStandaloneLessonHtml(
   <button id="presenter-download" class="presenter-tool primary" type="button" aria-label="Download annotated HTML" title="Download annotated HTML">&#x2B07;</button>
   <button id="presenter-pdf" class="presenter-tool primary" type="button" aria-label="Open print view" title="Open print view"><span class="presenter-tool-icon presenter-print-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/></svg></span></button>
 </nav>
-<div id="presenter-student-code" class="presenter-student-code" hidden></div>
+${options.offlineCapabilities ? `<details class="presenter-capability-note" open>
+  <summary>Offline copy</summary>
+  <p>Drawing, reveal, print and local download still work. Save to Builder, Poll and live retrieval require the hosted presenter. Open the saved lesson and choose Present to use them.</p>
+</details>` : ""}
+<div id="presenter-student-code" class="presenter-student-code" role="status" aria-live="polite" hidden></div>
 <script type="application/json" id="lesson-builder-state">${escapeJsonForHtml(JSON.stringify(document))}</script>
 <script type="application/json" id="lesson-live-retrieval">${escapeJsonForHtml(JSON.stringify(liveRetrieval))}</script>
 <script type="application/json" id="lesson-presenter-config">${escapeJsonForHtml(JSON.stringify(presenterConfig))}</script>
@@ -209,7 +214,7 @@ function renderStandaloneSlide(
     slide.type === "pdf-page"
       ? ` ${aspect >= 1 ? "landscape" : "portrait"}`
       : "";
-  const attrs = `class="lesson-slide ${escapeAttr(slide.type)}-slide${orientation}" style="--slide-aspect:${aspect}" data-slide-aspect="${aspect}" data-slide-index="${index}" data-annotation-slide="${index}" data-builder-slide-id="${escapeAttr(slide.id)}" data-builder-slide-type="${escapeAttr(slide.type)}"`;
+  const attrs = `class="lesson-slide ${escapeAttr(slide.type)}-slide${orientation}" style="--slide-aspect:${aspect}" aria-label="Slide ${index + 1}: ${escapeAttr(String(slide.title || slide.type || "Slide"))}" data-slide-aspect="${aspect}" data-slide-index="${index}" data-annotation-slide="${index}" data-builder-slide-id="${escapeAttr(slide.id)}" data-builder-slide-type="${escapeAttr(slide.type)}"`;
 
   if (slide.type === "starter") {
     const slots = arrayOfRecords(data.slots).slice(0, 4);
@@ -276,6 +281,12 @@ function renderStandaloneSlide(
   }
 
   if (slide.type === "pdf-page" || slide.type === "drawing") {
+    if (
+      slide.type === "drawing" &&
+      String(data.presenterGeneratedType || "") === "camera"
+    ) {
+      return `<section ${attrs.replace("drawing-slide", "drawing-slide camera-slide")}>${assetImage(data.image, title, "camera-slide-image")}<span class="slide-label">Camera</span></section>`;
+    }
     return `<section ${attrs}>${assetImage(data.image, title, "slide-image-fit")}</section>`;
   }
 
@@ -291,27 +302,39 @@ function renderStandaloneSlide(
   if (slide.type === "revision") {
     const reveals = presentationReveals(data);
     const items = arrayOfRecords(data.items).slice(0, 2);
-    return `<section ${attrs}><div class="revision-grid">${items
+    return `<section ${attrs}><div class="revision-slide-grid">${Array.from(
+      { length: 2 },
+      (_, itemIndex) => items[itemIndex],
+    )
       .map(
-        (item, itemIndex) => `<article>
-          ${toggleableImage(item.image, item.answerImage, `Revision ${itemIndex + 1}`, "replace", `revision-answer-${itemIndex}`, reveals[`revision-answer-${itemIndex}`] === true)}
-        </article>`,
+        (item, itemIndex) => `<div class="revision-question-cell" data-lo="${escapeAttr(String(item?.lo || ""))}">
+          ${item ? toggleableImage(item.image, item.answerImage, String(item.lo || `Revision question ${itemIndex + 1}`), "replace", `revision-answer-${itemIndex}`, reveals[`revision-answer-${itemIndex}`] === true) : ""}
+        </div>`,
       )
-      .join("")}</div></section>`;
+      .join("")}<div class="revision-working-area"></div></div><span class="slide-label">Revision</span></section>`;
   }
 
   if (slide.type === "template") {
-    return `<section ${attrs}><h2>${title}</h2><ul>${stringArray(data.bullets)
+    return `<section ${attrs}><div class="template-slide-inner"><h4>${title}</h4><ul>${stringArray(data.bullets)
       .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
-      .join("")}</ul></section>`;
+      .join("")}</ul></div><span class="slide-label">Template</span></section>`;
   }
 
   if (slide.type === "math") {
-    return `<section ${attrs}><h2>${title}</h2><div class="math-content latex-rendered">${renderLatexDocument(String(data.latex || ""))}</div></section>`;
+    return `<section ${attrs.replace("math-slide", "math-slide rendered-math-slide")}><div class="math-slide-inner"><h4>${escapeHtml(String(data.mode || "LaTeX"))}</h4><div class="latex-rendered">${renderLatexDocument(String(data.latex || "").trim())}</div></div><span class="slide-label">LaTeX</span></section>`;
   }
 
   if (slide.type === "placeholder") {
-    return `<section ${attrs}><h2>${title}</h2><p class="placeholder-content">${escapeHtml(String(data.text || ""))}</p></section>`;
+    return `<section ${attrs}><p>${escapeHtml(String(data.text || ""))}</p><span class="slide-label">Placeholder</span></section>`;
+  }
+
+  if (slide.type === "imported-html") {
+    const className = sanitizeImportedSlideClass(data.className);
+    const importedAttrs = attrs.replace(
+      /class="[^"]*"/,
+      `class="${escapeAttr(className)}"`,
+    );
+    return `<section ${importedAttrs}>${String(data.html || '<div class="empty-state">Imported slide</div>')}</section>`;
   }
 
   return `<section ${attrs}><h2>${title}</h2></section>`;
@@ -380,6 +403,17 @@ function assetSource(asset: unknown) {
   return String(record.dataUrl || record.url || record.path || "");
 }
 
+function sanitizeImportedSlideClass(value: unknown) {
+  const className = String(value || "")
+    .split(/\s+/)
+    .map((part) => part.replace(/[^A-Za-z0-9_-]/g, ""))
+    .filter(Boolean)
+    .join(" ");
+  return className.split(/\s+/).includes("lesson-slide")
+    ? className
+    : `lesson-slide ${className || "imported-html-slide"}`;
+}
+
 function standaloneLessonCss() {
   return `
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -387,20 +421,24 @@ function standaloneLessonCss() {
 .lesson-header{position:sticky;top:0;z-index:4;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;background:#fff;border-bottom:1px solid #cad7d7}
 .lesson-header h1{display:inline;margin:0 0 0 10px;font-size:22px}.lesson-header span,.lesson-header div:last-child{color:#5b6a70;font-size:13px}.lesson-deck{display:grid;gap:20px;place-items:center;max-width:1180px;margin:0 auto;padding:20px}
 .lesson-slide{position:relative;box-sizing:border-box;width:100%;aspect-ratio:var(--slide-aspect,16/10);overflow:hidden;background:#fffefb;border:1px solid #cad7d7;box-shadow:0 16px 34px rgba(19,37,42,.12);padding:24px;touch-action:none;page-break-after:always}
+.lesson-slide h4{margin:0 0 14px;font-size:28px;line-height:1.2}.slide-label{position:absolute;right:12px;bottom:10px;font-size:11px;color:#6b7280}.blank-slide{padding:0;background:#fff}.camera-slide{padding:0;background:#fff;display:grid;place-items:center;overflow:hidden}.camera-slide-image{display:block;width:100%;height:100%;object-fit:contain;object-position:center;background:#fff}
 .starter-grid{display:grid;width:100%;height:100%;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:0}.starter-cell{position:relative;min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.cell-number{position:absolute;z-index:6;top:8px;left:8px;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.78);color:rgba(17,24,39,.7);border:1px solid rgba(17,24,39,.28);font-size:13px;font-weight:800;line-height:1;pointer-events:none}.starter-cell:nth-child(2) .cell-number{right:8px;left:auto}.starter-cell:nth-child(3) .cell-number{top:auto;bottom:8px}.starter-cell:nth-child(4) .cell-number{right:8px;bottom:8px;left:auto;top:auto}
 .live-starter-image-host{display:grid;width:100%;height:100%;min-width:0;min-height:0}.live-retrieval-controls{position:absolute;z-index:9;display:grid;grid-template-columns:repeat(3,28px);gap:5px;align-items:center}.starter-cell:nth-child(1) .live-retrieval-controls{left:8px;top:8px}.starter-cell:nth-child(2) .live-retrieval-controls{right:8px;top:8px}.starter-cell:nth-child(3) .live-retrieval-controls{left:8px;bottom:8px}.starter-cell:nth-child(4) .live-retrieval-controls{right:8px;bottom:8px}.live-retrieval-button{width:28px;height:28px;border:1px solid #0f766e;border-radius:7px;background:rgba(255,255,255,.92);color:#0f766e;cursor:pointer;font:inherit;font-size:12px;font-weight:800;line-height:1;padding:0;box-shadow:0 6px 16px rgba(15,118,110,.18);touch-action:manipulation}.live-retrieval-button:hover{background:#ecfdf5}.live-retrieval-button:disabled{cursor:wait;opacity:.78}.live-retrieval-button.is-saved{background:#0f766e;color:#fff}.live-retrieval-button.is-error{border-color:#b91c1c;color:#b91c1c}
 .slide-image-fit{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;min-width:0;min-height:0}.qa-toggle{position:relative;display:block;width:100%;height:100%;min-height:0;border:0;background:transparent;padding:0;cursor:pointer}.qa-toggle-label{position:absolute;right:8px;top:8px;z-index:4;border-radius:7px;background:rgba(255,255,255,.86);color:#111827;font-size:10px;font-weight:750;padding:4px 7px}.qa-image-layer{position:absolute;inset:0;display:grid;min-width:0;min-height:0}.qa-answer-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-question-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-answer-layer{visibility:visible}.qa-toggle-append.is-showing-answer{display:grid;grid-template-rows:1fr 1fr}.qa-toggle-append.is-showing-answer .qa-question-layer{position:relative;visibility:visible;min-height:0}.qa-toggle-append.is-showing-answer .qa-answer-layer{position:relative;visibility:visible;min-height:0}
-.lo-bar{display:flex;align-items:center;gap:10px;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:10px;font-size:10px;line-height:1.2}.lo-bar-text{flex:1;min-width:0}.example-grid{display:grid;height:calc(100% - 28px);grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.revision-grid{display:grid;height:100%;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,58%) minmax(0,42%);gap:14px}.revision-grid article{min-width:0;min-height:0;overflow:hidden}.example-block{min-width:0;min-height:0}.example-reveal-region.is-hidden{visibility:hidden}.example-reveal-button{border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit;font-size:10px;line-height:1;padding:4px 7px;white-space:nowrap}
+.lo-bar{display:flex;align-items:center;gap:10px;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:10px;font-size:10px;line-height:1.2}.lo-bar-text{flex:1;min-width:0}.example-grid{display:grid;height:calc(100% - 28px);grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.example-block{min-width:0;min-height:0}.example-reveal-region.is-hidden{visibility:hidden}.example-reveal-button{border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit;font-size:10px;line-height:1;padding:4px 7px;white-space:nowrap}
+.revision-slide{padding:0;background:#fff}.revision-slide::before{content:"";position:absolute;inset:0 auto 0 50%;z-index:3;width:2px;background:#111827;transform:translateX(-1px);pointer-events:none}.revision-slide-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:100%;min-height:0}.revision-question-cell,.revision-working-area{min-width:0;min-height:0;overflow:hidden}.revision-question-cell{display:grid;place-items:center}.revision-working-area{grid-column:1/-1}
 .worksheet-slide{display:grid;place-content:center;gap:28px;text-align:center}.worksheet-links{display:grid;gap:18px}.worksheet-links a{padding:18px 24px;border:2px solid #0f766e;border-radius:10px;color:#0f766e;font-size:24px;font-weight:800;text-decoration:none}
 .pdf-page-slide,.drawing-slide,.cfu-slide{padding:0;background:#fff}.pdf-page-slide .slide-image-fit{object-position:top center}.cfu-image-wrap{width:100%;height:100%;display:grid}.cfu-image-wrap.top-left{width:62%;height:62%;place-self:start}.cfu-image-wrap.top-center{width:62%;height:62%;place-self:start center}
-.template-slide h2,.math-slide h2,.placeholder-slide h2{font-size:clamp(28px,4vw,58px)}.template-slide li,.placeholder-content,.math-content{font-size:clamp(22px,3vw,42px);line-height:1.5}.placeholder-content{white-space:pre-wrap}.math-content{font-family:Georgia,serif}.latex-rendered p{margin:0 0 .8em}.latex-display{display:flex;justify-content:center;margin:.6em 0}.latex-frac{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center;line-height:1.1}.latex-frac-num{border-bottom:.06em solid currentColor;padding:0 .15em}.latex-root{display:inline-flex;align-items:flex-start}.latex-root-body{border-top:.06em solid currentColor}.latex-script{display:inline-flex;align-items:flex-start}.latex-script sup,.latex-script sub{font-size:.65em}.latex-var,.latex-italic{font-style:italic}.latex-bold{font-weight:800}.latex-list{margin:.5em 0}
+.placeholder-slide,.math-slide,.template-slide{display:grid;place-items:center;text-align:center}.placeholder-slide p{max-width:84%;font-size:36px;line-height:1.25;white-space:pre-wrap}.template-slide-inner{width:min(76%,940px);text-align:left}.template-slide-inner h4{font-size:34px;margin-bottom:26px}.template-slide-inner ul{display:grid;gap:14px;margin:0;padding-left:1.3em;font-size:29px;line-height:1.25}.math-slide-inner{max-height:82%;width:86%;min-width:0;overflow:auto;text-align:left}.math-slide-inner h4{text-align:center}.latex-rendered{display:grid;gap:12px;color:#111827;font-size:20px;line-height:1.45}.latex-rendered p,.latex-list{margin:0}.latex-list{padding-left:1.2em}.latex-math{font-family:Georgia,"Times New Roman",serif;line-height:1.25}.latex-inline{display:inline-flex;align-items:baseline;gap:.05em;vertical-align:baseline}.latex-display{display:flex;justify-content:center;align-items:center;gap:.08em;width:100%;padding:8px 0;font-size:1.25em;text-align:center}.latex-align{display:grid;gap:8px}.latex-align-row{display:flex;justify-content:center}.latex-frac{display:inline-grid;grid-template-rows:auto auto;align-items:center;justify-items:center;margin:0 .1em;vertical-align:middle}.latex-frac-num,.latex-frac-den{display:block;padding:0 .18em}.latex-frac-num{border-bottom:1.5px solid currentColor}.latex-root{display:inline-flex;align-items:flex-start;gap:.02em;vertical-align:middle}.latex-root>sup{margin-right:-.18em;font-size:.55em}.latex-radical{font-size:1.25em;line-height:1}.latex-root-body{display:inline-block;padding:.05em .12em 0;border-top:1.5px solid currentColor}.latex-script{display:inline-flex;align-items:baseline;vertical-align:baseline}.latex-script sup,.latex-script sub{font-size:.65em;line-height:1}.latex-script sup{align-self:flex-start;margin-left:.04em}.latex-script sub{align-self:flex-end;margin-left:.04em}.latex-text,.latex-fn{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-style:normal}.latex-var,.latex-italic{font-style:italic}.latex-bold{font-weight:800}.latex-accent{display:inline-block;text-decoration-thickness:1.5px}.latex-accent-hat{position:relative}.latex-accent-hat::before{content:"^";position:absolute;left:50%;top:-.7em;transform:translateX(-50%);font-size:.75em}.latex-accent-bar,.latex-accent-overline{text-decoration-line:overline}.latex-accent-vec{text-decoration-line:overline}.latex-quad{display:inline-block;width:1em}.latex-qquad{display:inline-block;width:2em}
 .confidence-poll-slide{display:grid;place-items:center;background:#fff;padding:32px}.confidence-poll-content{display:grid;gap:26px;width:100%;height:100%;align-content:center;text-align:center}.confidence-poll-content h2{margin:0;font-size:clamp(34px,5vw,72px);line-height:1.05;color:#111827}.confidence-poll-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;width:100%}.confidence-poll-choice{min-height:220px;border:4px solid rgba(17,24,39,.28);border-radius:14px;color:#111827;font:900 clamp(54px,8vw,112px)/1 system-ui,sans-serif;display:grid;place-items:center;cursor:pointer;touch-action:manipulation;box-shadow:0 16px 28px rgba(17,24,39,.16)}.confidence-poll-choice-1{background:#fecaca}.confidence-poll-choice-2{background:#fed7aa}.confidence-poll-choice-3{background:#fef08a}.confidence-poll-choice-4{background:#bbf7d0}.confidence-poll-choice-5{background:#86efac}.confidence-poll-total{font-size:clamp(24px,3vw,40px);font-weight:900;color:#374151}.confidence-end-lesson{justify-self:center;border:0;border-radius:10px;background:#0f766e;color:#fff;padding:14px 24px;font:800 18px/1 system-ui,sans-serif;cursor:pointer}
-.presenter-tools{position:fixed;left:50%;top:4px;top:max(4px,env(safe-area-inset-top));transform:translateX(-50%);z-index:20;display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:5px;max-width:calc(100vw - 8px);overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;touch-action:pan-x;padding:5px;border:1px solid #cad7d7;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 6px 16px rgba(19,37,42,.16)}.presenter-tools::-webkit-scrollbar{display:none}.presenter-tool{min-height:36px;border:1px solid #cad7d7;border-radius:7px;background:#fff;color:#172124;padding:5px 8px;font:inherit;font-size:15px;font-weight:750;cursor:pointer;white-space:nowrap;flex:0 0 auto}.presenter-tool:hover{border-color:#8ba3a0}.presenter-tool.is-active,.presenter-tool.primary{background:#0f766e;border-color:#0f766e;color:#fff}.presenter-tool-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;vertical-align:middle}.presenter-tool-icon svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.presenter-colors{display:flex;align-items:center;gap:3px;flex:0 0 auto}.presenter-color{width:36px;height:36px;border:1px solid #cad7d7;border-radius:7px;background:var(--swatch-color,#2563eb);padding:0;cursor:pointer;flex:0 0 auto}.presenter-color.is-active{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.22)}.presenter-custom-color,.presenter-camera-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.presenter-size{width:96px;height:33px;flex:0 0 auto}
+.presenter-tools{position:fixed;left:50%;top:4px;top:max(4px,env(safe-area-inset-top));transform:translateX(-50%);z-index:20;display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:5px;max-width:calc(100vw - 8px);overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;touch-action:pan-x;padding:5px;border:1px solid #cad7d7;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 6px 16px rgba(19,37,42,.16)}.presenter-tools::-webkit-scrollbar{display:none}.presenter-tool{min-height:36px;border:1px solid #cad7d7;border-radius:7px;background:#fff;color:#172124;padding:5px 8px;font:inherit;font-size:15px;font-weight:750;cursor:pointer;white-space:nowrap;flex:0 0 auto}.presenter-tool:hover{border-color:#8ba3a0}.presenter-tool:focus-visible,.presenter-color:focus-visible,.presenter-size:focus-visible,.qa-toggle:focus-visible,.example-reveal-button:focus-visible,.confidence-poll-choice:focus-visible,.confidence-end-lesson:focus-visible,.worksheet-links a:focus-visible{outline:3px solid #0f766e;outline-offset:2px}.presenter-tool.is-active,.presenter-tool.primary{background:#0f766e;border-color:#0f766e;color:#fff}.presenter-tool-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;vertical-align:middle}.presenter-tool-icon svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.presenter-colors{display:flex;align-items:center;gap:3px;flex:0 0 auto}.presenter-color{width:36px;height:36px;border:1px solid #cad7d7;border-radius:7px;background:var(--swatch-color,#2563eb);padding:0;cursor:pointer;flex:0 0 auto}.presenter-color.is-active{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.22)}.presenter-custom-color,.presenter-camera-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.presenter-size{width:96px;height:33px;flex:0 0 auto}
 .presenter-student-code{position:fixed;right:10px;bottom:10px;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));z-index:24;border:1px solid #0f766e;border-radius:8px;background:rgba(255,255,255,.95);box-shadow:0 8px 18px rgba(19,37,42,.16);padding:8px 10px;color:#0f3d3b;font:900 16px/1.1 system-ui,sans-serif;letter-spacing:.02em}
+.presenter-capability-note{position:fixed;left:10px;bottom:10px;left:max(10px,env(safe-area-inset-left));bottom:max(10px,env(safe-area-inset-bottom));z-index:23;width:min(390px,calc(100vw - 20px));border:1px solid #0f766e;border-radius:8px;background:rgba(255,255,255,.97);box-shadow:0 8px 18px rgba(19,37,42,.16);padding:8px 10px;color:#0f3d3b;font:600 13px/1.35 system-ui,sans-serif}.presenter-capability-note summary{cursor:pointer;font-weight:900}.presenter-capability-note p{margin:7px 0 0}.presenter-capability-note:focus-within{outline:3px solid #0f766e;outline-offset:2px}
 body.focus-mode .lesson-header,body.fullscreen-mode .lesson-header{display:none}body.focus-mode,body.fullscreen-mode{overflow:hidden}body.focus-mode .lesson-deck,body.fullscreen-mode .lesson-deck{max-width:none;box-sizing:border-box;height:100vh;height:100dvh;min-height:0;padding:var(--presenter-toolbar-space) var(--presenter-edge-space) var(--presenter-edge-space);gap:0;place-items:center;overflow:auto;scroll-padding-top:var(--presenter-toolbar-space)}body.focus-mode .lesson-slide,body.fullscreen-mode .lesson-slide{box-sizing:border-box;border:0;box-shadow:none;width:var(--presenter-slide-width);height:var(--presenter-slide-height);max-width:calc(100vw - 12px);max-height:calc(100vh - var(--presenter-toolbar-space) - var(--presenter-edge-space));max-height:calc(100dvh - var(--presenter-toolbar-space) - var(--presenter-edge-space));scroll-snap-align:center}body.focus-mode .lesson-slide.pdf-page-slide,body.fullscreen-mode .lesson-slide.pdf-page-slide{max-height:none;align-self:start;scroll-snap-align:start center}body.presenter-zoom-mode.focus-mode .lesson-deck,body.presenter-zoom-mode.fullscreen-mode .lesson-deck{place-items:start;justify-items:start;align-items:start;overflow:auto;overscroll-behavior:contain;scroll-padding-left:var(--presenter-edge-space)}body.presenter-zoom-mode.focus-mode .lesson-slide,body.presenter-zoom-mode.fullscreen-mode .lesson-slide{max-width:none;max-height:none;scroll-snap-align:start}
 .handout-mode{padding:12px;background:#fff}.handout-mode .lesson-header,.handout-mode .presenter-tools{display:none}.handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:10mm}.handout-mode .lesson-slide{display:block!important;width:100%;height:auto;box-shadow:none;break-inside:avoid}.empty-state{display:grid;place-items:center;height:100%;color:#6b7f83}
-@media (max-width:760px){.presenter-tools{left:4px;right:4px;transform:none}.presenter-tool{padding:5px 6px;font-size:14px}.presenter-size{width:84px}}
-@page{size:16in 10in;margin:0}@media print{.lesson-header,.presenter-tools{display:none!important}.lesson-deck{display:block;padding:0}.lesson-slide{display:block!important;width:16in;height:10in;aspect-ratio:auto;border:0;box-shadow:none;break-after:page;page-break-after:always}.handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:6mm;padding:8mm}.handout-mode .lesson-slide{width:100%;height:auto;aspect-ratio:16/10;border:1px solid #555;break-after:auto;page-break-after:auto}}
+@media (max-width:760px){.presenter-tools{left:4px;right:4px;transform:none;scrollbar-width:thin}.presenter-tools::-webkit-scrollbar{display:block;height:6px}.presenter-tool{min-height:42px;padding:6px 8px;font-size:14px}.presenter-color{width:42px;height:42px}.presenter-size{width:96px;height:42px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@page{size:16in 10in;margin:0}@media print{.lesson-header,.presenter-tools,.presenter-capability-note{display:none!important}.lesson-deck{display:block;padding:0}.lesson-slide{display:block!important;width:16in;height:10in;aspect-ratio:auto;border:0;box-shadow:none;break-after:page;page-break-after:always}.handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:6mm;padding:8mm}.handout-mode .lesson-slide{width:100%;height:auto;aspect-ratio:16/10;border:1px solid #555;break-after:auto;page-break-after:auto}}
 `;
 }
 
@@ -410,6 +448,7 @@ function standaloneInteractionScript() {
   let slides = [];
   let zoomScale = 1;
   const deck = document.querySelector(".lesson-deck");
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
   const zoomButton = document.getElementById("presenter-zoom");
   const fullscreenButton = document.getElementById("presenter-fullscreen");
   const cameraInput = document.getElementById("presenter-camera-input");
@@ -460,6 +499,9 @@ function standaloneInteractionScript() {
     slides = Array.from(document.querySelectorAll(".lesson-slide"));
     slides.forEach((slide, index) => {
       slide.setAttribute("data-annotation-slide", String(index));
+      if (!slide.getAttribute("aria-label")) {
+        slide.setAttribute("aria-label", "Slide " + (index + 1));
+      }
     });
     window.__lessonPresenterRuntimeController?.refresh();
   }
@@ -587,7 +629,7 @@ function standaloneInteractionScript() {
     }
     refreshSlides();
     updatePresentationLayout();
-    slide.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    slide.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center", inline: "center" });
   }
 
   function addBlankSlide() {
@@ -936,7 +978,7 @@ function standaloneInteractionScript() {
     if (!presenterConfig?.enabled) return;
     const existing = deck?.querySelector('[data-generated-poll="true"]');
     if (existing) {
-      existing.scrollIntoView({ behavior: "smooth", block: "center" });
+      existing.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
       return;
     }
     const slide = document.createElement("section");

@@ -23,6 +23,7 @@ import {
   resolveImageDrawingBackground,
 } from "./image-drawing";
 import type { BuilderAsset } from "./schema";
+import { useDialogFocus } from "./useDialogFocus";
 
 const DRAWING_COLORS = [
   {
@@ -74,21 +75,15 @@ export function ImageDrawingEditor({
   const [isLoading, setIsLoading] = useState(Boolean(asset?.dataUrl));
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const dialogRef = useDialogFocus<HTMLElement>(onCancel);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    function escapeToCancel(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onCancel();
-    }
-    document.addEventListener("keydown", escapeToCancel);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", escapeToCancel);
     };
-  }, [onCancel]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,10 +198,12 @@ export function ImageDrawingEditor({
   return (
     <div className={styles.overlay} role="presentation">
       <section
+        ref={dialogRef}
         className={styles.panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
       >
         <header className={styles.toolbar}>
           <div className={styles.titleGroup}>

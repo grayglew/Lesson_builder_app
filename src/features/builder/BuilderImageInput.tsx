@@ -1,7 +1,7 @@
 "use client";
 
 import { ImagePlus, Pencil } from "lucide-react";
-import { type ClipboardEvent, useState } from "react";
+import { type ClipboardEvent, useRef, useState } from "react";
 import localStyles from "./BuilderImageInput.module.css";
 import styles from "./BuilderShell.module.css";
 import { ImageDrawingEditor } from "./ImageDrawingEditor";
@@ -24,6 +24,7 @@ export function BuilderImageInput({
   size = "default",
 }: BuilderImageInputProps) {
   const [isDrawing, setIsDrawing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   async function acceptFile(file: File | null | undefined) {
     if (!file) return;
@@ -38,7 +39,7 @@ export function BuilderImageInput({
     }
   }
 
-  function pastedImage(event: ClipboardEvent<HTMLLabelElement>) {
+  function pastedImage(event: ClipboardEvent<HTMLButtonElement>) {
     const file = Array.from(event.clipboardData.items)
       .find((item) => item.type.startsWith("image/"))
       ?.getAsFile();
@@ -57,8 +58,11 @@ export function BuilderImageInput({
   return (
     <div className={styles.assetEditor}>
       <span className={styles.assetLabel}>{label}</span>
-      <label
+      <button
         className={`${styles.imageDrop} ${sizeClass}`}
+        type="button"
+        aria-label={`Choose or paste ${label}`}
+        onClick={() => inputRef.current?.click()}
         onMouseEnter={(event) => {
           event.currentTarget.focus({ preventScroll: true });
         }}
@@ -68,12 +72,6 @@ export function BuilderImageInput({
           void acceptFile(event.dataTransfer.files[0]);
         }}
         onPaste={pastedImage}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          event.currentTarget.querySelector("input")?.click();
-        }}
-        tabIndex={0}
       >
         {asset?.dataUrl ? (
           // Embedded lesson images and signed URLs do not have stable dimensions.
@@ -90,17 +88,19 @@ export function BuilderImageInput({
             <small>Hover here and paste, or click to choose an image.</small>
           </span>
         )}
-        <input
-          className="sr-only"
-          type="file"
-          accept="image/*"
-          aria-label={label}
-          onChange={(event) => {
-            void acceptFile(event.target.files?.[0]);
-            event.target.value = "";
-          }}
-        />
-      </label>
+      </button>
+      <input
+        ref={inputRef}
+        className="sr-only"
+        type="file"
+        accept="image/*"
+        aria-label={label}
+        tabIndex={-1}
+        onChange={(event) => {
+          void acceptFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+      />
       <div className={localStyles.actions}>
         <button
           className={localStyles.drawButton}
