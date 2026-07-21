@@ -1,5 +1,6 @@
 import {
   createPresenterPdfSlideDocuments,
+  preparePowerPointSnapshotHtml,
   preparePresenterPdfSnapshotHtml,
   presenterPdfError,
 } from "@/features/builder/presenter-pdf";
@@ -48,6 +49,35 @@ describe("presenter PDF snapshots", () => {
     expect(snapshot).toContain("object-fit:contain!important");
     expect(snapshot.length).toBeLessThan(html.length * 0.6);
     expect(preparePresenterPdfSnapshotHtml(snapshot)).toBe(snapshot);
+  });
+
+  it("prepares a static PowerPoint layout without interactive controls or generic display overrides", () => {
+    const snapshot = preparePowerPointSnapshotHtml(`<!doctype html>
+      <html><head><style>
+        .worksheet-slide{display:grid}
+        .example-reveal-region.is-hidden{visibility:hidden}
+      </style></head><body>
+        <section class="lesson-slide example-slide">
+          <div class="lo-bar"><span class="lo-bar-text">Test 2</span>
+            <button class="example-reveal-button">Show second image</button>
+          </div>
+          <div class="example-grid">
+            <article class="example-block">First image</article>
+            <article class="example-block example-reveal-region is-hidden">Second image</article>
+          </div>
+        </section>
+      </body></html>`);
+
+    expect(snapshot).toContain('id="powerpoint-bundle-static-css"');
+    expect(snapshot).toContain(
+      ".example-reveal-button{display:none!important;}",
+    );
+    expect(snapshot).toContain(
+      ".example-reveal-region{visibility:visible!important;}",
+    );
+    expect(snapshot).not.toContain(
+      ".lesson-slide{display:block!important",
+    );
   });
 
   it("returns actionable, non-sensitive renderer failures", () => {

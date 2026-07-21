@@ -9,7 +9,10 @@ import {
   retrievalItemSchema,
   toWorkspaceDocument,
 } from "./schema";
-import { preparePresenterPdfSnapshotHtml } from "./presenter-pdf";
+import {
+  preparePowerPointSnapshotHtml,
+  preparePresenterPdfSnapshotHtml,
+} from "./presenter-pdf";
 
 const syncLatestSchema = z.object({
   ok: z.boolean().optional(),
@@ -324,7 +327,10 @@ export async function downloadPresenterSlideImages(
   lessonId: string,
   html: string,
 ) {
-  const ticket = await uploadPresenterSnapshot(lessonId, html);
+  const ticket = await uploadPresenterSnapshot(
+    lessonId,
+    preparePowerPointSnapshotHtml(html),
+  );
   const response = await requestPresenterSnapshotRender(
     lessonId,
     ticket.path,

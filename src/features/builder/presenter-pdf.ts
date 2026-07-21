@@ -4,13 +4,19 @@ html,body{margin:0!important;padding:0!important;background:#fff!important;}
 *{animation:none!important;transition:none!important;caret-color:transparent!important;}
 .lesson-header,.presenter-tools{display:none!important;}
 .lesson-deck{display:block!important;margin:0!important;padding:0!important;background:#fff!important;}
-.lesson-slide{display:block!important;width:16in!important;height:10in!important;max-width:none!important;max-height:none!important;margin:0!important;box-shadow:none!important;border:0!important;break-after:page;page-break-after:always;overflow:hidden!important;}
+.lesson-slide{width:16in!important;height:10in!important;max-width:none!important;max-height:none!important;margin:0!important;box-shadow:none!important;border:0!important;break-after:page;page-break-after:always;overflow:hidden!important;}
 .lesson-slide:last-child{break-after:auto;page-break-after:auto;}
 .lesson-slide.pdf-page-slide .slide-image-fit{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:top center!important;}
 .annotation-svg{pointer-events:none!important;}
 `;
 
 const PRINT_STYLE_ID = "presenter-pdf-print-css";
+const POWERPOINT_STYLE_ID = "powerpoint-bundle-static-css";
+const POWERPOINT_BUNDLE_STATIC_CSS = `
+.lesson-slide{width:1600px!important;height:1000px!important;}
+.example-reveal-button{display:none!important;}
+.example-reveal-region{visibility:visible!important;}
+`;
 
 export function preparePresenterPdfSnapshotHtml(html: string) {
   const staticHtml = String(html || "").replace(
@@ -24,6 +30,13 @@ export function preparePresenterPdfSnapshotHtml(html: string) {
     return staticHtml.replace(/<\/head>/i, `${printStyle}</head>`);
   }
   return `<!doctype html><html><head>${printStyle}</head><body>${staticHtml}</body></html>`;
+}
+
+export function preparePowerPointSnapshotHtml(html: string) {
+  const snapshot = preparePresenterPdfSnapshotHtml(html);
+  if (snapshot.includes(`id="${POWERPOINT_STYLE_ID}"`)) return snapshot;
+  const style = `<style id="${POWERPOINT_STYLE_ID}">${POWERPOINT_BUNDLE_STATIC_CSS}</style>`;
+  return snapshot.replace(/<\/head>/i, `${style}</head>`);
 }
 
 export function createPresenterPdfSlideDocuments(html: string) {

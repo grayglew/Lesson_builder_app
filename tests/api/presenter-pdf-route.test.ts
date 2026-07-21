@@ -165,6 +165,7 @@ describe("presenter PDF route renderer", () => {
         type: "jpeg",
         quality: 90,
         captureBeyondViewport: false,
+        clip: { x: 0, y: 0, width: 1600, height: 1000 },
       }),
     );
     expect(closePage).toHaveBeenCalledOnce();

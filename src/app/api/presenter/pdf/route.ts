@@ -96,8 +96,8 @@ export async function POST(request: Request) {
           file,
           width: 1600,
           height: 1000,
-          imageWidth: 1536,
-          imageHeight: 960,
+          imageWidth: 1600,
+          imageHeight: 1000,
         };
       });
       archive.file("manifest.json", JSON.stringify({ version: 1, slides }));
@@ -163,7 +163,7 @@ export function renderPresenterSnapshotToSlideImages(html: string) {
       type: "jpeg",
       quality: 90,
       captureBeyondViewport: false,
-      clip: { x: 0, y: 0, width: 1536, height: 960 },
+      clip: { x: 0, y: 0, width: 1600, height: 1000 },
     });
     return new Uint8Array(image);
   });
