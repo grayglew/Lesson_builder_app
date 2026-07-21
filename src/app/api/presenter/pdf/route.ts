@@ -159,6 +159,18 @@ export async function renderPresenterSnapshotToPdf(html: string) {
 export function renderPresenterSnapshotToSlideImages(html: string) {
   return renderPresenterSnapshotPages(html, async (page) => {
     await page.emulateMediaType("screen");
+    const geometry = await page.evaluate(() => {
+      const slide = document.querySelector<HTMLElement>(".lesson-slide");
+      if (!slide) return null;
+      const bounds = slide.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom,
+      };
+    });
+    assertSlideFillsExportViewport(geometry);
     const image = await page.screenshot({
       type: "jpeg",
       quality: 90,
@@ -167,6 +179,23 @@ export function renderPresenterSnapshotToSlideImages(html: string) {
     });
     return new Uint8Array(image);
   });
+}
+
+function assertSlideFillsExportViewport(
+  geometry: { left: number; top: number; right: number; bottom: number } | null,
+) {
+  const tolerance = 0.5;
+  if (
+    !geometry ||
+    Math.abs(geometry.left) > tolerance ||
+    Math.abs(geometry.top) > tolerance ||
+    Math.abs(geometry.right - 1600) > tolerance ||
+    Math.abs(geometry.bottom - 1000) > tolerance
+  ) {
+    throw new Error(
+      "The lesson slide does not fill the 1600x1000 export viewport.",
+    );
+  }
 }
 
 async function renderPresenterSnapshotPages<T>(

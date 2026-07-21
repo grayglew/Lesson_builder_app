@@ -74,4 +74,32 @@ describe("AdminRecoveryExport", () => {
     ).toBeInTheDocument();
     expect(clickLink).not.toHaveBeenCalled();
   });
+
+  it("downloads the expiring Storage manifest for an off-site object backup", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(new Blob(["manifest"])),
+      headers: new Headers({
+        "Content-Disposition":
+          'attachment; filename="lesson-builder-storage-manifest-2026-07-22.json"',
+      }),
+    } as unknown as Response);
+    const user = userEvent.setup();
+    render(<AdminRecoveryExport />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Download Storage manifest" }),
+    );
+
+    await waitFor(() => expect(clickLink).toHaveBeenCalledOnce());
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/admin/storage-backup-manifest",
+      { cache: "no-store" },
+    );
+    expect(
+      screen.getByText(
+        "Downloaded the Storage manifest. Its links remain valid for one hour.",
+      ),
+    ).toBeInTheDocument();
+  });
 });

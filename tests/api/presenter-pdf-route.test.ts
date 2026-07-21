@@ -145,10 +145,14 @@ describe("presenter PDF route renderer", () => {
     const screenshot = vi.fn().mockResolvedValue(jpeg);
     const closePage = vi.fn().mockResolvedValue(undefined);
     const closeBrowser = vi.fn().mockResolvedValue(undefined);
+    const evaluate = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ left: 0, top: 0, right: 1600, bottom: 1000 });
     const newPage = vi.fn().mockResolvedValue({
       goto: vi.fn().mockResolvedValue(undefined),
       emulateMediaType: vi.fn().mockResolvedValue(undefined),
-      evaluate: vi.fn().mockResolvedValue(undefined),
+      evaluate,
       screenshot,
       close: closePage,
     });
@@ -170,6 +174,30 @@ describe("presenter PDF route renderer", () => {
     );
     expect(closePage).toHaveBeenCalledOnce();
     expect(closeBrowser).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["left", { left: -210, top: 0, right: 1390, bottom: 1000 }],
+    ["top", { left: 0, top: -20, right: 1600, bottom: 980 }],
+    ["right", { left: 0, top: 0, right: 1599, bottom: 1000 }],
+    ["bottom", { left: 0, top: 0, right: 1600, bottom: 999 }],
+  ])("rejects a slide whose %s edge is outside the export viewport", async (_edge, geometry) => {
+    const closePage = vi.fn().mockResolvedValue(undefined);
+    const closeBrowser = vi.fn().mockResolvedValue(undefined);
+    const newPage = vi.fn().mockResolvedValue({
+      goto: vi.fn().mockResolvedValue(undefined),
+      emulateMediaType: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(geometry),
+      screenshot: vi.fn().mockResolvedValue(new Uint8Array([0xff, 0xd8, 0xff, 0xd9])),
+      close: closePage,
+    });
+    mocks.launch.mockResolvedValue({ newPage, close: closeBrowser });
+
+    await expect(
+      renderPresenterSnapshotToSlideImages(
+        '<!doctype html><main class="lesson-deck"><section class="lesson-slide">Lesson</section></main>',
+      ),
+    ).rejects.toThrow("The lesson slide does not fill the 1600x1000 export viewport.");
   });
 });
 
