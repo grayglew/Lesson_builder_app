@@ -78,6 +78,9 @@ describe("presenter PDF snapshots", () => {
     expect(snapshot).not.toContain(
       ".lesson-slide{display:block!important",
     );
+    expect(snapshot).toContain(
+      ".lesson-deck{display:block!important;width:1600px!important;max-width:none!important;place-items:start!important;",
+    );
   });
 
   it("returns actionable, non-sensitive renderer failures", () => {

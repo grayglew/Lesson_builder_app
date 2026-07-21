@@ -3,7 +3,7 @@ export const PRESENTER_PDF_PRINT_CSS = `
 html,body{margin:0!important;padding:0!important;background:#fff!important;}
 *{animation:none!important;transition:none!important;caret-color:transparent!important;}
 .lesson-header,.presenter-tools{display:none!important;}
-.lesson-deck{display:block!important;margin:0!important;padding:0!important;background:#fff!important;}
+.lesson-deck{display:block!important;width:100%!important;max-width:none!important;place-items:start!important;margin:0!important;padding:0!important;background:#fff!important;}
 .lesson-slide{width:16in!important;height:10in!important;max-width:none!important;max-height:none!important;margin:0!important;box-shadow:none!important;border:0!important;break-after:page;page-break-after:always;overflow:hidden!important;}
 .lesson-slide:last-child{break-after:auto;page-break-after:auto;}
 .lesson-slide.pdf-page-slide .slide-image-fit{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:top center!important;}
@@ -13,6 +13,7 @@ html,body{margin:0!important;padding:0!important;background:#fff!important;}
 const PRINT_STYLE_ID = "presenter-pdf-print-css";
 const POWERPOINT_STYLE_ID = "powerpoint-bundle-static-css";
 const POWERPOINT_BUNDLE_STATIC_CSS = `
+.lesson-deck{display:block!important;width:1600px!important;max-width:none!important;place-items:start!important;margin:0!important;padding:0!important;}
 .lesson-slide{width:1600px!important;height:1000px!important;}
 .example-reveal-button{display:none!important;}
 .example-reveal-region{visibility:visible!important;}
