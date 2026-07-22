@@ -100,6 +100,24 @@ const retrievalProgressResultSchema = z
   })
   .passthrough();
 
+const retrievalLookupSchema = z.object({
+  ok: z.literal(true),
+  exists: z.boolean(),
+  trackedForClass: z.boolean(),
+  match: z
+    .object({
+      contentId: z.string(),
+      loCode: z.string(),
+      lo: z.string(),
+    })
+    .nullable(),
+});
+
+export type RetrievalLookupResult = Omit<
+  z.infer<typeof retrievalLookupSchema>,
+  "ok"
+>;
+
 export type SavedLessonSummary = z.infer<typeof lessonSummarySchema>;
 
 export type SavedLessonMetadataPatch = Pick<
@@ -504,6 +522,28 @@ export async function saveRetrievalItem(item: RetrievalItem) {
     }),
   );
   return result.item;
+}
+
+export async function lookupRetrievalLo(
+  lo: string,
+  className: string,
+  signal?: AbortSignal,
+): Promise<RetrievalLookupResult> {
+  const searchParams = new URLSearchParams({ lo, className });
+  const response = await fetch(
+    `/api/builder-global/retrieval-items?${searchParams.toString()}`,
+    {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+    },
+  );
+  const result = await readJson(response, retrievalLookupSchema);
+  return {
+    exists: result.exists,
+    trackedForClass: result.trackedForClass,
+    match: result.match,
+  };
 }
 
 export async function archiveRetrievalItem(id: string) {

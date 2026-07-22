@@ -180,6 +180,54 @@ export function extractRetrievalLoCode(value: unknown) {
   return match ? match[1].toLowerCase() : "";
 }
 
+export async function lookupRetrievalLoData(
+  supabase: SupabaseClient,
+  userId: string,
+  lo: string,
+  className: string,
+) {
+  const loCode = extractRetrievalLoCode(lo) || normalizeBuilderKey(lo);
+  if (!loCode) {
+    return { exists: false, trackedForClass: false, match: null };
+  }
+
+  const { data: retrievalLo, error: retrievalLoError } = await supabase
+    .from("retrieval_los")
+    .select("id,lo_code,lo_text")
+    .eq("owner_id", userId)
+    .eq("lo_code", loCode)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (retrievalLoError) throw retrievalLoError;
+  if (!retrievalLo) {
+    return { exists: false, trackedForClass: false, match: null };
+  }
+
+  let trackedForClass = false;
+  if (className) {
+    const { data: progress, error: progressError } = await supabase
+      .from("retrieval_class_progress")
+      .select("id")
+      .eq("owner_id", userId)
+      .eq("retrieval_lo_id", retrievalLo.id)
+      .eq("class_name", className)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (progressError) throw progressError;
+    trackedForClass = Boolean(progress);
+  }
+
+  return {
+    exists: true,
+    trackedForClass,
+    match: {
+      contentId: String(retrievalLo.id),
+      loCode: String(retrievalLo.lo_code),
+      lo: String(retrievalLo.lo_text),
+    },
+  };
+}
+
 export function normalizeImageRole(value: unknown): RetrievalImageRole {
   return value === "answer" ? "answer" : "question";
 }

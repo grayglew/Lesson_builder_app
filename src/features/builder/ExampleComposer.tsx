@@ -1,10 +1,12 @@
 "use client";
 
 import { Database, LoaderCircle, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   clearRetrievalImage,
+  lookupRetrievalLo,
   saveRetrievalItem,
+  type RetrievalLookupResult,
   uploadRetrievalImage,
 } from "./api-client";
 import { BuilderImageInput } from "./BuilderImageInput";
@@ -28,6 +30,11 @@ type ImageDraft = {
   file?: File;
 };
 
+type LiveLookupState =
+  | { state: "idle" }
+  | { state: "ready"; queryKey: string; result: RetrievalLookupResult }
+  | { state: "error"; queryKey: string };
+
 const emptyImageDrafts = () =>
   Array.from({ length: 8 }, (): ImageDraft => ({ asset: null }));
 
@@ -45,6 +52,9 @@ export function ExampleComposer() {
   const [questions, setQuestions] = useState<ImageDraft[]>(emptyImageDrafts);
   const [answers, setAnswers] = useState<ImageDraft[]>(emptyImageDrafts);
   const [isSavingBank, setIsSavingBank] = useState(false);
+  const [liveLookup, setLiveLookup] = useState<LiveLookupState>({
+    state: "idle",
+  });
 
   const bankStatus = useMemo(
     () =>
@@ -55,6 +65,42 @@ export function ExampleComposer() {
       ),
     [document.className, document.retrievalItems, lo],
   );
+  const liveLookupQueryKey = `${document.className}\n${lo.trim()}`;
+  const activeLiveLookup =
+    liveLookup.state !== "idle" && liveLookup.queryKey === liveLookupQueryKey
+      ? liveLookup
+      : ({ state: "idle" } as const);
+
+  useEffect(() => {
+    const trimmedLo = lo.trim();
+    if (!trimmedLo || bankStatus.state === "tracked" || bankStatus.state === "shared") {
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const queryKey = `${document.className}\n${trimmedLo}`;
+    const timer = window.setTimeout(() => {
+      void lookupRetrievalLo(trimmedLo, document.className, controller.signal)
+        .then((result) => {
+          if (!cancelled) setLiveLookup({ state: "ready", queryKey, result });
+        })
+        .catch((error: unknown) => {
+          if (
+            !cancelled &&
+            !(error instanceof DOMException && error.name === "AbortError")
+          ) {
+            setLiveLookup({ state: "error", queryKey });
+          }
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [bankStatus.state, document.className, lo]);
 
   function updateRetrievalImage(
     role: "questions" | "answers",
@@ -134,12 +180,14 @@ export function ExampleComposer() {
           ? bankStatus.sharedItem
           : undefined;
       const source = existing ?? sharedItem;
+      const liveMatch =
+        activeLiveLookup.state === "ready" ? activeLiveLookup.result.match : null;
       const saved = await saveRetrievalItem({
         ...(existing ?? {}),
         id: existing?.id ?? createBuilderId("retrieval"),
-        lo: trimmedLo,
+        lo: !existing && liveMatch ? liveMatch.lo : trimmedLo,
         className: document.className,
-        contentId: source?.contentId,
+        contentId: source?.contentId ?? liveMatch?.contentId,
         spacingFactor: coerceExampleSpacing(spacingFactor),
         lastTaught: document.teachingDate,
         seenCount: Math.max(1, existing?.seenCount ?? 0),
@@ -174,7 +222,7 @@ export function ExampleComposer() {
 
       const message = existing
         ? "Updated the existing retrieval item."
-        : bankStatus.state === "shared"
+        : bankStatus.state === "shared" || Boolean(liveMatch)
           ? "Added class tracking for the existing shared LO."
           : "Added a retrieval row.";
       setStatus({ tone: "success", message });
@@ -226,10 +274,11 @@ export function ExampleComposer() {
     });
   }
 
+  const databaseStatus = getDatabaseStatus(bankStatus, activeLiveLookup);
   const bankStatusClass =
-    bankStatus.state === "tracked"
+    databaseStatus.tone === "good"
       ? styles.fieldNoteGood
-      : bankStatus.state === "shared"
+      : databaseStatus.tone === "warn"
         ? styles.fieldNoteWarn
         : "";
 
@@ -250,7 +299,7 @@ export function ExampleComposer() {
         onChange={(event) => setLo(event.target.value)}
       />
       <p className={`${styles.fieldNote} ${bankStatusClass}`}>
-        {bankStatus.message}
+        {databaseStatus.message}
       </p>
 
       <label className={styles.exampleSpacingField}>
@@ -361,4 +410,46 @@ export function ExampleComposer() {
       </div>
     </section>
   );
+}
+
+function getDatabaseStatus(
+  bankStatus: ReturnType<typeof getExampleRetrievalBankStatus>,
+  liveLookup: LiveLookupState,
+) {
+  if (bankStatus.state === "tracked") {
+    return {
+      tone: "good" as const,
+      message: "Already in retrieval database; tracked for this class.",
+    };
+  }
+  if (bankStatus.state === "shared") {
+    return {
+      tone: "warn" as const,
+      message: "Already in retrieval database; not yet tracked for this class.",
+    };
+  }
+  if (
+    liveLookup.state === "idle" &&
+    bankStatus.state !== "empty"
+  ) {
+    return { tone: "neutral" as const, message: "Checking retrieval database…" };
+  }
+  if (liveLookup.state === "error") {
+    return {
+      tone: "warn" as const,
+      message: "Could not check the retrieval database; you can still continue.",
+    };
+  }
+  if (liveLookup.state === "ready") {
+    if (liveLookup.result.exists) {
+      return {
+        tone: liveLookup.result.trackedForClass ? ("good" as const) : ("warn" as const),
+        message: liveLookup.result.trackedForClass
+          ? "Already in retrieval database; tracked for this class."
+          : "Already in retrieval database; not yet tracked for this class.",
+      };
+    }
+    return { tone: "neutral" as const, message: "Not yet in retrieval database." };
+  }
+  return { tone: "neutral" as const, message: bankStatus.message };
 }

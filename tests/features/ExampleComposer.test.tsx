@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearRetrievalImage,
+  lookupRetrievalLo,
   saveRetrievalItem,
   uploadRetrievalImage,
 } from "@/features/builder/api-client";
@@ -19,6 +20,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
   return {
     ...original,
     clearRetrievalImage: vi.fn().mockResolvedValue(undefined),
+    lookupRetrievalLo: vi.fn(),
     saveRetrievalItem: vi.fn(async (item: RetrievalItem) => ({
       ...item,
       id: item.id.startsWith("retrieval_")
@@ -42,6 +44,11 @@ describe("ExampleComposer", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(lookupRetrievalLo).mockResolvedValue({
+      exists: false,
+      trackedForClass: false,
+      match: null,
+    });
     const document = createInitialBuilderDocument(
       "2026-07-18T06:00:00.000Z",
     );
@@ -133,7 +140,7 @@ describe("ExampleComposer", () => {
     );
     expect(
       screen.getByText(
-        "Already in shared retrieval bank; tracked for this class.",
+        "Already in retrieval database; tracked for this class.",
       ),
     ).toBeInTheDocument();
     await user.click(
@@ -183,6 +190,69 @@ describe("ExampleComposer", () => {
       expect.objectContaining({ name: "retrieval.png" }),
     );
     expect(clearRetrievalImage).toHaveBeenCalledTimes(7);
+  });
+
+  it("shows an automatic debounced database match without a separate check button", async () => {
+    vi.mocked(lookupRetrievalLo).mockResolvedValue({
+      exists: true,
+      trackedForClass: false,
+      match: {
+        contentId: "11111111-1111-4111-8111-111111111111",
+        loCode: "101a",
+        lo: "101a: Canonical expand brackets",
+      },
+    });
+    const user = userEvent.setup();
+    render(<ExampleComposer />);
+
+    await user.type(screen.getByLabelText("Learning objective"), "101A");
+
+    await waitFor(() =>
+      expect(lookupRetrievalLo).toHaveBeenCalledWith(
+        "101A",
+        "Year 9",
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(
+      screen.getByText(
+        "Already in retrieval database; not yet tracked for this class.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /check.*retrieval/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("activates the matched canonical LO for the class when adding it to retrieval", async () => {
+    vi.mocked(lookupRetrievalLo).mockResolvedValue({
+      exists: true,
+      trackedForClass: false,
+      match: {
+        contentId: "11111111-1111-4111-8111-111111111111",
+        loCode: "101a",
+        lo: "101a: Canonical expand brackets",
+      },
+    });
+    const user = userEvent.setup();
+    render(<ExampleComposer />);
+
+    await user.type(screen.getByLabelText("Learning objective"), "101A");
+    await screen.findByText(
+      "Already in retrieval database; not yet tracked for this class.",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Add LO to retrieval bank" }),
+    );
+
+    await waitFor(() => expect(saveRetrievalItem).toHaveBeenCalledOnce());
+    expect(saveRetrievalItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contentId: "11111111-1111-4111-8111-111111111111",
+        lo: "101a: Canonical expand brackets",
+        className: "Year 9",
+      }),
+    );
   });
 });
 

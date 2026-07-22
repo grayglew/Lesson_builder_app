@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run test:unit",
     "test:unit": "vitest run --configLoader runner",
+    "drfrost:inventory": "node scripts/import-drfrost-captures.mjs",
     "test:e2e": "playwright test",
     "test:presenter-runtime": "node src/features/presenter/runtime-browser-check.mjs"
   },
