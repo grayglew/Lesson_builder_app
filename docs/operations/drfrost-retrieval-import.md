@@ -24,7 +24,15 @@ npm run drfrost:inventory -- --project-ref <target-project-ref> --workspace-root
 
 This writes `drfrost-import-reports/import-manifest.json` and an approval template. It prints the SHA-256 manifest hash, totals, target project, and owner. It does not read service-role credentials, construct a Supabase client, or upload anything.
 
-`--allow-incomplete` exists only for inspection during capture work; a manifest created that way must not be approved for the final import.
+`--allow-incomplete` exists only for inspection during capture work. It writes an
+`inspection-only` manifest containing every currently eligible checked capture,
+plus an `omissions` list for checked codes that do not yet have a valid helper
+2.0.9+ capture. Its approval template is marked `applyEligible: false`.
+
+Inspection-only or otherwise incomplete manifests are mechanically rejected by
+the apply command before service-role credentials are read or an upload-capable
+client is constructed. A final manifest is apply-eligible only when all 1,809
+codes are checked, eligible, present as entries, and the omissions list is empty.
 
 ## 3. Review and obtain explicit approval
 

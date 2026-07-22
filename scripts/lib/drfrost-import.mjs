@@ -43,14 +43,20 @@ export async function buildDrFrostImportManifest({
   }
 
   const missing = [...register.checked].filter((code) => !candidates.has(code));
-  if (missing.length) {
+  if (requireAllChecked && missing.length) {
     throw new Error(
       `No valid helper ${MIN_HELPER_VERSION}+ capture found for ${missing.length} checked code(s): ${missing.slice(0, 12).join(", ")}${missing.length > 12 ? "…" : ""}`,
     );
   }
 
+  const omissions = missing.map((code) => ({
+    code,
+    reason: `no-valid-helper-${MIN_HELPER_VERSION}+-capture`,
+  }));
+
   return {
     schemaVersion: "drfrost-import-manifest/v1",
+    inventoryMode: requireAllChecked ? "final" : "inspection-only",
     runId: randomUUID(),
     createdAt: new Date().toISOString(),
     targetProjectRef,
@@ -59,7 +65,9 @@ export async function buildDrFrostImportManifest({
       expectedTotal,
       checked: register.checked.size,
       unchecked: expectedTotal - register.checked.size,
+      eligibleChecked: candidates.size,
     },
+    omissions,
     entries: [...candidates.values()].sort((left, right) =>
       left.code.localeCompare(right.code, "en", { numeric: true }),
     ),
@@ -102,6 +110,8 @@ export async function applyApprovedImport({
   if (computedHash !== manifestHash) {
     throw new Error("The supplied manifest hash does not match the manifest content.");
   }
+
+  assertFinalImportManifest(manifest);
 
   // This gate intentionally runs before environment credentials are read or an
   // adapter capable of network/storage writes is constructed.
@@ -174,6 +184,27 @@ export async function applyApprovedImport({
   report.completedAt = new Date().toISOString();
   await onCheckpoint(structuredClone(report));
   return report;
+}
+
+function assertFinalImportManifest(manifest) {
+  const register = manifest?.register;
+  const omissions = Array.isArray(manifest?.omissions) ? manifest.omissions : [];
+  const entries = Array.isArray(manifest?.entries) ? manifest.entries : [];
+  const isComplete =
+    manifest?.inventoryMode === "final" &&
+    Number.isInteger(register?.expectedTotal) &&
+    register.expectedTotal > 0 &&
+    register.checked === register.expectedTotal &&
+    register.unchecked === 0 &&
+    register.eligibleChecked === register.expectedTotal &&
+    entries.length === register.expectedTotal &&
+    omissions.length === 0;
+
+  if (!isComplete) {
+    throw new Error(
+      "Inspection-only or incomplete Doctor Frost inventories cannot be applied.",
+    );
+  }
 }
 
 export async function rollbackApprovedImport({ report, approval, createAdapter }) {

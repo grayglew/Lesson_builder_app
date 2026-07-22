@@ -45,6 +45,8 @@ async function createInventory() {
   const approvalTemplatePath = `${outputPath}.approval-template.json`;
   await writeJson(approvalTemplatePath, {
     approved: false,
+    applyEligible: manifest.inventoryMode === "final",
+    inventoryMode: manifest.inventoryMode,
     targetProjectRef: manifest.targetProjectRef,
     ownerEmail: manifest.ownerEmail,
     manifestHash,
@@ -54,12 +56,13 @@ async function createInventory() {
   console.log(
     JSON.stringify(
       {
-        mode: "inventory-only",
+        mode: manifest.inventoryMode,
         uploaded: false,
         manifestPath: outputPath,
         approvalTemplatePath,
         manifestHash,
         entries: manifest.entries.length,
+        omissions: manifest.omissions.length,
         register: manifest.register,
       },
       null,

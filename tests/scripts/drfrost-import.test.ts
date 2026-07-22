@@ -46,6 +46,42 @@ describe("Doctor Frost import inventory", () => {
       ),
     ).toBe(true);
   });
+
+  it("builds an inspection-only inventory when checked captures are not all eligible", async () => {
+    const root = await makeRoot();
+    await writeFile(
+      path.join(root, "lane-1.md"),
+      "- [x] 101a\n- [x] 101b\n- [ ] 101c\n",
+    );
+    await makeCapture(root, "20260720T000000Z-101a", "101a", "2.0.9", "2026-07-20T00:00:00Z");
+    await makeCapture(root, "20260720T000000Z-101b", "101b", "2.0.8", "2026-07-20T00:00:00Z");
+
+    const manifest = await buildDrFrostImportManifest({
+      captureRoot: path.join(root, "captures"),
+      registerFiles: [path.join(root, "lane-1.md")],
+      expectedTotal: 3,
+      requireAllChecked: false,
+      targetProjectRef: "project-ref",
+      ownerEmail: "grayglew@gmail.com",
+    });
+
+    expect(manifest).toMatchObject({
+      inventoryMode: "inspection-only",
+      register: {
+        expectedTotal: 3,
+        checked: 2,
+        unchecked: 1,
+        eligibleChecked: 1,
+      },
+      omissions: [
+        {
+          code: "101b",
+          reason: "no-valid-helper-2.0.9+-capture",
+        },
+      ],
+    });
+    expect(manifest.entries.map((entry: { code: string }) => entry.code)).toEqual(["101a"]);
+  });
 });
 
 describe("Doctor Frost apply approval gate", () => {
@@ -116,6 +152,35 @@ describe("Doctor Frost apply approval gate", () => {
     expect(adapter.uploadImmutableImage).toHaveBeenCalledTimes(16);
     expect(report.replaced).toBe(1);
   });
+
+  it("rejects an inspection-only manifest before constructing an upload adapter", async () => {
+    const manifest = {
+      ...sampleManifest(),
+      inventoryMode: "inspection-only",
+      register: { expectedTotal: 2, checked: 1, unchecked: 1, eligibleChecked: 1 },
+      omissions: [],
+    };
+    const manifestHash = hashImportManifest(manifest);
+    const createAdapter = vi.fn();
+
+    await expect(
+      applyApprovedImport({
+        manifest,
+        manifestHash,
+        approval: {
+          approved: true,
+          targetProjectRef: manifest.targetProjectRef,
+          ownerEmail: manifest.ownerEmail,
+          manifestHash,
+          runId: manifest.runId,
+          approvedAt: "2026-07-22T00:00:00Z",
+        },
+        createAdapter,
+      }),
+    ).rejects.toThrow(/inspection|incomplete/i);
+
+    expect(createAdapter).not.toHaveBeenCalled();
+  });
 });
 
 async function makeRoot() {
@@ -170,11 +235,13 @@ async function makeCapture(
 function sampleManifest() {
   return {
     schemaVersion: "drfrost-import-manifest/v1",
+    inventoryMode: "final",
     runId: "run-1",
     createdAt: "2026-07-22T00:00:00Z",
     targetProjectRef: "project-ref",
     ownerEmail: "grayglew@gmail.com",
-    register: { expectedTotal: 1, checked: 1, unchecked: 0 },
+    register: { expectedTotal: 1, checked: 1, unchecked: 0, eligibleChecked: 1 },
+    omissions: [],
     entries: [
       {
         code: "101a",
