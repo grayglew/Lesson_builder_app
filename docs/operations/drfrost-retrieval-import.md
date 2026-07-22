@@ -34,6 +34,32 @@ the apply command before service-role credentials are read or an upload-capable
 client is constructed. A final manifest is apply-eligible only when all 1,809
 codes are checked, eligible, present as entries, and the omissions list is empty.
 
+### Explicit partial import
+
+If the user explicitly chooses to exclude unfinished or ineligible captures,
+generate a separately labelled immutable manifest:
+
+```powershell
+npm run drfrost:inventory -- --project-ref <target-project-ref> --workspace-root "C:\Users\grayg\Documents\New project 6" --partial-final
+```
+
+A `partial-final` manifest lists every excluded code and its reason, so its
+included entries plus exclusions still partition all 1,809 register codes. It
+cannot be applied using an ordinary approval. In addition to the normal exact
+manifest approval fields, approval must contain:
+
+```json
+{
+  "inventoryMode": "partial-final",
+  "allowPartial": true,
+  "approvedEntryCount": 1645,
+  "excludedEntryCount": 164
+}
+```
+
+Use the counts written into that manifest's approval template rather than the
+example values above. Any mismatch is rejected before an upload client exists.
+
 ## 3. Review and obtain explicit approval
 
 Review the exact manifest, target project ref, owner (`grayglew@gmail.com`), entry count, and hash. Do not set `approved` to `true` merely because the inventory succeeded. An operator may create the approval JSON only after the user explicitly approves that exact environment and manifest hash.

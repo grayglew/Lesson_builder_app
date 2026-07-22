@@ -20,6 +20,9 @@ try {
 }
 
 async function createInventory() {
+  if (args.allowIncomplete && args.partialFinal) {
+    throw new Error("Choose either --allow-incomplete or --partial-final, not both.");
+  }
   const workspaceRoot = path.resolve(args.workspaceRoot || path.join(process.cwd(), ".."));
   const captureRoot = path.resolve(args.captureRoot || path.join(workspaceRoot, "drfrost-captures"));
   const registerFiles = args.register
@@ -36,7 +39,8 @@ async function createInventory() {
     captureRoot,
     registerFiles,
     expectedTotal: Number(args.expectedTotal || 1809),
-    requireAllChecked: !args.allowIncomplete,
+    requireAllChecked: !args.allowIncomplete && !args.partialFinal,
+    partialFinal: Boolean(args.partialFinal),
     targetProjectRef,
     ownerEmail,
   });
@@ -45,8 +49,11 @@ async function createInventory() {
   const approvalTemplatePath = `${outputPath}.approval-template.json`;
   await writeJson(approvalTemplatePath, {
     approved: false,
-    applyEligible: manifest.inventoryMode === "final",
+    applyEligible: manifest.inventoryMode !== "inspection-only",
     inventoryMode: manifest.inventoryMode,
+    allowPartial: false,
+    approvedEntryCount: manifest.entries.length,
+    excludedEntryCount: manifest.exclusions.length,
     targetProjectRef: manifest.targetProjectRef,
     ownerEmail: manifest.ownerEmail,
     manifestHash,
@@ -63,6 +70,7 @@ async function createInventory() {
         manifestHash,
         entries: manifest.entries.length,
         omissions: manifest.omissions.length,
+        exclusions: manifest.exclusions.length,
         register: manifest.register,
       },
       null,

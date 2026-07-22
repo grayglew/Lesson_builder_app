@@ -82,6 +82,53 @@ describe("Doctor Frost import inventory", () => {
     });
     expect(manifest.entries.map((entry: { code: string }) => entry.code)).toEqual(["101a"]);
   });
+
+  it("builds a partial-final manifest with the exact eligible and excluded scope", async () => {
+    const root = await makeRoot();
+    await writeFile(
+      path.join(root, "lane-1.md"),
+      "- [x] 101a\n- [x] 101b\n- [ ] 101c\n",
+    );
+    await makeCapture(root, "20260720T000000Z-101a", "101a", "2.0.9", "2026-07-20T00:00:00Z");
+    await makeCapture(root, "20260720T000000Z-101b", "101b", "2.0.8", "2026-07-20T00:00:00Z");
+
+    const manifest = await buildDrFrostImportManifest({
+      captureRoot: path.join(root, "captures"),
+      registerFiles: [path.join(root, "lane-1.md")],
+      expectedTotal: 3,
+      requireAllChecked: false,
+      partialFinal: true,
+      targetProjectRef: "project-ref",
+      ownerEmail: "grayglew@gmail.com",
+    });
+
+    expect(manifest).toMatchObject({
+      inventoryMode: "partial-final",
+      register: {
+        expectedTotal: 3,
+        checked: 2,
+        unchecked: 1,
+        eligibleChecked: 1,
+      },
+      omissions: [
+        {
+          code: "101b",
+          reason: "no-valid-helper-2.0.9+-capture",
+        },
+      ],
+      exclusions: [
+        {
+          code: "101b",
+          reason: "no-valid-helper-2.0.9+-capture",
+        },
+        {
+          code: "101c",
+          reason: "unchecked-register-item",
+        },
+      ],
+    });
+    expect(manifest.entries.map((entry: { code: string }) => entry.code)).toEqual(["101a"]);
+  });
 });
 
 describe("Doctor Frost apply approval gate", () => {
@@ -181,6 +228,58 @@ describe("Doctor Frost apply approval gate", () => {
 
     expect(createAdapter).not.toHaveBeenCalled();
   });
+
+  it("requires an explicit exact-scope acknowledgement for a partial-final manifest", async () => {
+    const manifest = samplePartialManifest();
+    const manifestHash = hashImportManifest(manifest);
+    const createAdapter = vi.fn();
+
+    await expect(
+      applyApprovedImport({
+        manifest,
+        manifestHash,
+        approval: approvalFor(manifest, manifestHash),
+        createAdapter,
+      }),
+    ).rejects.toThrow(/partial/i);
+
+    expect(createAdapter).not.toHaveBeenCalled();
+  });
+
+  it("accepts a partial-final manifest only with matching included and excluded counts", async () => {
+    const manifest = samplePartialManifest();
+    const manifestHash = hashImportManifest(manifest);
+    const adapter = {
+      resolveOwnerId: vi.fn().mockResolvedValue("owner-id"),
+      findActiveLo: vi.fn().mockResolvedValue({
+        id: "existing-lo-id",
+        lo_text: "101a: Older wording",
+      }),
+      uploadImmutableImage: vi.fn(async (image: { role: string; seenCount: number }) => ({
+        assetId: `asset-${image.role}-${image.seenCount}`,
+        ...image,
+      })),
+      replaceCanonicalContent: vi.fn().mockResolvedValue(undefined),
+    };
+    const createAdapter = vi.fn().mockResolvedValue(adapter);
+
+    const report = await applyApprovedImport({
+      manifest,
+      manifestHash,
+      approval: {
+        ...approvalFor(manifest, manifestHash),
+        allowPartial: true,
+        inventoryMode: "partial-final",
+        approvedEntryCount: 1,
+        excludedEntryCount: 1,
+      },
+      createAdapter,
+    });
+
+    expect(createAdapter).toHaveBeenCalledTimes(1);
+    expect(adapter.uploadImmutableImage).toHaveBeenCalledTimes(16);
+    expect(report.replaced).toBe(1);
+  });
 });
 
 async function makeRoot() {
@@ -258,5 +357,25 @@ function sampleManifest() {
         })),
       },
     ],
+  };
+}
+
+function samplePartialManifest() {
+  return {
+    ...sampleManifest(),
+    inventoryMode: "partial-final",
+    register: { expectedTotal: 2, checked: 1, unchecked: 1, eligibleChecked: 1 },
+    exclusions: [{ code: "101b", reason: "unchecked-register-item" }],
+  };
+}
+
+function approvalFor(manifest: ReturnType<typeof sampleManifest>, manifestHash: string) {
+  return {
+    approved: true,
+    targetProjectRef: manifest.targetProjectRef,
+    ownerEmail: manifest.ownerEmail,
+    manifestHash,
+    runId: manifest.runId,
+    approvedAt: "2026-07-22T00:00:00Z",
   };
 }

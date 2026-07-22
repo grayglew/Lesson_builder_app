@@ -10,11 +10,15 @@ export async function buildDrFrostImportManifest({
   registerFiles,
   expectedTotal = 1809,
   requireAllChecked = true,
+  partialFinal = false,
   targetProjectRef,
   ownerEmail,
 }) {
   if (!targetProjectRef || !ownerEmail) {
     throw new Error("Target project ref and owner email are required for an import inventory.");
+  }
+  if (partialFinal && requireAllChecked) {
+    throw new Error("A partial-final inventory cannot require every register item to be checked.");
   }
 
   const register = await readRegisterState(registerFiles);
@@ -42,7 +46,9 @@ export async function buildDrFrostImportManifest({
     }
   }
 
-  const missing = [...register.checked].filter((code) => !candidates.has(code));
+  const missing = [...register.checked]
+    .filter((code) => !candidates.has(code))
+    .sort((left, right) => left.localeCompare(right, "en", { numeric: true }));
   if (requireAllChecked && missing.length) {
     throw new Error(
       `No valid helper ${MIN_HELPER_VERSION}+ capture found for ${missing.length} checked code(s): ${missing.slice(0, 12).join(", ")}${missing.length > 12 ? "…" : ""}`,
@@ -53,10 +59,21 @@ export async function buildDrFrostImportManifest({
     code,
     reason: `no-valid-helper-${MIN_HELPER_VERSION}+-capture`,
   }));
+  const unchecked = [...register.codes]
+    .filter((code) => !register.checked.has(code))
+    .sort((left, right) => left.localeCompare(right, "en", { numeric: true }))
+    .map((code) => ({ code, reason: "unchecked-register-item" }));
+  const exclusions = [...omissions, ...unchecked].sort((left, right) =>
+    left.code.localeCompare(right.code, "en", { numeric: true }),
+  );
 
   return {
     schemaVersion: "drfrost-import-manifest/v1",
-    inventoryMode: requireAllChecked ? "final" : "inspection-only",
+    inventoryMode: partialFinal
+      ? "partial-final"
+      : requireAllChecked
+        ? "final"
+        : "inspection-only",
     runId: randomUUID(),
     createdAt: new Date().toISOString(),
     targetProjectRef,
@@ -68,6 +85,7 @@ export async function buildDrFrostImportManifest({
       eligibleChecked: candidates.size,
     },
     omissions,
+    exclusions,
     entries: [...candidates.values()].sort((left, right) =>
       left.code.localeCompare(right.code, "en", { numeric: true }),
     ),
@@ -111,11 +129,12 @@ export async function applyApprovedImport({
     throw new Error("The supplied manifest hash does not match the manifest content.");
   }
 
-  assertFinalImportManifest(manifest);
+  assertImportManifestStructure(manifest);
 
   // This gate intentionally runs before environment credentials are read or an
   // adapter capable of network/storage writes is constructed.
   assertApplyApproval({ manifest, manifestHash, approval });
+  assertPartialImportApproval({ manifest, approval });
   const adapter = await createAdapter();
   const ownerId = await adapter.resolveOwnerId(manifest.ownerEmail);
   const report = {
@@ -186,23 +205,58 @@ export async function applyApprovedImport({
   return report;
 }
 
-function assertFinalImportManifest(manifest) {
+function assertImportManifestStructure(manifest) {
   const register = manifest?.register;
   const omissions = Array.isArray(manifest?.omissions) ? manifest.omissions : [];
+  const exclusions = Array.isArray(manifest?.exclusions) ? manifest.exclusions : [];
   const entries = Array.isArray(manifest?.entries) ? manifest.entries : [];
-  const isComplete =
-    manifest?.inventoryMode === "final" &&
+  const hasBasicCounts =
     Number.isInteger(register?.expectedTotal) &&
     register.expectedTotal > 0 &&
-    register.checked === register.expectedTotal &&
-    register.unchecked === 0 &&
-    register.eligibleChecked === register.expectedTotal &&
-    entries.length === register.expectedTotal &&
-    omissions.length === 0;
+    Number.isInteger(register.checked) &&
+    Number.isInteger(register.unchecked) &&
+    Number.isInteger(register.eligibleChecked) &&
+    register.checked + register.unchecked === register.expectedTotal &&
+    register.eligibleChecked === entries.length &&
+    register.checked === entries.length + omissions.length;
+  const codes = [...entries.map((entry) => entry.code), ...exclusions.map((item) => item.code)];
+  const hasExactCodePartition =
+    codes.length === register?.expectedTotal && new Set(codes).size === codes.length;
+  const isFinal =
+    manifest?.inventoryMode === "final" &&
+    register?.checked === register?.expectedTotal &&
+    register?.unchecked === 0 &&
+    register?.eligibleChecked === register?.expectedTotal &&
+    entries.length === register?.expectedTotal &&
+    omissions.length === 0 &&
+    exclusions.length === 0;
+  const isPartialFinal =
+    manifest?.inventoryMode === "partial-final" &&
+    hasBasicCounts &&
+    hasExactCodePartition &&
+    exclusions.length === register.expectedTotal - entries.length &&
+    exclusions.filter((item) => item.reason === "unchecked-register-item").length ===
+      register.unchecked &&
+    exclusions.filter((item) => item.reason !== "unchecked-register-item").length ===
+      omissions.length;
 
-  if (!isComplete) {
+  if (!isFinal && !isPartialFinal) {
     throw new Error(
       "Inspection-only or incomplete Doctor Frost inventories cannot be applied.",
+    );
+  }
+}
+
+function assertPartialImportApproval({ manifest, approval }) {
+  if (manifest.inventoryMode !== "partial-final") return;
+  if (
+    approval.allowPartial !== true ||
+    approval.inventoryMode !== "partial-final" ||
+    approval.approvedEntryCount !== manifest.entries.length ||
+    approval.excludedEntryCount !== manifest.exclusions.length
+  ) {
+    throw new Error(
+      "Partial-final imports require explicit approval of the exact included and excluded counts.",
     );
   }
 }
