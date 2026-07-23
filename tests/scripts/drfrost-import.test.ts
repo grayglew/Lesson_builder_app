@@ -280,6 +280,36 @@ describe("Doctor Frost apply approval gate", () => {
     expect(adapter.uploadImmutableImage).toHaveBeenCalledTimes(16);
     expect(report.replaced).toBe(1);
   });
+
+  it("uses bounded image-upload concurrency without exceeding the requested limit", async () => {
+    const manifest = sampleManifest();
+    const manifestHash = hashImportManifest(manifest);
+    let activeUploads = 0;
+    let maximumActiveUploads = 0;
+    const adapter = {
+      resolveOwnerId: vi.fn().mockResolvedValue("owner-id"),
+      findActiveLo: vi.fn().mockResolvedValue({ id: "existing-lo-id" }),
+      uploadImmutableImage: vi.fn(async (image: { role: string; seenCount: number }) => {
+        activeUploads += 1;
+        maximumActiveUploads = Math.max(maximumActiveUploads, activeUploads);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        activeUploads -= 1;
+        return { assetId: `asset-${image.role}-${image.seenCount}`, ...image };
+      }),
+      replaceCanonicalContent: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await applyApprovedImport({
+      manifest,
+      manifestHash,
+      approval: approvalFor(manifest, manifestHash),
+      createAdapter: vi.fn().mockResolvedValue(adapter),
+      uploadConcurrency: 4,
+    });
+
+    expect(maximumActiveUploads).toBe(4);
+    expect(adapter.uploadImmutableImage).toHaveBeenCalledTimes(16);
+  });
 });
 
 async function makeRoot() {

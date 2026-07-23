@@ -123,6 +123,7 @@ export async function applyApprovedImport({
   approval,
   createAdapter,
   onCheckpoint = async () => undefined,
+  uploadConcurrency = 1,
 }) {
   const computedHash = hashImportManifest(manifest);
   if (computedHash !== manifestHash) {
@@ -135,6 +136,9 @@ export async function applyApprovedImport({
   // adapter capable of network/storage writes is constructed.
   assertApplyApproval({ manifest, manifestHash, approval });
   assertPartialImportApproval({ manifest, approval });
+  if (!Number.isInteger(uploadConcurrency) || uploadConcurrency < 1 || uploadConcurrency > 16) {
+    throw new Error("Image upload concurrency must be an integer between 1 and 16.");
+  }
   const adapter = await createAdapter();
   const ownerId = await adapter.resolveOwnerId(manifest.ownerEmail);
   const report = {
@@ -168,16 +172,20 @@ export async function applyApprovedImport({
     report.entries.push(reportEntry);
     await onCheckpoint(structuredClone(report));
     const uploadedImages = [];
-    for (const image of entry.images) {
-      uploadedImages.push(
-        await adapter.uploadImmutableImage({
+    for (let imageIndex = 0; imageIndex < entry.images.length; imageIndex += uploadConcurrency) {
+      const batch = entry.images.slice(imageIndex, imageIndex + uploadConcurrency);
+      const uploadedBatch = await Promise.all(
+        batch.map((image) =>
+          adapter.uploadImmutableImage({
           ...image,
           ownerId,
           retrievalLoId: retrievalLo.id,
           code: entry.code,
           manifestHash,
-        }),
+          }),
+        ),
       );
+      uploadedImages.push(...uploadedBatch);
       reportEntry.uploadedImages = uploadedImages.map((uploaded) => ({
         assetId: uploaded.assetId,
         storagePath: uploaded.storagePath,

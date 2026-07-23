@@ -92,14 +92,24 @@ async function applyImport() {
   const checkpointPath = path.resolve(
     args.checkpoint || `${manifestPath}.${manifest.runId}.checkpoint.json`,
   );
+  const checkpointWriter = createCheckpointWriter(
+    checkpointPath,
+    Number(args.checkpointIntervalMs || 30000),
+  );
   const createAdapter = createApprovedAdapterFactory(requestedProjectRef);
-  const report = await applyApprovedImport({
-    manifest,
-    manifestHash,
-    approval,
-    createAdapter,
-    onCheckpoint: (checkpoint) => writeJson(checkpointPath, checkpoint),
-  });
+  let report;
+  try {
+    report = await applyApprovedImport({
+      manifest,
+      manifestHash,
+      approval,
+      createAdapter,
+      uploadConcurrency: Number(args.uploadConcurrency || 8),
+      onCheckpoint: checkpointWriter.write,
+    });
+  } finally {
+    await checkpointWriter.flush();
+  }
   const reportPath = path.resolve(args.report || `${manifestPath}.${manifest.runId}.report.json`);
   await writeJson(reportPath, report);
   console.log(JSON.stringify({ mode: "apply", reportPath, ...report }, null, 2));
@@ -148,6 +158,40 @@ function createApprovedAdapterFactory(projectRef) {
 async function writeJson(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function createCheckpointWriter(filePath, minimumIntervalMs) {
+  if (!Number.isFinite(minimumIntervalMs) || minimumIntervalMs < 1000) {
+    throw new Error("Checkpoint interval must be at least 1000 milliseconds.");
+  }
+  let latest = null;
+  let lastWrittenAt = 0;
+  let lastReportedComplete = 0;
+  return {
+    write: async (checkpoint) => {
+      latest = checkpoint;
+      const complete = checkpoint.entries.filter((entry) => entry.status === "complete").length;
+      if (complete >= lastReportedComplete + 10 || checkpoint.completedAt) {
+        lastReportedComplete = complete;
+        console.log(
+          JSON.stringify({
+            mode: "apply-progress",
+            complete,
+            total: checkpoint.entries.length,
+            created: checkpoint.created,
+            replaced: checkpoint.replaced,
+          }),
+        );
+      }
+      if (checkpoint.completedAt || Date.now() - lastWrittenAt >= minimumIntervalMs) {
+        await writeJson(filePath, checkpoint);
+        lastWrittenAt = Date.now();
+      }
+    },
+    flush: async () => {
+      if (latest) await writeJson(filePath, latest);
+    },
+  };
 }
 
 function requireArg(name) {
