@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const migrationPath = resolve(
   process.cwd(),
-  "supabase/migrations/20260723003210_allow_shared_retrieval_image_assets.sql",
+  "supabase/migrations/20260723004117_allow_shared_retrieval_image_assets.sql",
 );
 
 describe("shared retrieval image asset constraint", () => {
