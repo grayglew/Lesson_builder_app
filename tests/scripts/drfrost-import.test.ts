@@ -6,6 +6,7 @@ import {
   applyApprovedImport,
   buildDrFrostImportManifest,
   hashImportManifest,
+  loadImportCheckpoint,
 } from "../../scripts/lib/drfrost-import.mjs";
 
 const temporaryRoots: string[] = [];
@@ -132,6 +133,16 @@ describe("Doctor Frost import inventory", () => {
 });
 
 describe("Doctor Frost apply approval gate", () => {
+  it("loads an existing checkpoint and treats a missing path as a fresh run", async () => {
+    const root = await makeRoot();
+    const checkpointPath = path.join(root, "checkpoint.json");
+    const checkpoint = { runId: "run-1", entries: [{ code: "101a" }] };
+    await writeFile(checkpointPath, JSON.stringify(checkpoint));
+
+    await expect(loadImportCheckpoint(checkpointPath)).resolves.toEqual(checkpoint);
+    await expect(loadImportCheckpoint(path.join(root, "missing.json"))).resolves.toBeNull();
+  });
+
   it("does not construct an upload adapter when approval is absent or mismatched", async () => {
     const manifest = sampleManifest();
     const manifestHash = hashImportManifest(manifest);
@@ -309,6 +320,93 @@ describe("Doctor Frost apply approval gate", () => {
 
     expect(maximumActiveUploads).toBe(4);
     expect(adapter.uploadImmutableImage).toHaveBeenCalledTimes(16);
+  });
+
+  it("resumes an incomplete created LO without reclassifying it as replaced", async () => {
+    const manifest = sampleManifest();
+    const manifestHash = hashImportManifest(manifest);
+    const createdLo = { id: "created-lo-id", lo_text: manifest.entries[0].lo };
+    const adapter = {
+      resolveOwnerId: vi.fn().mockResolvedValue("owner-id"),
+      findActiveLo: vi.fn().mockResolvedValue(createdLo),
+      createActiveLo: vi.fn(),
+      snapshotCanonicalContent: vi.fn(),
+      uploadImmutableImage: vi.fn(async (image: { role: string; seenCount: number }) => ({
+        assetId: `asset-${image.role}-${image.seenCount}`,
+        storagePath: `retrieval/${image.role}-${image.seenCount}.png`,
+        ...image,
+      })),
+      replaceCanonicalContent: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const report = await applyApprovedImport({
+      manifest,
+      manifestHash,
+      approval: approvalFor(manifest, manifestHash),
+      createAdapter: vi.fn().mockResolvedValue(adapter),
+      resumeReport: {
+        schemaVersion: "drfrost-import-report/v1",
+        runId: manifest.runId,
+        manifestHash,
+        targetProjectRef: manifest.targetProjectRef,
+        ownerEmail: manifest.ownerEmail,
+        startedAt: "2026-07-22T01:00:00Z",
+        completedAt: null,
+        created: 0,
+        replaced: 0,
+        entries: [
+          {
+            code: manifest.entries[0].code,
+            retrievalLoId: createdLo.id,
+            action: "created",
+            status: "uploading",
+            previous: null,
+            newLo: manifest.entries[0].lo,
+            uploadedImages: [],
+          },
+        ],
+      },
+    });
+
+    expect(adapter.createActiveLo).not.toHaveBeenCalled();
+    expect(adapter.snapshotCanonicalContent).not.toHaveBeenCalled();
+    expect(report.entries[0]).toMatchObject({
+      code: manifest.entries[0].code,
+      retrievalLoId: createdLo.id,
+      action: "created",
+      status: "complete",
+    });
+    expect(report.created).toBe(1);
+    expect(report.replaced).toBe(0);
+  });
+
+  it("rejects a mismatched checkpoint before constructing an upload adapter", async () => {
+    const manifest = sampleManifest();
+    const manifestHash = hashImportManifest(manifest);
+    const createAdapter = vi.fn();
+
+    await expect(
+      applyApprovedImport({
+        manifest,
+        manifestHash,
+        approval: approvalFor(manifest, manifestHash),
+        createAdapter,
+        resumeReport: {
+          schemaVersion: "drfrost-import-report/v1",
+          runId: "different-run",
+          manifestHash,
+          targetProjectRef: manifest.targetProjectRef,
+          ownerEmail: manifest.ownerEmail,
+          startedAt: "2026-07-22T01:00:00Z",
+          completedAt: null,
+          created: 0,
+          replaced: 0,
+          entries: [],
+        },
+      }),
+    ).rejects.toThrow(/checkpoint.*manifest/i);
+
+    expect(createAdapter).not.toHaveBeenCalled();
   });
 });
 

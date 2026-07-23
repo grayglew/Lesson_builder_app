@@ -124,6 +124,7 @@ export async function applyApprovedImport({
   createAdapter,
   onCheckpoint = async () => undefined,
   uploadConcurrency = 1,
+  resumeReport = /** @type {Record<string, any> | null} */ (null),
 }) {
   const computedHash = hashImportManifest(manifest);
   if (computedHash !== manifestHash) {
@@ -139,37 +140,56 @@ export async function applyApprovedImport({
   if (!Number.isInteger(uploadConcurrency) || uploadConcurrency < 1 || uploadConcurrency > 16) {
     throw new Error("Image upload concurrency must be an integer between 1 and 16.");
   }
+  const report = resumeReport
+    ? prepareResumeReport({ resumeReport, manifest, manifestHash })
+    : {
+        schemaVersion: "drfrost-import-report/v1",
+        runId: manifest.runId,
+        manifestHash,
+        targetProjectRef: manifest.targetProjectRef,
+        ownerEmail: manifest.ownerEmail,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+        created: 0,
+        replaced: 0,
+        entries: [],
+      };
   const adapter = await createAdapter();
   const ownerId = await adapter.resolveOwnerId(manifest.ownerEmail);
-  const report = {
-    schemaVersion: "drfrost-import-report/v1",
-    runId: manifest.runId,
-    manifestHash,
-    targetProjectRef: manifest.targetProjectRef,
-    ownerEmail: manifest.ownerEmail,
-    startedAt: new Date().toISOString(),
-    completedAt: null,
-    created: 0,
-    replaced: 0,
-    entries: [],
-  };
 
-  for (const entry of manifest.entries) {
-    const existing = await adapter.findActiveLo(ownerId, entry.code);
-    const retrievalLo = existing || (await adapter.createActiveLo(ownerId, entry.code, entry.lo));
-    const previous = existing && adapter.snapshotCanonicalContent
-      ? await adapter.snapshotCanonicalContent(ownerId, retrievalLo.id)
-      : existing;
-    const reportEntry = {
-      code: entry.code,
-      retrievalLoId: retrievalLo.id,
-      action: existing ? "replaced" : "created",
-      status: "uploading",
-      previous,
-      newLo: entry.lo,
-      uploadedImages: [],
-    };
-    report.entries.push(reportEntry);
+  for (const [entryIndex, entry] of manifest.entries.entries()) {
+    const resumedEntry = report.entries[entryIndex];
+    if (resumedEntry?.status === "complete") continue;
+
+    const activeLo = await adapter.findActiveLo(ownerId, entry.code);
+    let retrievalLo;
+    let previous;
+    let reportEntry;
+    if (resumedEntry) {
+      if (!activeLo || activeLo.id !== resumedEntry.retrievalLoId) {
+        throw new Error(`Checkpoint LO identity no longer matches active code ${entry.code}.`);
+      }
+      retrievalLo = activeLo;
+      previous = resumedEntry.previous;
+      reportEntry = resumedEntry;
+      reportEntry.status = "uploading";
+      reportEntry.uploadedImages = [];
+    } else {
+      retrievalLo = activeLo || (await adapter.createActiveLo(ownerId, entry.code, entry.lo));
+      previous = activeLo && adapter.snapshotCanonicalContent
+        ? await adapter.snapshotCanonicalContent(ownerId, retrievalLo.id)
+        : activeLo;
+      reportEntry = {
+        code: entry.code,
+        retrievalLoId: retrievalLo.id,
+        action: activeLo ? "replaced" : "created",
+        status: "uploading",
+        previous,
+        newLo: entry.lo,
+        uploadedImages: [],
+      };
+      report.entries.push(reportEntry);
+    }
     await onCheckpoint(structuredClone(report));
     const uploadedImages = [];
     for (let imageIndex = 0; imageIndex < entry.images.length; imageIndex += uploadConcurrency) {
@@ -202,7 +222,7 @@ export async function applyApprovedImport({
       images: uploadedImages,
       previous,
     });
-    if (existing) report.replaced += 1;
+    if (reportEntry.action === "replaced") report.replaced += 1;
     else report.created += 1;
     reportEntry.status = "complete";
     reportEntry.imageCount = uploadedImages.length;
@@ -210,6 +230,39 @@ export async function applyApprovedImport({
   }
   report.completedAt = new Date().toISOString();
   await onCheckpoint(structuredClone(report));
+  return report;
+}
+
+function prepareResumeReport({ resumeReport, manifest, manifestHash }) {
+  const report = structuredClone(resumeReport);
+  const identityMatches =
+    report?.schemaVersion === "drfrost-import-report/v1" &&
+    report.runId === manifest.runId &&
+    report.manifestHash === manifestHash &&
+    report.targetProjectRef === manifest.targetProjectRef &&
+    String(report.ownerEmail || "").toLowerCase() === manifest.ownerEmail.toLowerCase() &&
+    report.completedAt === null &&
+    Array.isArray(report.entries) &&
+    report.entries.length <= manifest.entries.length;
+  if (!identityMatches) {
+    throw new Error("Import checkpoint does not match the approved manifest identity.");
+  }
+  for (const [index, entry] of report.entries.entries()) {
+    if (
+      entry.code !== manifest.entries[index]?.code ||
+      !["created", "replaced"].includes(entry.action) ||
+      !["uploading", "replacing", "complete"].includes(entry.status) ||
+      !entry.retrievalLoId
+    ) {
+      throw new Error("Import checkpoint entries do not match the approved manifest order.");
+    }
+  }
+  report.created = report.entries.filter(
+    (entry) => entry.status === "complete" && entry.action === "created",
+  ).length;
+  report.replaced = report.entries.filter(
+    (entry) => entry.status === "complete" && entry.action === "replaced",
+  ).length;
   return report;
 }
 
@@ -266,6 +319,15 @@ function assertPartialImportApproval({ manifest, approval }) {
     throw new Error(
       "Partial-final imports require explicit approval of the exact included and excluded counts.",
     );
+  }
+}
+
+export async function loadImportCheckpoint(checkpointPath) {
+  try {
+    return JSON.parse(await readFile(checkpointPath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
   }
 }
 

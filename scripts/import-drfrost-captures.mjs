@@ -4,6 +4,7 @@ import {
   applyApprovedImport,
   buildDrFrostImportManifest,
   hashImportManifest,
+  loadImportCheckpoint,
   rollbackApprovedImport,
 } from "./lib/drfrost-import.mjs";
 import { createSupabaseDrFrostAdapter } from "./lib/supabase-drfrost-adapter.mjs";
@@ -15,7 +16,7 @@ try {
   else if (args.rollback) await rollbackImport();
   else await createInventory();
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(formatError(error));
   process.exitCode = 1;
 }
 
@@ -92,6 +93,7 @@ async function applyImport() {
   const checkpointPath = path.resolve(
     args.checkpoint || `${manifestPath}.${manifest.runId}.checkpoint.json`,
   );
+  const resumeReport = await loadImportCheckpoint(checkpointPath);
   const checkpointWriter = createCheckpointWriter(
     checkpointPath,
     Number(args.checkpointIntervalMs || 30000),
@@ -104,6 +106,7 @@ async function applyImport() {
       manifestHash,
       approval,
       createAdapter,
+      resumeReport,
       uploadConcurrency: Number(args.uploadConcurrency || 8),
       onCheckpoint: checkpointWriter.write,
     });
@@ -243,4 +246,17 @@ function toCamel(value) {
 
 function toKebab(value) {
   return value.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+}
+
+function formatError(error) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const safe = Object.fromEntries(
+      ["name", "message", "code", "details", "hint", "status", "statusCode", "error"].flatMap(
+        (key) => (error[key] === undefined ? [] : [[key, error[key]]]),
+      ),
+    );
+    if (Object.keys(safe).length) return JSON.stringify(safe);
+  }
+  return String(error);
 }
