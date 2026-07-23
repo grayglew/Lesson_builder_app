@@ -112,7 +112,25 @@ async function applyImport() {
   }
   const reportPath = path.resolve(args.report || `${manifestPath}.${manifest.runId}.report.json`);
   await writeJson(reportPath, report);
-  console.log(JSON.stringify({ mode: "apply", reportPath, ...report }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        mode: "apply",
+        reportPath,
+        runId: report.runId,
+        manifestHash: report.manifestHash,
+        targetProjectRef: report.targetProjectRef,
+        ownerEmail: report.ownerEmail,
+        startedAt: report.startedAt,
+        completedAt: report.completedAt,
+        entries: report.entries.length,
+        created: report.created,
+        replaced: report.replaced,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function rollbackImport() {
