@@ -96,9 +96,34 @@ test.describe("Compact Console functional review", () => {
     await expect(page.getByRole("menu", { name: "Account and utilities" })).toBeHidden();
     await expect(account).toBeFocused();
 
+    const lessonRail = page.getByRole("complementary", {
+      name: "Lesson builder navigation",
+    });
+    const lessonRailBefore = await lessonRail.boundingBox();
+    await page.getByRole("button", { name: "Collapse lesson preview" }).click();
+    const expandPreview = page.getByRole("button", { name: "Expand lesson preview" });
+    await expect(expandPreview).toBeVisible();
+
+    const lessonRailAfter = await lessonRail.boundingBox();
+    expect(lessonRailBefore).not.toBeNull();
+    expect(lessonRailAfter).not.toBeNull();
+    expect(lessonRailAfter!.x).toBe(lessonRailBefore!.x);
+    expect(lessonRailAfter!.width).toBe(lessonRailBefore!.width);
+
+    const previewRail = await page
+      .getByRole("complementary", { name: "Lesson preview" })
+      .boundingBox();
+    const expandPreviewBox = await expandPreview.boundingBox();
+    expect(previewRail).not.toBeNull();
+    expect(expandPreviewBox).not.toBeNull();
+    expect(expandPreviewBox!.x).toBeGreaterThanOrEqual(previewRail!.x);
+    expect(expandPreviewBox!.x + expandPreviewBox!.width).toBeLessThanOrEqual(
+      previewRail!.x + previewRail!.width,
+    );
+
+    await expandPreview.click();
+    await expect(page.getByRole("button", { name: "Collapse lesson preview" })).toBeVisible();
     await page.getByRole("button", { name: "Collapse lesson tools" }).click();
     await expect(page.getByRole("button", { name: "Expand lesson tools" })).toBeVisible();
-    await page.getByRole("button", { name: "Collapse lesson preview" }).click();
-    await expect(page.getByRole("button", { name: "Expand lesson preview" })).toBeVisible();
   });
 });

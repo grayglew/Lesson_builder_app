@@ -1916,6 +1916,26 @@
     grid-template-columns: minmax(15rem, 15.5rem) minmax(34rem, 1fr) 3.8rem;
   }
 
+  .compactConsole .previewCollapsed .previewPane {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading {
+    justify-content: center;
+    padding: 0.4rem 0;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading > div,
+  .compactConsole .previewCollapsed .compactDeckActions {
+    display: none;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading button {
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    padding: 0;
+  }
+
   .compactConsole .lessonRailCollapsed {
     grid-template-columns: 3.8rem minmax(34rem, 1fr) minmax(18rem, 19rem);
   }
