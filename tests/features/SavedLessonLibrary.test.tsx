@@ -1,7 +1,8 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SavedLessonLibrary } from "@/features/builder/SavedLessonLibrary";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import {
   downloadPresenterSlideImages,
   listSavedLessons,
@@ -111,23 +112,35 @@ describe("SavedLessonLibrary production actions", () => {
 
   it("updates a saved lesson class without opening it", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "prompt").mockReturnValue("Year 10");
     vi.mocked(updateSavedLessonMetadata).mockResolvedValue(
       lesson("active", "Active lesson", "2026-04-02", false, "Year 10"),
     );
-    render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
+    render(
+      <AppNotificationsProvider>
+        <SavedLessonLibrary embedded onBack={vi.fn()} />
+      </AppNotificationsProvider>,
+    );
 
     const row = (await screen.findAllByRole("row"))[1];
     await user.click(
       within(row).getByRole("button", { name: "Change class" }),
     );
+    const dialog = screen.getByRole("dialog", { name: "Change lesson class" });
+    const classInput = within(dialog).getByRole("textbox", { name: "Class" });
+    await user.clear(classInput);
+    await user.type(classInput, "Year 10");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Update class" }),
+    );
 
-    expect(updateSavedLessonMetadata).toHaveBeenCalledWith({
-      id: "active",
-      title: "Active lesson",
-      className: "Year 10",
-      teachingDate: "2026-04-02",
-    });
+    await waitFor(() =>
+      expect(updateSavedLessonMetadata).toHaveBeenCalledWith({
+        id: "active",
+        title: "Active lesson",
+        className: "Year 10",
+        teachingDate: "2026-04-02",
+      }),
+    );
     expect((await screen.findAllByText("Year 10")).length).toBeGreaterThan(0);
   });
 

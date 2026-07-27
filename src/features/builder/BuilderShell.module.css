@@ -1342,6 +1342,12 @@
   font-size: 13px;
   font-weight: 650;
   line-height: 1.35;
+  animation: toastEnter 160ms ease-out;
+}
+
+.notificationToast > span {
+  min-width: 0;
+  flex: 1;
 }
 
 .notificationToast.success {
@@ -1366,6 +1372,49 @@
   width: 20px;
   height: 20px;
   animation: spin 0.9s linear infinite;
+}
+
+.toastIcon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.toastCloseButton {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.toastCloseButton:hover {
+  background: rgba(255, 255, 255, 0.55);
+  opacity: 1;
+}
+
+.toastCloseButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notificationToast {
+    animation: none;
+  }
 }
 
 .loadingPage {

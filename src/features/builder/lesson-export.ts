@@ -433,10 +433,12 @@ function standaloneLessonCss() {
 .confidence-poll-slide{display:grid;place-items:center;background:#fff;padding:32px}.confidence-poll-content{display:grid;gap:26px;width:100%;height:100%;align-content:center;text-align:center}.confidence-poll-content h2{margin:0;font-size:clamp(34px,5vw,72px);line-height:1.05;color:#111827}.confidence-poll-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;width:100%}.confidence-poll-choice{min-height:220px;border:4px solid rgba(17,24,39,.28);border-radius:14px;color:#111827;font:900 clamp(54px,8vw,112px)/1 system-ui,sans-serif;display:grid;place-items:center;cursor:pointer;touch-action:manipulation;box-shadow:0 16px 28px rgba(17,24,39,.16)}.confidence-poll-choice-1{background:#fecaca}.confidence-poll-choice-2{background:#fed7aa}.confidence-poll-choice-3{background:#fef08a}.confidence-poll-choice-4{background:#bbf7d0}.confidence-poll-choice-5{background:#86efac}.confidence-poll-total{font-size:clamp(24px,3vw,40px);font-weight:900;color:#374151}.confidence-end-lesson{justify-self:center;border:0;border-radius:10px;background:#0f766e;color:#fff;padding:14px 24px;font:800 18px/1 system-ui,sans-serif;cursor:pointer}
 .presenter-tools{position:fixed;left:50%;top:4px;top:max(4px,env(safe-area-inset-top));transform:translateX(-50%);z-index:20;display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:5px;max-width:calc(100vw - 8px);overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;touch-action:pan-x;padding:5px;border:1px solid #cad7d7;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 6px 16px rgba(19,37,42,.16)}.presenter-tools::-webkit-scrollbar{display:none}.presenter-tool{min-height:36px;border:1px solid #cad7d7;border-radius:7px;background:#fff;color:#172124;padding:5px 8px;font:inherit;font-size:15px;font-weight:750;cursor:pointer;white-space:nowrap;flex:0 0 auto}.presenter-tool:hover{border-color:#8ba3a0}.presenter-tool:focus-visible,.presenter-color:focus-visible,.presenter-size:focus-visible,.qa-toggle:focus-visible,.example-reveal-button:focus-visible,.confidence-poll-choice:focus-visible,.confidence-end-lesson:focus-visible,.worksheet-links a:focus-visible{outline:3px solid #0f766e;outline-offset:2px}.presenter-tool.is-active,.presenter-tool.primary{background:#0f766e;border-color:#0f766e;color:#fff}.presenter-tool-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;vertical-align:middle}.presenter-tool-icon svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.presenter-colors{display:flex;align-items:center;gap:3px;flex:0 0 auto}.presenter-color{width:36px;height:36px;border:1px solid #cad7d7;border-radius:7px;background:var(--swatch-color,#2563eb);padding:0;cursor:pointer;flex:0 0 auto}.presenter-color.is-active{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.22)}.presenter-custom-color,.presenter-camera-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.presenter-size{width:96px;height:33px;flex:0 0 auto}
 .presenter-student-code{position:fixed;right:10px;bottom:10px;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));z-index:24;border:1px solid #0f766e;border-radius:8px;background:rgba(255,255,255,.95);box-shadow:0 8px 18px rgba(19,37,42,.16);padding:8px 10px;color:#0f3d3b;font:900 16px/1.1 system-ui,sans-serif;letter-spacing:.02em}
+.presenter-notification-stack{position:fixed;right:16px;bottom:16px;z-index:80;display:grid;width:min(420px,calc(100vw - 32px));gap:8px}.presenter-notification{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px;border:1px solid #cad7d7;border-radius:10px;background:rgba(255,255,255,.98);box-shadow:0 14px 34px rgba(19,37,42,.22);padding:12px 14px;color:#172124;font:700 14px/1.4 system-ui,sans-serif}.presenter-notification.success{border-color:#9ad9ca;background:#e8f8f3;color:#0b514d}.presenter-notification.warning{border-color:#f5d58c;background:#fff8e8;color:#92400e}.presenter-notification.error{border-color:#ffc4ba;background:#fff0ed;color:#991b1b}.presenter-notification button{display:grid;width:28px;height:28px;place-items:center;border:0;border-radius:6px;background:transparent;color:currentColor;font:900 20px/1 system-ui,sans-serif;cursor:pointer}.presenter-dialog-backdrop{position:fixed;inset:0;z-index:90;display:grid;place-items:center;overflow:auto;padding:20px;background:rgba(12,27,31,.6);backdrop-filter:blur(5px)}.presenter-dialog{width:min(500px,100%);border:1px solid #cad7d7;border-radius:12px;background:#fff;box-shadow:0 28px 80px rgba(5,19,23,.32);padding:22px;color:#172124;font-family:system-ui,sans-serif}.presenter-dialog h2{margin:0;font-size:22px;line-height:1.25}.presenter-dialog p{margin:8px 0 0;color:#5b6a70;font-size:15px;line-height:1.5}.presenter-dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:22px}.presenter-dialog button{min-height:42px;border:1px solid #cad7d7;border-radius:8px;background:#fff;color:#172124;padding:9px 16px;font:800 14px/1.2 system-ui,sans-serif;cursor:pointer}.presenter-dialog button.primary{border-color:#0f766e;background:#0f766e;color:#fff}.presenter-dialog.danger button.primary{border-color:#b42318;background:#b42318}.presenter-dialog.warning{border-top:4px solid #b45309}.presenter-dialog.danger{border-top:4px solid #b42318}.presenter-dialog button:focus-visible,.presenter-notification button:focus-visible{outline:3px solid rgba(15,118,110,.35);outline-offset:2px}
 .presenter-capability-note{position:fixed;left:10px;bottom:10px;left:max(10px,env(safe-area-inset-left));bottom:max(10px,env(safe-area-inset-bottom));z-index:23;width:min(390px,calc(100vw - 20px));border:1px solid #0f766e;border-radius:8px;background:rgba(255,255,255,.97);box-shadow:0 8px 18px rgba(19,37,42,.16);padding:8px 10px;color:#0f3d3b;font:600 13px/1.35 system-ui,sans-serif}.presenter-capability-note summary{cursor:pointer;font-weight:900}.presenter-capability-note p{margin:7px 0 0}.presenter-capability-note:focus-within{outline:3px solid #0f766e;outline-offset:2px}
 body.focus-mode .lesson-header,body.fullscreen-mode .lesson-header{display:none}body.focus-mode,body.fullscreen-mode{overflow:hidden}body.focus-mode .lesson-deck,body.fullscreen-mode .lesson-deck{max-width:none;box-sizing:border-box;height:100vh;height:100dvh;min-height:0;padding:var(--presenter-toolbar-space) var(--presenter-edge-space) var(--presenter-edge-space);gap:0;place-items:center;overflow:auto;scroll-padding-top:var(--presenter-toolbar-space)}body.focus-mode .lesson-slide,body.fullscreen-mode .lesson-slide{box-sizing:border-box;border:0;box-shadow:none;width:var(--presenter-slide-width);height:var(--presenter-slide-height);max-width:calc(100vw - 12px);max-height:calc(100vh - var(--presenter-toolbar-space) - var(--presenter-edge-space));max-height:calc(100dvh - var(--presenter-toolbar-space) - var(--presenter-edge-space));scroll-snap-align:center}body.focus-mode .lesson-slide.pdf-page-slide,body.fullscreen-mode .lesson-slide.pdf-page-slide{max-height:none;align-self:start;scroll-snap-align:start center}body.presenter-zoom-mode.focus-mode .lesson-deck,body.presenter-zoom-mode.fullscreen-mode .lesson-deck{place-items:start;justify-items:start;align-items:start;overflow:auto;overscroll-behavior:contain;scroll-padding-left:var(--presenter-edge-space)}body.presenter-zoom-mode.focus-mode .lesson-slide,body.presenter-zoom-mode.fullscreen-mode .lesson-slide{max-width:none;max-height:none;scroll-snap-align:start}
 .handout-mode{padding:12px;background:#fff}.handout-mode .lesson-header,.handout-mode .presenter-tools{display:none}.handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:10mm}.handout-mode .lesson-slide{display:block!important;width:100%;height:auto;box-shadow:none;break-inside:avoid}.empty-state{display:grid;place-items:center;height:100%;color:#6b7f83}
 @media (max-width:760px){.presenter-tools{left:4px;right:4px;transform:none;scrollbar-width:thin}.presenter-tools::-webkit-scrollbar{display:block;height:6px}.presenter-tool{min-height:42px;padding:6px 8px;font-size:14px}.presenter-color{width:42px;height:42px}.presenter-size{width:96px;height:42px}}
+@media (max-width:560px){.presenter-dialog-backdrop{align-items:end;padding:12px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @page{size:16in 10in;margin:0}@media print{.lesson-header,.presenter-tools,.presenter-capability-note{display:none!important}.lesson-deck{display:block;padding:0}.lesson-slide{display:block!important;width:16in;height:10in;aspect-ratio:auto;border:0;box-shadow:none;break-after:page;page-break-after:always}.handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:6mm;padding:8mm}.handout-mode .lesson-slide{width:100%;height:auto;aspect-ratio:16/10;border:1px solid #555;break-after:auto;page-break-after:auto}}
 `;
@@ -468,6 +470,8 @@ function standaloneInteractionScript() {
     counts: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
     completedAt: "",
   };
+  const presenterNotifications = createPresenterNotifications();
+  window.__lessonPresenterNotifications = presenterNotifications;
 
   if (presenterConfig?.enabled) {
     if (pollButton) pollButton.hidden = false;
@@ -493,6 +497,136 @@ function standaloneInteractionScript() {
     } catch {
       return null;
     }
+  }
+
+  function createPresenterNotifications() {
+    const stack = document.createElement("div");
+    stack.className = "presenter-notification-stack";
+    stack.setAttribute("aria-label", "Presenter notifications");
+    document.body.appendChild(stack);
+    const dialogQueue = [];
+    let dialogOpen = false;
+    let dialogSequence = 0;
+
+    function notify(message, tone) {
+      const notification = document.createElement("div");
+      const effectiveTone = tone || "default";
+      notification.className = "presenter-notification " + effectiveTone;
+      notification.setAttribute("role", effectiveTone === "error" ? "alert" : "status");
+      const copy = document.createElement("span");
+      copy.textContent = String(message || "");
+      const close = document.createElement("button");
+      close.type = "button";
+      close.setAttribute("aria-label", "Dismiss notification");
+      close.textContent = "×";
+      close.addEventListener("click", () => notification.remove());
+      notification.append(copy, close);
+      stack.appendChild(notification);
+      if (effectiveTone === "success" || effectiveTone === "default") {
+        window.setTimeout(() => notification.remove(), 4000);
+      }
+    }
+
+    function enqueueDialog(options, noticeOnly) {
+      return new Promise((resolve) => {
+        dialogQueue.push({ options: options || {}, noticeOnly, resolve });
+        openNextDialog();
+      });
+    }
+
+    function openNextDialog() {
+      if (dialogOpen || !dialogQueue.length) return;
+      dialogOpen = true;
+      const request = dialogQueue[0];
+      const options = request.options;
+      const previousFocus = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      const backdrop = document.createElement("div");
+      backdrop.className = "presenter-dialog-backdrop";
+      const dialog = document.createElement("section");
+      dialogSequence += 1;
+      const titleId = "presenter-dialog-title-" + dialogSequence;
+      const descriptionId = "presenter-dialog-description-" + dialogSequence;
+      dialog.className = "presenter-dialog " + (options.tone || "default");
+      dialog.setAttribute("role", options.tone === "danger" ? "alertdialog" : "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      dialog.setAttribute("aria-labelledby", titleId);
+      dialog.setAttribute("aria-describedby", descriptionId);
+      dialog.tabIndex = -1;
+
+      const title = document.createElement("h2");
+      title.id = titleId;
+      title.textContent = options.title || "Lesson presenter";
+      const description = document.createElement("p");
+      description.id = descriptionId;
+      description.textContent = options.description || "";
+      const actions = document.createElement("div");
+      actions.className = "presenter-dialog-actions";
+      let cancel = null;
+      if (!request.noticeOnly) {
+        cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = options.cancelLabel || "Cancel";
+        actions.appendChild(cancel);
+      }
+      const confirm = document.createElement("button");
+      confirm.type = "button";
+      confirm.className = "primary";
+      confirm.textContent = options.confirmLabel || (request.noticeOnly ? "OK" : "Continue");
+      actions.appendChild(confirm);
+      dialog.append(title, description, actions);
+      backdrop.appendChild(dialog);
+      document.body.appendChild(backdrop);
+
+      function finish(result) {
+        document.removeEventListener("keydown", handleKeydown);
+        backdrop.remove();
+        dialogQueue.shift();
+        dialogOpen = false;
+        request.resolve(result);
+        if (previousFocus?.isConnected) previousFocus.focus();
+        openNextDialog();
+      }
+
+      function handleKeydown(event) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          finish(request.noticeOnly ? undefined : false);
+          return;
+        }
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(dialog.querySelectorAll("button:not([disabled])"));
+        if (!focusable.length) {
+          event.preventDefault();
+          dialog.focus();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+
+      cancel?.addEventListener("click", () => finish(false));
+      confirm.addEventListener("click", () => finish(request.noticeOnly ? undefined : true));
+      backdrop.addEventListener("mousedown", (event) => {
+        if (event.target === backdrop) finish(request.noticeOnly ? undefined : false);
+      });
+      document.addEventListener("keydown", handleKeydown);
+      (cancel || confirm).focus();
+    }
+
+    return {
+      notify,
+      confirm: (options) => enqueueDialog(options, false),
+      notice: (options) => enqueueDialog(options, true),
+    };
   }
 
   function refreshSlides() {
@@ -710,16 +844,20 @@ function standaloneInteractionScript() {
     const file = event?.target?.files?.[0];
     if (!file) return;
     if (!/^image\//i.test(file.type || "") && !/\.(png|jpe?g|webp|gif)$/i.test(file.name || "")) {
-      alert("Choose an image from the camera.");
+      presenterNotifications.notify("Choose an image from the camera.", "error");
       return;
     }
     if (cameraButton) cameraButton.disabled = true;
     try {
       const dataUrl = await downscaleCameraImage(file);
       addCameraSlide(dataUrl, file.name || "camera-photo.jpg");
+      presenterNotifications.notify("Camera photo added as a new slide.", "success");
     } catch (error) {
       console.error(error);
-      alert("Could not add the camera photo. Try taking the photo again.");
+      presenterNotifications.notify(
+        "Could not add the camera photo. Try taking the photo again.",
+        "error",
+      );
     } finally {
       if (cameraButton) cameraButton.disabled = false;
     }
@@ -733,7 +871,7 @@ function standaloneInteractionScript() {
     }
   }
 
-  function openPrintView() {
+  async function openPrintView() {
     if (!pdfButton) return;
     refreshSlides();
     if (!slides.length) return;
@@ -745,15 +883,24 @@ function standaloneInteractionScript() {
       const html = buildPresenterPrintHtml();
       const printWindow = window.open("", "_blank");
       if (!printWindow) {
-        alert("The browser blocked the print view. Allow pop-ups for this site and try again.");
+        await presenterNotifications.notice({
+          title: "Print view was blocked",
+          description: "Allow pop-ups for this site, then try opening the print view again.",
+          confirmLabel: "OK",
+          tone: "warning",
+        });
         return;
       }
       printWindow.document.open();
       printWindow.document.write(html);
       printWindow.document.close();
+      presenterNotifications.notify("Print view opened in a new window.", "success");
     } catch (error) {
       console.error(error);
-      alert(error?.message || "Could not open the print view.");
+      presenterNotifications.notify(
+        error?.message || "Could not open the print view.",
+        "error",
+      );
     } finally {
       pdfButton.disabled = false;
       pdfButton.removeAttribute("aria-busy");
@@ -1189,7 +1336,12 @@ function standaloneInteractionScript() {
       !presenterConfig.completeEndpoint ||
       !presenterConfig.taughtEndpoint
     ) {
-      alert("This lesson cannot save back to Lesson Builder.");
+      await presenterNotifications.notice({
+        title: "Save to Lesson Builder is unavailable",
+        description: "This lesson does not contain the connection details needed to save it back to Lesson Builder.",
+        confirmLabel: "OK",
+        tone: "warning",
+      });
       return null;
     }
     if (saveBuilderButton) {
@@ -1277,11 +1429,14 @@ function standaloneInteractionScript() {
         body: JSON.stringify({ id: presentedLessonId, taught: true }),
       });
       await readApiJson(taughtResponse, "Could not mark the lesson as taught.");
-      alert("Saved taught lesson to Lesson Builder.");
+      presenterNotifications.notify("Saved taught lesson to Lesson Builder.", "success");
       return completed?.lesson || null;
     } catch (error) {
       console.error(error);
-      alert(error?.message || "Could not save this taught lesson.");
+      presenterNotifications.notify(
+        error?.message || "Could not save this taught lesson.",
+        "error",
+      );
       throw error;
     } finally {
       if (saveBuilderButton) {
@@ -1392,7 +1547,12 @@ function standaloneInteractionScript() {
   async function uploadStudentSnapshot(options) {
     const silent = Boolean(options?.silent);
     if (!hasStudentSessionConfig()) {
-      alert("This presenter does not have a student sharing session.");
+      await presenterNotifications.notice({
+        title: "Student sharing is unavailable",
+        description: "This presenter does not have an active student sharing session.",
+        confirmLabel: "OK",
+        tone: "warning",
+      });
       return null;
     }
     if (studentUploadButton) {
@@ -1458,9 +1618,10 @@ function standaloneInteractionScript() {
           (presenterConfig.studentSession.viewerUrl || "/student");
       }
       if (!silent) {
-        alert(
+        presenterNotifications.notify(
           "Student view updated. Code: " +
             (presenterConfig.studentSession.code || ""),
+          "success",
         );
       }
       return completed;
@@ -1471,7 +1632,10 @@ function standaloneInteractionScript() {
           error?.message || "Could not publish the student view.";
       }
       if (!silent) {
-        alert(error?.message || "Could not upload the student view.");
+        presenterNotifications.notify(
+          error?.message || "Could not upload the student view.",
+          "error",
+        );
       }
       return null;
     } finally {

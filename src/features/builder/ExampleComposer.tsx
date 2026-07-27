@@ -9,6 +9,7 @@ import {
   type RetrievalLookupResult,
   uploadRetrievalImage,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
 import {
@@ -43,6 +44,7 @@ export function ExampleComposer() {
   const addSlides = useBuilderStore((state) => state.addSlides);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [lo, setLo] = useState("");
   const [spacingFactor, setSpacingFactor] = useState(1.3);
   const [image1, setImage1] = useState<BuilderAsset | null>(null);
@@ -165,13 +167,16 @@ export function ExampleComposer() {
       trimmedLo,
       document.className,
     );
-    if (
-      existing &&
-      !window.confirm(
-        "This LO already exists in the retrieval bank. Updating it will replace the spacing, last taught date, seen count, and any retrieval images you have added here. Continue?",
-      )
-    ) {
-      return;
+    if (existing) {
+      const approved = await confirmDialog({
+        title: "Replace the existing retrieval entry?",
+        description:
+          "This LO already exists. Updating it will replace its spacing, last-taught date, seen count, and retrieval images.",
+        confirmLabel: "Replace entry",
+        cancelLabel: "Keep existing entry",
+        tone: "warning",
+      });
+      if (!approved) return;
     }
 
     setIsSavingBank(true);

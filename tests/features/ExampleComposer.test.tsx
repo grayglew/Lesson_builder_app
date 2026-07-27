@@ -8,6 +8,7 @@ import {
   uploadRetrievalImage,
 } from "@/features/builder/api-client";
 import { ExampleComposer } from "@/features/builder/ExampleComposer";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import {
   createInitialBuilderDocument,
   type RetrievalItem,
@@ -130,9 +131,12 @@ describe("ExampleComposer", () => {
     useBuilderStore
       .getState()
       .updateGlobalData({ retrievalItems: [existing] });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
-    render(<ExampleComposer />);
+    render(
+      <AppNotificationsProvider>
+        <ExampleComposer />
+      </AppNotificationsProvider>,
+    );
 
     await user.type(
       screen.getByLabelText("Learning objective"),
@@ -146,6 +150,7 @@ describe("ExampleComposer", () => {
     await user.click(
       screen.getByRole("button", { name: "Add LO to retrieval bank" }),
     );
+    await user.click(screen.getByRole("button", { name: "Replace entry" }));
 
     await waitFor(() => expect(saveRetrievalItem).toHaveBeenCalledOnce());
     expect(saveRetrievalItem).toHaveBeenCalledWith(

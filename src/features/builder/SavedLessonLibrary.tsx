@@ -35,6 +35,7 @@ import {
   setSavedLessonTaught,
   updateSavedLessonMetadata,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import { ConfidenceModal } from "./ConfidenceModal";
 import {
   buildPowerPointBundleZip,
@@ -67,6 +68,7 @@ export function SavedLessonLibrary({
   );
   const clearActiveLesson = useBuilderStore((state) => state.clearActiveLesson);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog, promptDialog } = useAppNotifications();
   const [lessons, setLessons] = useState<SavedLessonSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
@@ -184,13 +186,15 @@ export function SavedLessonLibrary({
   }
 
   async function openLessonById(lesson: SavedLessonSummary) {
-    if (
-      isLessonDirty(document) &&
-      !window.confirm(
-        `Open "${lesson.title}"? Unsaved changes in the current v2 workspace will be replaced.`,
-      )
-    ) {
-      return;
+    if (isLessonDirty(document)) {
+      const approved = await confirmDialog({
+        title: `Open "${lesson.title}"?`,
+        description: "Unsaved changes in the current workspace will be replaced.",
+        confirmLabel: "Open lesson",
+        cancelLabel: "Keep current lesson",
+        tone: "warning",
+      });
+      if (!approved) return;
     }
     setBusyId(lesson.id);
     setStatus({ tone: "working", message: `Opening "${lesson.title}"…` });
@@ -295,7 +299,14 @@ export function SavedLessonLibrary({
   }
 
   async function changeClass(lesson: SavedLessonSummary) {
-    const entered = window.prompt("Class", lesson.className);
+    const entered = await promptDialog({
+      title: "Change lesson class",
+      description: `Move "${lesson.title}" to a different class.`,
+      inputLabel: "Class",
+      initialValue: lesson.className,
+      confirmLabel: "Update class",
+      required: true,
+    });
     if (entered === null) return;
     const className = entered.trim();
     if (!className) {
@@ -321,7 +332,14 @@ export function SavedLessonLibrary({
   }
 
   async function renameLesson(lesson: SavedLessonSummary) {
-    const entered = window.prompt("Lesson title", lesson.title);
+    const entered = await promptDialog({
+      title: "Rename lesson",
+      description: "Enter the new title for this saved lesson.",
+      inputLabel: "Lesson title",
+      initialValue: lesson.title,
+      confirmLabel: "Rename lesson",
+      required: true,
+    });
     if (entered === null) return;
     const title = entered.trim();
     if (!title) {
@@ -362,9 +380,15 @@ export function SavedLessonLibrary({
   }
 
   async function removeLesson(lesson: SavedLessonSummary) {
-    if (!window.confirm(`Delete "${lesson.title}" from the saved lesson library?`)) {
-      return;
-    }
+    const approved = await confirmDialog({
+      title: `Delete "${lesson.title}"?`,
+      description:
+        "The saved lesson will be removed from the library. The slides currently open in the builder will remain.",
+      confirmLabel: "Delete lesson",
+      cancelLabel: "Keep lesson",
+      tone: "danger",
+    });
+    if (!approved) return;
     await mutateLesson(lesson.id, async () => {
       await deleteSavedLesson(lesson.id);
       setLessons((current) => current.filter((entry) => entry.id !== lesson.id));

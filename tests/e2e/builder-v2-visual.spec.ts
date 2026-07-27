@@ -555,7 +555,6 @@ test.describe("Builder accepted UI baseline", () => {
     await expect(presenter.locator("[data-live-retrieval-next]").first()).toHaveText(
       "Loaded",
     );
-    presenter.on("dialog", (dialog) => void dialog.accept());
     await presenter.getByRole("button", { name: "Save to Builder" }).click();
     await expect.poll(() => liveApiRequests).toContain(
       "http://127.0.0.1:3100/api/builder-lessons/taught",
@@ -563,6 +562,11 @@ test.describe("Builder accepted UI baseline", () => {
     await expect(
       presenter.getByRole("button", { name: "Save to Builder" }),
     ).toBeEnabled();
+    await expect(
+      presenter.locator(".presenter-notification", {
+        hasText: "Saved taught lesson to Lesson Builder.",
+      }),
+    ).toBeVisible();
     await expect(presenter.getByText("Student code: ABC-123")).toBeVisible();
     await presenter.getByRole("button", { name: "Update students" }).click();
     await expect.poll(() => liveApiRequests).toContain(
@@ -571,6 +575,11 @@ test.describe("Builder accepted UI baseline", () => {
     await expect(
       presenter.getByRole("button", { name: "Update students" }),
     ).toBeEnabled();
+    await expect(
+      presenter.locator(".presenter-notification", {
+        hasText: "Student view updated.",
+      }),
+    ).toBeVisible();
     await expect(
       presenter.getByRole("button", { name: "Previous slide" }),
     ).toHaveCount(0);

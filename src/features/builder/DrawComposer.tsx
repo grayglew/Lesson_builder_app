@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import styles from "./DrawComposer.module.css";
+import { useAppNotifications } from "./AppNotifications";
 import {
   DRAWING_RESOLUTIONS,
   type DrawingResolution,
@@ -36,6 +37,7 @@ export function DrawComposer() {
   const activeStrokeRef = useRef<DrawingStroke | null>(null);
   const addSlides = useBuilderStore((state) => state.addSlides);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
   const [mode, setMode] = useState<DrawingStroke["mode"]>("pen");
   const [color, setColor] = useState("#2563eb");
@@ -106,8 +108,17 @@ export function DrawComposer() {
     setStatus({ tone: "success", message: "Undid the last stroke." });
   }
 
-  function clearDrawing() {
-    if (strokes.length && !window.confirm("Clear the drawing canvas?")) return;
+  async function clearDrawing() {
+    if (strokes.length) {
+      const approved = await confirmDialog({
+        title: "Clear the drawing canvas?",
+        description: "All strokes on the current drawing canvas will be removed.",
+        confirmLabel: "Clear canvas",
+        cancelLabel: "Keep drawing",
+        tone: "danger",
+      });
+      if (!approved) return;
+    }
     activeStrokeRef.current = null;
     setStrokes([]);
     setStatus({ tone: "success", message: "Cleared the drawing canvas." });
@@ -172,7 +183,7 @@ export function DrawComposer() {
           <button
             className={`${styles.dangerButton} ${styles.compactButton}`}
             type="button"
-            onClick={clearDrawing}
+            onClick={() => void clearDrawing()}
           >
             <Trash2 size={15} aria-hidden />
             Clear

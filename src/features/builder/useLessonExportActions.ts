@@ -1,6 +1,7 @@
 "use client";
 
 import { useBuilderStore } from "./store";
+import { useAppNotifications } from "./AppNotifications";
 import {
   createPresenterStudentSession,
   downloadPresenterPdf,
@@ -27,6 +28,7 @@ export function useLessonExportActions() {
   const hydrate = useBuilderStore((state) => state.hydrate);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
 
   async function previewLesson(handout = false) {
     const previewWindow = window.open("", "_blank");
@@ -168,7 +170,7 @@ export function useLessonExportActions() {
   async function importJson(file: File) {
     try {
       const input = JSON.parse(await file.text());
-      if (!replaceDocument(normalizeImportedBuilderDocument(input, document))) {
+      if (!(await replaceDocument(normalizeImportedBuilderDocument(input, document)))) {
         return;
       }
       setStatus({ tone: "success", message: "Imported lesson JSON." });
@@ -196,7 +198,7 @@ export function useLessonExportActions() {
         },
         document,
       );
-      if (!replaceDocument(importedLesson)) return;
+      if (!(await replaceDocument(importedLesson))) return;
       setStatus({
         tone: "success",
         message: `Imported ${imported.slides.length} slide${imported.slides.length === 1 ? "" : "s"} from HTML.`,
@@ -209,14 +211,17 @@ export function useLessonExportActions() {
     }
   }
 
-  function replaceDocument(nextDocument: unknown) {
-    if (
-      document.slides.length &&
-      !window.confirm(
-        "Import this file and replace the current lesson? Shared builder data is preserved unless it is explicitly included in the imported file.",
-      )
-    ) {
-      return false;
+  async function replaceDocument(nextDocument: unknown) {
+    if (document.slides.length) {
+      const approved = await confirmDialog({
+        title: "Import and replace the current lesson?",
+        description:
+          "The current lesson will be replaced. Shared builder data is preserved unless it is explicitly included in the imported file.",
+        confirmLabel: "Import lesson",
+        cancelLabel: "Keep current lesson",
+        tone: "warning",
+      });
+      if (!approved) return false;
     }
     hydrate(nextDocument);
     return true;

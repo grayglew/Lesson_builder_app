@@ -6,6 +6,7 @@ import {
   logRetrievalItems,
   resolveRetrievalImages,
 } from "@/features/builder/api-client";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import { RetrievalComposer } from "@/features/builder/RetrievalComposer";
 import {
   createInitialBuilderDocument,
@@ -149,6 +150,54 @@ describe("RetrievalComposer", () => {
         expect.objectContaining({
           seenCount: 2,
           lastTaught: "2026-07-18",
+        }),
+      );
+    });
+  });
+
+  it("rolls selected progress and the taught date back after confirmation", async () => {
+    const user = userEvent.setup();
+    vi.mocked(logRetrievalItems).mockResolvedValue([
+      {
+        id: "319874a0-2e50-4aa2-86df-1dc1f7af815f",
+        seenCount: 7,
+        lastTaught: "2026-06-11",
+      },
+    ]);
+    useBuilderStore.getState().updateGlobalData({
+      retrievalItems: useBuilderStore
+        .getState()
+        .document.retrievalItems.map((item, index) => ({
+          ...item,
+          selected: index === 1,
+        })),
+    });
+    render(
+      <AppNotificationsProvider>
+        <RetrievalComposer />
+      </AppNotificationsProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Roll back selected" }));
+    expect(logRetrievalItems).not.toHaveBeenCalled();
+    await user.click(
+      screen.getAllByRole("button", { name: "Roll back selected" })[1],
+    );
+
+    await waitFor(() => {
+      expect(logRetrievalItems).toHaveBeenCalledWith([
+        {
+          className: "Year 9",
+          itemId: "319874a0-2e50-4aa2-86df-1dc1f7af815f",
+          lo: "102a: Factorise",
+          teachingDate: "2026-07-18",
+          deltaSeen: -1,
+        },
+      ]);
+      expect(useBuilderStore.getState().document.retrievalItems[1]).toEqual(
+        expect.objectContaining({
+          seenCount: 7,
+          lastTaught: "2026-06-11",
         }),
       );
     });

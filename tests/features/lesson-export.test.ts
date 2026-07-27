@@ -77,6 +77,15 @@ describe("standalone lesson export", () => {
     expect(html).toContain(".lesson-slide:last-child{break-after:auto");
     expect(html).toContain("function waitForImages()");
     expect(html).toContain("window.print();},350");
+    expect(html).toContain('className = "presenter-notification-stack"');
+    expect(html).toContain(
+      'setAttribute("role", effectiveTone === "error" ? "alert" : "status")',
+    );
+    expect(html).toContain(
+      "window.__lessonPresenterNotifications = presenterNotifications",
+    );
+    expect(html).not.toMatch(/window\.(?:alert|confirm|prompt)\s*\(/);
+    expect(html).not.toMatch(/(^|[^.\w])alert\s*\(/m);
   });
 
   it("explains which controls require the hosted presenter in downloaded HTML", () => {

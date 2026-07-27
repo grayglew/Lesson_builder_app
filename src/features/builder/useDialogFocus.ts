@@ -15,6 +15,11 @@ const focusableSelector = [
 export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
   const dialogRef = useRef<T>(null);
   const onCloseRef = useRef(onClose);
+  const previousFocusRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -23,11 +28,7 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+    const previousFocus = previousFocusRef.current;
 
     function focusableElements() {
       return Array.from(

@@ -11,7 +11,9 @@ import {
   saveCurrentLesson,
   syncBuilderDocument,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import styles from "./BuilderShell.module.css";
+import { BuilderStatusToast } from "./BuilderStatusToast";
 import { CfuComposer } from "./CfuComposer";
 import { DrawComposer } from "./DrawComposer";
 import { ExampleComposer } from "./ExampleComposer";
@@ -98,7 +100,6 @@ export function BuilderShell({
     (state) => state.selectedPreviewSlideIds,
   );
   const hydrated = useBuilderStore((state) => state.hydrated);
-  const status = useBuilderStore((state) => state.status);
   const hydrate = useBuilderStore((state) => state.hydrate);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const reset = useBuilderStore((state) => state.reset);
@@ -111,6 +112,7 @@ export function BuilderShell({
   const moveSlide = useBuilderStore((state) => state.moveSlide);
   const removeSlide = useBuilderStore((state) => state.removeSlide);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog, promptDialog } = useAppNotifications();
   const [activeTool, setActiveTool] = useState<ToolName>("starter");
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [busyAction, setBusyAction] = useState("");
@@ -231,7 +233,13 @@ export function BuilderShell({
   }
 
   async function addClass() {
-    const entered = window.prompt("Class name", "");
+    const entered = await promptDialog({
+      title: "Add a class",
+      description: "Enter the class name to add to Lesson Builder.",
+      inputLabel: "Class name",
+      confirmLabel: "Add class",
+      required: true,
+    });
     if (entered === null) return;
     const className = entered.trim();
     if (!className) return;
@@ -254,7 +262,14 @@ export function BuilderShell({
   async function renameSelectedClass() {
     const currentName = document.className.trim();
     if (!currentName) return;
-    const entered = window.prompt("Rename class", currentName);
+    const entered = await promptDialog({
+      title: "Rename class",
+      description: `Choose a new name for "${currentName}".`,
+      inputLabel: "Class name",
+      initialValue: currentName,
+      confirmLabel: "Rename class",
+      required: true,
+    });
     if (entered === null) return;
     const nextName = entered.replace(/\s+/g, " ").trim();
     if (!nextName || nextName === currentName) return;
@@ -281,11 +296,15 @@ export function BuilderShell({
   async function deleteSelectedClass() {
     const className = document.className.trim();
     if (!className) return;
-    if (
-      !window.confirm(
-        `Delete class "${className}"? Its retrieval schedule will be archived. Saved lessons will be kept.`,
-      )
-    ) {
+    const approved = await confirmDialog({
+      title: `Delete ${className}?`,
+      description:
+        "Its retrieval schedule will be archived. Saved lessons will be kept.",
+      confirmLabel: "Delete class",
+      cancelLabel: "Keep class",
+      tone: "danger",
+    });
+    if (!approved) {
       return;
     }
 
@@ -305,12 +324,15 @@ export function BuilderShell({
     }
   }
 
-  function resetCurrentLesson() {
-    if (
-      window.confirm(
-        "Start a new lesson? Unsaved changes in the current workspace will be replaced.",
-      )
-    ) {
+  async function resetCurrentLesson() {
+    const approved = await confirmDialog({
+      title: "Start a new lesson?",
+      description: "Unsaved changes in the current workspace will be replaced.",
+      confirmLabel: "Start new lesson",
+      cancelLabel: "Keep current lesson",
+      tone: "warning",
+    });
+    if (approved) {
       reset();
       setActiveTool("starter");
     }
@@ -694,7 +716,7 @@ export function BuilderShell({
                 type="button"
                 aria-label="Reset lesson"
                 title="Reset lesson"
-                onClick={resetCurrentLesson}
+                onClick={() => void resetCurrentLesson()}
               >
                 ↺
               </button>
@@ -785,16 +807,7 @@ export function BuilderShell({
         />
       ) : null}
 
-      <div
-        className={`${styles.notificationToast} ${styles[status.tone]}`}
-        role="status"
-        aria-live="polite"
-      >
-        {status.tone === "working" ? (
-          <LoaderCircle aria-hidden className={styles.toastSpinner} />
-        ) : null}
-        {status.message}
-      </div>
+      <BuilderStatusToast />
     </main>
   );
 }

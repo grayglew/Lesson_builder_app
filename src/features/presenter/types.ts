@@ -49,7 +49,9 @@ export interface PresenterRuntimeOptions {
   initialColor?: string;
   initialSize?: number;
   initialAnnotations?: PresenterAnnotations;
-  confirmClear?: (annotations: PresenterAnnotations) => boolean;
+  confirmClear?: (
+    annotations: PresenterAnnotations,
+  ) => boolean | Promise<boolean>;
   onAnnotationsChange?: (annotations: PresenterAnnotations) => void;
   onPinchZoom?: (scale: number, clientPoint: PresenterPoint) => void;
 }
@@ -89,9 +91,20 @@ export interface LessonPresenterRuntimeGlobal {
   PRESENTER_RUNTIME_VERSION: string;
 }
 
+export interface LessonPresenterNotifications {
+  confirm(options: {
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    tone?: "default" | "warning" | "danger";
+  }): Promise<boolean>;
+}
+
 declare global {
   interface Window {
     LessonPresenterRuntime?: LessonPresenterRuntimeGlobal;
     __lessonPresenterRuntimeController?: PresenterRuntimeController;
+    __lessonPresenterNotifications?: LessonPresenterNotifications;
   }
 }

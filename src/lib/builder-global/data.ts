@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PRESENTER_SIGNED_URL_SECONDS } from "@/lib/builder-sync/signed-url-expiry";
+import { rollbackRetrievalLastTaught } from "@/lib/retrieval-schedule";
 
 export const DEFAULT_SLIDE_TEMPLATES = [
   {
@@ -535,10 +536,22 @@ export async function logRetrievalBatchData(
       className,
       teachingDate,
     });
-    const nextSeen = Math.max(0, Math.round(Number(item.seen_count) || 0) + (Number(entry.deltaSeen) < 0 ? -1 : 1));
+    const isRollback = Number(entry.deltaSeen) < 0;
+    const nextSeen = Math.max(
+      0,
+      Math.round(Number(item.seen_count) || 0) + (isRollback ? -1 : 1),
+    );
+    const nextLastTaught = isRollback
+      ? rollbackRetrievalLastTaught(
+          item.last_taught,
+          item.spacing_factor,
+          nextSeen,
+          teachingDate,
+        )
+      : teachingDate;
     const { data, error } = await supabase
       .from("retrieval_class_progress")
-      .update({ seen_count: nextSeen, last_taught: teachingDate })
+      .update({ seen_count: nextSeen, last_taught: nextLastTaught })
       .eq("owner_id", userId)
       .eq("id", item.id)
       .select(RETRIEVAL_PROGRESS_SELECT)

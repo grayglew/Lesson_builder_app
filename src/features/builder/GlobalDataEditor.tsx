@@ -18,6 +18,7 @@ import {
   saveRetrievalItem,
   saveSlideTemplates,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import {
   type RetrievalItem,
   type SlideTemplate,
@@ -53,6 +54,7 @@ export function GlobalDataEditor({
     (state) => state.insertTemplateSlide,
   );
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [view, setView] = useState<DataView>(initialView);
   const [busy, setBusy] = useState(false);
   const [classText, setClassText] = useState(document.classNames.join("\n"));
@@ -151,7 +153,14 @@ export function GlobalDataEditor({
       (item) => item.id === retrievalDraft.id,
     );
     if (!existing) return;
-    if (!window.confirm(`Archive "${existing.lo}" from the retrieval bank?`)) {
+    const approved = await confirmDialog({
+      title: "Archive this learning objective?",
+      description: `"${existing.lo}" will be removed from the active retrieval bank.`,
+      confirmLabel: "Archive LO",
+      cancelLabel: "Keep LO",
+      tone: "danger",
+    });
+    if (!approved) {
       return;
     }
     setBusy(true);
@@ -232,9 +241,16 @@ export function GlobalDataEditor({
     );
   }
 
-  function deleteTemplate() {
+  async function deleteTemplate() {
     if (!activeTemplate) return;
-    if (!window.confirm(`Remove "${activeTemplate.title}" from the draft template list?`)) {
+    const approved = await confirmDialog({
+      title: "Remove this draft template?",
+      description: `"${activeTemplate.title}" will be removed from the draft list.`,
+      confirmLabel: "Remove template",
+      cancelLabel: "Keep template",
+      tone: "danger",
+    });
+    if (!approved) {
       return;
     }
     const next = templates.filter((template) => template.id !== activeTemplate.id);
@@ -389,7 +405,7 @@ export function GlobalDataEditor({
                     </label>
                   </div>
                   <div className="mt-5 flex flex-wrap justify-between gap-2">
-                    <button className="danger-action" type="button" onClick={deleteTemplate}>
+                    <button className="danger-action" type="button" onClick={() => void deleteTemplate()}>
                       <Trash2 className="size-4" aria-hidden />
                       Remove from draft
                     </button>

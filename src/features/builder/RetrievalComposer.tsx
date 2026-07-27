@@ -11,6 +11,7 @@ import {
   saveRetrievalItem,
   uploadRetrievalImage,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
 import { useDialogFocus } from "./useDialogFocus";
@@ -54,6 +55,7 @@ export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const addSlides = useBuilderStore((state) => state.addSlides);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [editor, setEditor] = useState<RetrievalEditorState | null>(null);
   const [busyAction, setBusyAction] = useState("");
 
@@ -258,7 +260,14 @@ export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean
   }
 
   async function archiveItem(item: RetrievalItem) {
-    if (!window.confirm(`Archive "${item.lo}" from the retrieval bank?`)) return;
+    const approved = await confirmDialog({
+      title: "Archive this learning objective?",
+      description: `"${item.lo}" will be removed from the active retrieval bank.`,
+      confirmLabel: "Archive LO",
+      cancelLabel: "Keep LO",
+      tone: "danger",
+    });
+    if (!approved) return;
     setBusyAction(`archive-${item.id}`);
     try {
       await archiveRetrievalItem(item.id);
@@ -470,6 +479,68 @@ export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean
     }
   }
 
+  async function rollbackSelected() {
+    const rollbackItems = selectedItems.filter((item) => item.seenCount > 0);
+    if (!rollbackItems.length) {
+      setStatus({
+        tone: "error",
+        message: "Select at least one retrieval item with a seen count above zero.",
+      });
+      return;
+    }
+    const approved = await confirmDialog({
+      title: `Roll back ${rollbackItems.length} retrieval item${rollbackItems.length === 1 ? "" : "s"}?`,
+      description:
+        "Each selected LO will have its seen count reduced by one and its last-taught date moved back by the matching spacing interval.",
+      confirmLabel: "Roll back selected",
+      cancelLabel: "Keep progress",
+      tone: "warning",
+    });
+    if (!approved) return;
+
+    setBusyAction("rollback");
+    setStatus({ tone: "working", message: "Rolling back selected retrieval..." });
+    try {
+      const results = await logRetrievalItems(
+        rollbackItems.map((item) => ({
+          itemId: item.id,
+          lo: item.lo,
+          className: item.className || document.className,
+          teachingDate: document.teachingDate,
+          deltaSeen: -1,
+        })),
+      );
+      const progressById = new Map(results.map((result) => [result.id, result]));
+      replaceItems(
+        document.retrievalItems.map((item) => {
+          const progress = progressById.get(item.id);
+          if (!progress) return item;
+          return {
+            ...item,
+            seenCount:
+              progress.seenCount ?? progress.seen_count ?? item.seenCount,
+            lastTaught:
+              progress.lastTaught ?? progress.last_taught ?? item.lastTaught,
+          };
+        }),
+      );
+      setStatus({
+        tone: "success",
+        message: `Rolled back ${rollbackItems.length} selected retrieval item${rollbackItems.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(
+          error,
+          "Could not roll back the selected retrieval items.",
+        ),
+      });
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   async function updateDatabase() {
     if (!visibleItems.length) {
       setStatus({ tone: "warning", message: "No retrieval items are visible." });
@@ -560,6 +631,14 @@ export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean
             onClick={() => void logSelected()}
           >
             Log selected
+          </button>
+          <button
+            className={`${styles.secondaryButton} ${styles.compactButton}`}
+            type="button"
+            disabled={Boolean(busyAction)}
+            onClick={() => void rollbackSelected()}
+          >
+            Roll back selected
           </button>
           <button
             className={`${styles.secondaryButton} ${styles.compactButton}`}

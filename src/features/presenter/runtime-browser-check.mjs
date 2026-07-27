@@ -65,6 +65,17 @@ try {
     <script type="application/json" id="lesson-annotations-data">{}</script>
   `);
   await page.addStyleTag({ path: cssPath });
+  await page.evaluate(() => {
+    window.__presenterConfirmCalls = 0;
+    window.__lessonPresenterNotifications = {
+      confirm: () => {
+        window.__presenterConfirmCalls += 1;
+        return new Promise((resolveConfirmation) => {
+          window.setTimeout(() => resolveConfirmation(true), 25);
+        });
+      },
+    };
+  });
   await page.addScriptTag({ path: runtimePath });
 
   const result = await page.evaluate(() => {
@@ -260,6 +271,28 @@ try {
   );
   assert(result.undoWorked, "Undo must report a completed action.");
   assert(result.strokeCountAfterUndo === 2, "Undo must remove the latest stroke.");
+  const clearResult = await page.evaluate(async () => {
+    const clearButton = document.getElementById("presenter-clear");
+    clearButton.click();
+    clearButton.click();
+    await new Promise((resolveConfirmation) =>
+      window.setTimeout(resolveConfirmation, 60),
+    );
+    return {
+      confirmationCalls: window.__presenterConfirmCalls,
+      remainingStrokes: Object.values(
+        window.__lessonPresenterRuntimeController.getAnnotations(),
+      ).reduce((total, strokes) => total + strokes.length, 0),
+    };
+  });
+  assert(
+    clearResult.confirmationCalls === 1,
+    "Repeated Clear clicks must share one pending confirmation.",
+  );
+  assert(
+    clearResult.remainingStrokes === 0,
+    "Accepted asynchronous confirmation must clear annotations.",
+  );
   console.log("Extracted presenter runtime browser checks passed.");
 } finally {
   await browser.close();

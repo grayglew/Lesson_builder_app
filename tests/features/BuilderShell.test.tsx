@@ -8,6 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BuilderShell } from "@/features/builder/BuilderShell";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import {
   archiveClassName,
   loadBuilderDocument,
@@ -344,16 +345,32 @@ describe("BuilderShell legacy UI parity", () => {
       slideTemplates: [],
       updatedAt: "2026-07-18T08:00:00.000Z",
     });
-    vi.spyOn(window, "prompt").mockReturnValue("Year 9 Maths");
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-
-    render(<BuilderShell userEmail="teacher@example.com" />);
+    render(
+      <AppNotificationsProvider>
+        <BuilderShell userEmail="teacher@example.com" />
+      </AppNotificationsProvider>,
+    );
     await user.click(screen.getByRole("button", { name: "Rename class" }));
+    const renameDialog = screen.getByRole("dialog", { name: "Rename class" });
+    const classNameInput = within(renameDialog).getByRole("textbox", {
+      name: "Class name",
+    });
+    await user.clear(classNameInput);
+    await user.type(classNameInput, "Year 9 Maths");
+    await user.click(
+      within(renameDialog).getByRole("button", { name: "Rename class" }),
+    );
 
     await waitFor(() => expect(renameClassName).toHaveBeenCalledWith("Year 9", "Year 9 Maths"));
     expect(screen.getByLabelText("Class")).toHaveValue("Year 9 Maths");
 
     await user.click(screen.getByRole("button", { name: "Delete class" }));
+    const deleteDialog = screen.getByRole("alertdialog", {
+      name: "Delete Year 9 Maths?",
+    });
+    await user.click(
+      within(deleteDialog).getByRole("button", { name: "Delete class" }),
+    );
     await waitFor(() => expect(archiveClassName).toHaveBeenCalledWith("Year 9 Maths"));
     expect(screen.getByLabelText("Class")).toHaveValue("");
   });

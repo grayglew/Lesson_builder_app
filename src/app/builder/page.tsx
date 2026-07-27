@@ -4,6 +4,7 @@ import {
   resolveEffectiveUser,
 } from "@/lib/auth/app-users";
 import { BuilderShell } from "@/features/builder/BuilderShell";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,11 @@ export default async function BuilderPage({
 }) {
   const { visual } = await searchParams;
   if (process.env.BUILDER_VISUAL_TEST === "1" && visual === "1") {
-    return <BuilderShell userEmail="teacher@example.com" />;
+    return (
+      <AppNotificationsProvider>
+        <BuilderShell userEmail="teacher@example.com" />
+      </AppNotificationsProvider>
+    );
   }
 
   const context = await getAuthorizedAppContext();
@@ -23,14 +28,16 @@ export default async function BuilderPage({
   const effective = await resolveEffectiveUser(context);
 
   return (
-    <BuilderShell
-      actorEmail={context.actorUser.email || context.actorProfile.email}
-      isImpersonating={effective.isImpersonating}
-      userEmail={
-        effective.effectiveUser.email ||
-        context.actorUser.email ||
-        context.actorProfile.email
-      }
-    />
+    <AppNotificationsProvider>
+      <BuilderShell
+        actorEmail={context.actorUser.email || context.actorProfile.email}
+        isImpersonating={effective.isImpersonating}
+        userEmail={
+          effective.effectiveUser.email ||
+          context.actorUser.email ||
+          context.actorProfile.email
+        }
+      />
+    </AppNotificationsProvider>
   );
 }
