@@ -104,6 +104,17 @@ describe("builder store slide insertion", () => {
     });
     expect((inserted as { bullets: string[] }).bullets).not.toBe(template.bullets);
   });
+
+  it("appends a new slide when no slide has been selected", () => {
+    useBuilderStore.getState().addPlaceholderSlide("Appended content");
+
+    const slides = useBuilderStore.getState().document.slides;
+    expect(slides.map((slide) => slide.title)).toEqual([
+      "Before",
+      "After",
+      "Placeholder",
+    ]);
+  });
 });
 
 function baseDocument(): BuilderDocument {

@@ -49,7 +49,7 @@ type RetrievalEditorState = {
   answers: ImageDraft[];
 };
 
-export function RetrievalComposer() {
+export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean }) {
   const document = useBuilderStore(selectDocument);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const addSlides = useBuilderStore((state) => state.addSlides);
@@ -699,7 +699,9 @@ export function RetrievalComposer() {
             {!visibleItems.length ? (
               <tr>
                 <td colSpan={8}>
-                  <div className={styles.emptyTableState}>No retrieval items yet.</div>
+                  <div className={styles.emptyTableState} aria-live="polite">
+                    {refreshing ? "Refreshing retrieval items..." : "No retrieval items yet."}
+                  </div>
                 </td>
               </tr>
             ) : null}

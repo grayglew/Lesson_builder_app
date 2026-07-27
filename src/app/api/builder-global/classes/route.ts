@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedBuilderSyncClient } from "@/lib/builder-sync/auth";
-import { saveClassNamesData } from "@/lib/builder-global/data";
+import {
+  BuilderClassError,
+  archiveClassData,
+  renameClassData,
+  saveClassNamesData,
+} from "@/lib/builder-global/data";
 
 export async function POST(request: Request) {
   const auth = await getAuthorizedBuilderSyncClient();
@@ -20,4 +25,42 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+export async function PATCH(request: Request) {
+  const auth = await getAuthorizedBuilderSyncClient();
+  if ("response" in auth) return auth.response;
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  try {
+    const state = await renameClassData(
+      auth.supabase,
+      auth.user.id,
+      body.currentName,
+      body.nextName,
+    );
+    return NextResponse.json({ ok: true, state });
+  } catch (error) {
+    return classErrorResponse(error, "Could not rename the class.");
+  }
+}
+
+export async function DELETE(request: Request) {
+  const auth = await getAuthorizedBuilderSyncClient();
+  if ("response" in auth) return auth.response;
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  try {
+    const state = await archiveClassData(auth.supabase, auth.user.id, body.className);
+    return NextResponse.json({ ok: true, state });
+  } catch (error) {
+    return classErrorResponse(error, "Could not delete the class.");
+  }
+}
+
+function classErrorResponse(error: unknown, fallback: string) {
+  return NextResponse.json(
+    { ok: false, error: error instanceof Error ? error.message : fallback },
+    { status: error instanceof BuilderClassError ? error.status : 500 },
+  );
 }

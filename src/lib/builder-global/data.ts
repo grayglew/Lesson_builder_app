@@ -2,8 +2,6 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PRESENTER_SIGNED_URL_SECONDS } from "@/lib/builder-sync/signed-url-expiry";
 
-export const DEFAULT_BUILDER_CLASSES = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11", "Year 12", "Year 13"];
-
 export const DEFAULT_SLIDE_TEMPLATES = [
   {
     id: "template_start_expectations",
@@ -289,7 +287,6 @@ async function loadBuilderGlobalDataInternal(
   const classNames = uniqueStrings([
     ...((classes || []) as ClassRow[]).map((entry) => entry.name),
     ...retrievalItems.map((item) => item.className || ""),
-    ...DEFAULT_BUILDER_CLASSES,
   ]);
 
   const slideTemplates = normalizeTemplates((templates || []) as SlideTemplateRow[]);
@@ -385,8 +382,97 @@ export async function saveBuilderGlobalData(supabase: SupabaseClient, userId: st
 }
 
 export async function saveClassNamesData(supabase: SupabaseClient, userId: string, classNames: unknown[]) {
-  const names = uniqueStrings([...arrayOfStrings(classNames), ...DEFAULT_BUILDER_CLASSES]);
+  const names = uniqueStrings(arrayOfStrings(classNames));
   await upsertClasses(supabase, userId, names);
+  return loadBuilderGlobalBootstrapData(supabase, userId);
+}
+
+export class BuilderClassError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "BuilderClassError";
+  }
+}
+
+export async function renameClassData(
+  supabase: SupabaseClient,
+  userId: string,
+  currentNameInput: unknown,
+  nextNameInput: unknown,
+) {
+  const currentName = normalizeClassName(currentNameInput);
+  const nextName = normalizeClassName(nextNameInput);
+  if (!currentName || !nextName) {
+    throw new BuilderClassError("Current and new class names are required.", 400);
+  }
+  if (currentName === nextName) {
+    return loadBuilderGlobalBootstrapData(supabase, userId);
+  }
+
+  const classes = await loadActiveClasses(supabase, userId);
+  const source = classes.find((row) => normalizeBuilderKey(row.name) === normalizeBuilderKey(currentName));
+  if (!source) throw new BuilderClassError(`Class "${currentName}" was not found.`, 404);
+  if (classes.some((row) => row.id !== source.id && normalizeBuilderKey(row.name) === normalizeBuilderKey(nextName))) {
+    throw new BuilderClassError(`Class "${nextName}" already exists.`, 409);
+  }
+
+  const { error: classError } = await supabase
+    .from("classes")
+    .update({ name: nextName })
+    .eq("owner_id", userId)
+    .eq("id", source.id)
+    .is("archived_at", null);
+  if (classError) throw classError;
+
+  try {
+    await updateClassLabel(supabase, "retrieval_class_progress", userId, source.name, nextName);
+    await updateClassLabel(supabase, "builder_lessons", userId, source.name, nextName);
+  } catch (error) {
+    await supabase.from("classes").update({ name: source.name }).eq("owner_id", userId).eq("id", source.id);
+    await updateClassLabel(supabase, "retrieval_class_progress", userId, nextName, source.name).catch(() => undefined);
+    await updateClassLabel(supabase, "builder_lessons", userId, nextName, source.name).catch(() => undefined);
+    throw error;
+  }
+
+  return loadBuilderGlobalBootstrapData(supabase, userId);
+}
+
+export async function archiveClassData(
+  supabase: SupabaseClient,
+  userId: string,
+  classNameInput: unknown,
+) {
+  const className = normalizeClassName(classNameInput);
+  if (!className) throw new BuilderClassError("Class name is required.", 400);
+  const classes = await loadActiveClasses(supabase, userId);
+  const source = classes.find((row) => normalizeBuilderKey(row.name) === normalizeBuilderKey(className));
+  if (!source) throw new BuilderClassError(`Class "${className}" was not found.`, 404);
+
+  const archivedAt = new Date().toISOString();
+  const { error: progressError } = await supabase
+    .from("retrieval_class_progress")
+    .update({ archived_at: archivedAt })
+    .eq("owner_id", userId)
+    .eq("class_name", source.name)
+    .is("archived_at", null);
+  if (progressError) throw progressError;
+
+  const { error: classError } = await supabase
+    .from("classes")
+    .update({ archived_at: archivedAt })
+    .eq("owner_id", userId)
+    .eq("id", source.id)
+    .is("archived_at", null);
+  if (classError) {
+    await supabase
+      .from("retrieval_class_progress")
+      .update({ archived_at: null })
+      .eq("owner_id", userId)
+      .eq("class_name", source.name)
+      .eq("archived_at", archivedAt);
+    throw classError;
+  }
+
   return loadBuilderGlobalBootstrapData(supabase, userId);
 }
 
@@ -400,7 +486,7 @@ export async function saveRetrievalItemData(supabase: SupabaseClient, userId: st
   if (!lo) throw new Error("Learning objective is required.");
 
   const className = String(input.className || "").trim();
-  const classes = await upsertClasses(supabase, userId, uniqueStrings([className, ...DEFAULT_BUILDER_CLASSES]));
+  const classes = await upsertClasses(supabase, userId, uniqueStrings([className]));
   const classByName = new Map(classes.map((row) => [normalizeBuilderKey(row.name), row]));
   const classRow = className ? classByName.get(normalizeBuilderKey(className)) : null;
   const existing = await fetchExistingRetrievalItemForInput(supabase, userId, input, className, lo);
@@ -773,8 +859,36 @@ function normalizeClassNames(payload: BuilderGlobalPayload) {
   return uniqueStrings([
     ...arrayOfStrings(payload.classNames),
     ...(Array.isArray(payload.retrievalItems) ? payload.retrievalItems.map((item) => item.className || "") : []),
-    ...DEFAULT_BUILDER_CLASSES,
   ]);
+}
+
+function normalizeClassName(value: unknown) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+async function loadActiveClasses(supabase: SupabaseClient, userId: string) {
+  const { data, error } = await supabase
+    .from("classes")
+    .select("id,name,sort_order")
+    .eq("owner_id", userId)
+    .is("archived_at", null);
+  if (error) throw error;
+  return (data || []) as ClassRow[];
+}
+
+async function updateClassLabel(
+  supabase: SupabaseClient,
+  table: "retrieval_class_progress" | "builder_lessons",
+  userId: string,
+  currentName: string,
+  nextName: string,
+) {
+  const { error } = await supabase
+    .from(table)
+    .update({ class_name: nextName })
+    .eq("owner_id", userId)
+    .eq("class_name", currentName);
+  if (error) throw error;
 }
 
 async function upsertClasses(supabase: SupabaseClient, userId: string, classNames: string[]) {
@@ -947,7 +1061,7 @@ async function findOrCreateRetrievalItemForContext(
   });
   if (existing) return existing;
 
-  const classes = await upsertClasses(supabase, userId, uniqueStrings([input.className, ...DEFAULT_BUILDER_CLASSES]));
+  const classes = await upsertClasses(supabase, userId, uniqueStrings([input.className]));
   const classRow = classes.find((entry) => normalizeBuilderKey(entry.name) === normalizeBuilderKey(input.className)) || null;
   const retrievalLo = await upsertSharedRetrievalLo(supabase, userId, {}, input.lo);
   const saved = await upsertClassProgress(supabase, userId, {}, {

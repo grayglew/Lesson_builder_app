@@ -3,7 +3,10 @@
 import { LoaderCircle } from "lucide-react";
 import { type CSSProperties, useEffect, useState } from "react";
 import {
+  archiveClassName,
   loadBuilderDocument,
+  loadBuilderGlobalState,
+  renameClassName,
   saveClassNames,
   saveCurrentLesson,
   syncBuilderDocument,
@@ -107,6 +110,7 @@ export function BuilderShell({
   const [activeTool, setActiveTool] = useState<ToolName>("starter");
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [busyAction, setBusyAction] = useState("");
+  const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
@@ -165,6 +169,33 @@ export function BuilderShell({
     };
   }, [hydrate, setStatus]);
 
+  useEffect(() => {
+    if (!hydrated || activeTool !== "retrieval") return;
+    const controller = new AbortController();
+
+    async function refreshRetrievalData() {
+      setRetrievalRefreshing(true);
+      try {
+        const global = await loadBuilderGlobalState(controller.signal);
+        if (!controller.signal.aborted) updateGlobalData(global);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setStatus({
+          tone: "warning",
+          message: errorMessage(
+            error,
+            "Could not refresh retrieval items; the last loaded copy is still available.",
+          ),
+        });
+      } finally {
+        if (!controller.signal.aborted) setRetrievalRefreshing(false);
+      }
+    }
+
+    void refreshRetrievalData();
+    return () => controller.abort();
+  }, [activeTool, document.className, hydrated, setStatus, updateGlobalData]);
+
   async function saveLesson(copy: boolean) {
     if (!document.className.trim()) {
       setStatus({ tone: "error", message: "Choose a class before saving." });
@@ -209,6 +240,60 @@ export function BuilderShell({
       setStatus({
         tone: "error",
         message: errorMessage(error, "Could not add the class."),
+      });
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function renameSelectedClass() {
+    const currentName = document.className.trim();
+    if (!currentName) return;
+    const entered = window.prompt("Rename class", currentName);
+    if (entered === null) return;
+    const nextName = entered.replace(/\s+/g, " ").trim();
+    if (!nextName || nextName === currentName) return;
+
+    setBusyAction("rename-class");
+    try {
+      const global = await renameClassName(currentName, nextName);
+      updateMetadata({ className: nextName });
+      updateGlobalData(global);
+      setStatus({
+        tone: "success",
+        message: `Renamed class "${currentName}" to "${nextName}".`,
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(error, "Could not rename the class."),
+      });
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function deleteSelectedClass() {
+    const className = document.className.trim();
+    if (!className) return;
+    if (
+      !window.confirm(
+        `Delete class "${className}"? Its retrieval schedule will be archived. Saved lessons will be kept.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyAction("delete-class");
+    try {
+      const global = await archiveClassName(className);
+      updateMetadata({ className: "" });
+      updateGlobalData(global);
+      setStatus({ tone: "success", message: `Deleted class "${className}".` });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(error, "Could not delete the class."),
       });
     } finally {
       setBusyAction("");
@@ -298,6 +383,24 @@ export function BuilderShell({
               </option>
             ))}
           </select>
+          <div className={styles.classActions} aria-label="Selected class actions">
+            <button
+              className={`${styles.secondaryButton} ${styles.tinyButton}`}
+              type="button"
+              disabled={!document.className || Boolean(busyAction)}
+              onClick={() => void renameSelectedClass()}
+            >
+              {busyAction === "rename-class" ? "Renaming..." : "Rename class"}
+            </button>
+            <button
+              className={`${styles.dangerButton} ${styles.tinyButton}`}
+              type="button"
+              disabled={!document.className || Boolean(busyAction)}
+              onClick={() => void deleteSelectedClass()}
+            >
+              {busyAction === "delete-class" ? "Deleting..." : "Delete class"}
+            </button>
+          </div>
 
           <label className={styles.fieldLabel} htmlFor="v2-teaching-date">
             Date of teaching
@@ -398,7 +501,9 @@ export function BuilderShell({
               />
             </div>
           ) : null}
-          {activeTool === "retrieval" ? <RetrievalComposer /> : null}
+          {activeTool === "retrieval" ? (
+            <RetrievalComposer refreshing={retrievalRefreshing} />
+          ) : null}
           {activeTool === "example" ? <ExampleComposer /> : null}
           {activeTool === "worksheet" ? <WorksheetComposer /> : null}
           {activeTool === "pdf" ? <PdfComposer /> : null}

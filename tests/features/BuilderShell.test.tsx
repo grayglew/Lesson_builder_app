@@ -1,8 +1,13 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BuilderShell } from "@/features/builder/BuilderShell";
-import { loadBuilderDocument } from "@/features/builder/api-client";
+import {
+  archiveClassName,
+  loadBuilderDocument,
+  loadBuilderGlobalState,
+  renameClassName,
+} from "@/features/builder/api-client";
 import {
   loadV2CachedDocument,
   saveV2CachedDocument,
@@ -21,6 +26,14 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
   return {
     ...original,
     loadBuilderDocument: vi.fn().mockResolvedValue(null),
+    loadBuilderGlobalState: vi.fn().mockResolvedValue({
+      classNames: [],
+      retrievalItems: [],
+      slideTemplates: [],
+      updatedAt: "2026-07-18T06:00:00.000Z",
+    }),
+    renameClassName: vi.fn(),
+    archiveClassName: vi.fn(),
     syncBuilderDocument: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -30,6 +43,12 @@ describe("BuilderShell legacy UI parity", () => {
 
   beforeEach(() => {
     vi.mocked(loadBuilderDocument).mockResolvedValue(null);
+    vi.mocked(loadBuilderGlobalState).mockResolvedValue({
+      classNames: [],
+      retrievalItems: [],
+      slideTemplates: [],
+      updatedAt: "2026-07-18T06:00:00.000Z",
+    });
     vi.mocked(loadV2CachedDocument).mockResolvedValue(null);
     vi.mocked(saveV2CachedDocument).mockResolvedValue(undefined);
     useBuilderStore
@@ -119,6 +138,97 @@ describe("BuilderShell legacy UI parity", () => {
     expect(
       screen.getByRole("heading", { name: "1 slide" }),
     ).toBeInTheDocument();
+  });
+
+  it("inserts a placeholder below the selected preview slide", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.slides = [
+      { id: "first", type: "blank", title: "First" },
+      { id: "second", type: "blank", title: "Second" },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    render(<BuilderShell userEmail="teacher@example.com" />);
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Select slide 1 for handout" })[0],
+    );
+    await user.click(screen.getByRole("button", { name: "Placeholder" }));
+    await user.click(screen.getByRole("button", { name: "Add placeholder slide" }));
+
+    expect(useBuilderStore.getState().document.slides.map((slide) => slide.title)).toEqual([
+      "First",
+      "Placeholder",
+      "Second",
+    ]);
+  });
+
+  it("refreshes retrieval data when Retrieval opens and when the class changes", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 9";
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(loadBuilderGlobalState).mockResolvedValue({
+      classNames: ["Year 9", "Year 10"],
+      retrievalItems: [
+        {
+          id: "year-9-lo",
+          lo: "Year 9 refreshed objective",
+          className: "Year 9",
+          spacingFactor: 1.3,
+          currentImageSlot: 1,
+          seenCount: 0,
+          selected: false,
+          images: [],
+          answerImages: [],
+        },
+      ],
+      slideTemplates: [],
+      updatedAt: "2026-07-18T07:00:00.000Z",
+    });
+
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await user.click(screen.getByRole("button", { name: "Retrieval" }));
+
+    expect(await screen.findByDisplayValue("Year 9 refreshed objective")).toBeInTheDocument();
+    expect(loadBuilderGlobalState).toHaveBeenCalledTimes(1);
+
+    await user.selectOptions(screen.getByLabelText("Class"), "Year 10");
+    await waitFor(() => expect(loadBuilderGlobalState).toHaveBeenCalledTimes(2));
+  });
+
+  it("renames and deletes the selected class from the sidebar controls", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 9";
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(renameClassName).mockResolvedValue({
+      classNames: ["Year 9 Maths"],
+      retrievalItems: [],
+      slideTemplates: [],
+      updatedAt: "2026-07-18T07:00:00.000Z",
+    });
+    vi.mocked(archiveClassName).mockResolvedValue({
+      classNames: [],
+      retrievalItems: [],
+      slideTemplates: [],
+      updatedAt: "2026-07-18T08:00:00.000Z",
+    });
+    vi.spyOn(window, "prompt").mockReturnValue("Year 9 Maths");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await user.click(screen.getByRole("button", { name: "Rename class" }));
+
+    await waitFor(() => expect(renameClassName).toHaveBeenCalledWith("Year 9", "Year 9 Maths"));
+    expect(screen.getByLabelText("Class")).toHaveValue("Year 9 Maths");
+
+    await user.click(screen.getByRole("button", { name: "Delete class" }));
+    await waitFor(() => expect(archiveClassName).toHaveBeenCalledWith("Year 9 Maths"));
+    expect(screen.getByLabelText("Class")).toHaveValue("");
   });
 
   it("allows several preview slides to be selected independently for a handout", async () => {
