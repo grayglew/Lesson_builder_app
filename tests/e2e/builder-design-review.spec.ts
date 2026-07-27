@@ -129,3 +129,53 @@ test.describe("Builder design review", () => {
     ).toContainText("Couldn’t export the lesson");
   });
 });
+
+test.describe("Compact Console focused review", () => {
+  test("opens expandable menus, collapsible rails, and dark mode", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("http://127.0.0.1:3200/design-review/builder/compact");
+
+    await expect(page.getByText("Compact Console", { exact: true }).first()).toBeVisible();
+    await page.getByRole("button", { name: "Dark" }).click();
+    await expect(page.locator('[data-theme="dark"]')).toBeVisible();
+
+    await page.getByRole("button", { name: /Lessons/ }).click();
+    await expect(page.getByRole("menu", { name: "Lesson menu" })).toBeVisible();
+    await page.getByRole("button", { name: /Lessons/ }).click();
+
+    const lessonTools = page.getByRole("complementary", { name: "Lesson tools" });
+    await page.getByRole("button", { name: "Core slides" }).click();
+    await expect(lessonTools.getByRole("button", { name: /Starter/ })).toBeHidden();
+    await page.getByRole("button", { name: "Core slides" }).click();
+
+    await page.getByRole("button", { name: "Collapse lesson tools" }).click();
+    await expect(page.getByRole("button", { name: "Expand lesson tools" })).toBeVisible();
+    await page.getByRole("button", { name: "Collapse deck preview" }).click();
+    await expect(page.getByRole("button", { name: "Expand deck preview" })).toBeVisible();
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("uses the approved drawer and dock model on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("http://127.0.0.1:3200/design-review/builder/compact");
+    const dock = page.getByRole("navigation", { name: "Mobile workspace navigation" });
+
+    await dock.getByRole("button", { name: "Lesson" }).click();
+    await expect(page.getByRole("complementary", { name: "Lesson tools" })).toBeVisible();
+    await page.getByRole("button", { name: "Close lesson drawer" }).click();
+    await dock.getByRole("button", { name: /Deck/ }).click();
+    await expect(page.getByRole("complementary", { name: "Deck preview" })).toBeVisible();
+
+    const undersized = await page.locator('[data-theme] button:visible').evaluateAll((buttons) =>
+      buttons
+        .map((button) => {
+          const rect = button.getBoundingClientRect();
+          return { label: button.getAttribute("aria-label") || button.textContent?.trim(), width: rect.width, height: rect.height };
+        })
+        .filter(({ width, height }) => width < 44 || height < 44),
+    );
+    expect(undersized).toEqual([]);
+  });
+});

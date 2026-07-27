@@ -221,6 +221,10 @@ export function BuilderDesignReview() {
             </button>
           ))}
         </div>
+        <a className={styles.focusLink} href="/design-review/builder/compact">
+          <span><strong>Compact Console selected</strong><small>Open the focused, interactive review mockup</small></span>
+          <ChevronRight aria-hidden />
+        </a>
       </section>
 
       <section className={styles.prototypeSection} aria-labelledby="prototype-title">
