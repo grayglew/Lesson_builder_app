@@ -168,6 +168,9 @@ describe("ExampleComposer", () => {
     const user = userEvent.setup();
     render(<ExampleComposer />);
 
+    await user.click(
+      screen.getByRole("button", { name: "Show retrieval images" }),
+    );
     expect(screen.getAllByLabelText(/^Question image \d$/)).toHaveLength(8);
     expect(screen.getAllByLabelText(/^Answer image \d$/)).toHaveLength(8);
     await user.type(
@@ -190,6 +193,46 @@ describe("ExampleComposer", () => {
       expect.objectContaining({ name: "retrieval.png" }),
     );
     expect(clearRetrievalImage).toHaveBeenCalledTimes(7);
+  });
+
+  it("keeps the actions visible while retrieval image inputs are collapsed", async () => {
+    const user = userEvent.setup();
+    render(<ExampleComposer />);
+
+    const toggle = screen.getByRole("button", {
+      name: "Show retrieval images",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("Question image 1")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add example slide" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Add LO to retrieval bank" }),
+    ).toBeVisible();
+
+    await user.click(toggle);
+
+    expect(
+      screen.getByRole("button", { name: "Hide retrieval images" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByLabelText(/^Question image \d$/)).toHaveLength(8);
+    expect(screen.getAllByLabelText(/^Answer image \d$/)).toHaveLength(8);
+
+    await user.click(
+      screen.getByRole("button", { name: "Hide retrieval images" }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Show retrieval images" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("Question image 1")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add example slide" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Add LO to retrieval bank" }),
+    ).toBeVisible();
   });
 
   it("shows an automatic debounced database match without a separate check button", async () => {

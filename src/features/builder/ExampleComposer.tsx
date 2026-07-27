@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, LoaderCircle, Plus } from "lucide-react";
+import { ChevronDown, Database, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   clearRetrievalImage,
@@ -51,6 +51,8 @@ export function ExampleComposer() {
   const [answerImage2, setAnswerImage2] = useState<BuilderAsset | null>(null);
   const [questions, setQuestions] = useState<ImageDraft[]>(emptyImageDrafts);
   const [answers, setAnswers] = useState<ImageDraft[]>(emptyImageDrafts);
+  const [retrievalImagesExpanded, setRetrievalImagesExpanded] =
+    useState(false);
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [liveLookup, setLiveLookup] = useState<LiveLookupState>({
     state: "idle",
@@ -353,37 +355,60 @@ export function ExampleComposer() {
       <div className={styles.subsectionHead}>
         <div>
           <h4>Retrieval images</h4>
-          <p>
+          <p id="v2-example-retrieval-images-description">
             Optional question and answer images are paired by the number of
             times this LO has been seen.
           </p>
         </div>
+        <button
+          className={styles.exampleRetrievalToggle}
+          type="button"
+          aria-expanded={retrievalImagesExpanded}
+          aria-controls="v2-example-retrieval-images"
+          aria-describedby="v2-example-retrieval-images-description"
+          onClick={() => setRetrievalImagesExpanded((expanded) => !expanded)}
+        >
+          {retrievalImagesExpanded ? "Hide" : "Show"} retrieval images
+          <ChevronDown
+            className={`${styles.exampleRetrievalChevron} ${
+              retrievalImagesExpanded
+                ? styles.exampleRetrievalChevronExpanded
+                : ""
+            }`}
+            aria-hidden
+          />
+        </button>
       </div>
-      <div className={styles.exampleRetrievalGrid}>
-        {questions.map((question, index) => (
-          <div key={index} className={styles.exampleRetrievalSlot}>
-            <span className={styles.fieldLabel}>Seen {index + 1}</span>
-            <BuilderImageInput
-              asset={question.asset}
-              label={`Question image ${index + 1}`}
-              size="retrieval"
-              onChange={(asset, file) =>
-                updateRetrievalImage("questions", index, asset, file)
-              }
-              onError={(message) => setStatus({ tone: "error", message })}
-            />
-            <BuilderImageInput
-              asset={answers[index].asset}
-              label={`Answer image ${index + 1}`}
-              size="retrieval"
-              onChange={(asset, file) =>
-                updateRetrievalImage("answers", index, asset, file)
-              }
-              onError={(message) => setStatus({ tone: "error", message })}
-            />
-          </div>
-        ))}
-      </div>
+      {retrievalImagesExpanded ? (
+        <div
+          id="v2-example-retrieval-images"
+          className={styles.exampleRetrievalGrid}
+        >
+          {questions.map((question, index) => (
+            <div key={index} className={styles.exampleRetrievalSlot}>
+              <span className={styles.fieldLabel}>Seen {index + 1}</span>
+              <BuilderImageInput
+                asset={question.asset}
+                label={`Question image ${index + 1}`}
+                size="retrieval"
+                onChange={(asset, file) =>
+                  updateRetrievalImage("questions", index, asset, file)
+                }
+                onError={(message) => setStatus({ tone: "error", message })}
+              />
+              <BuilderImageInput
+                asset={answers[index].asset}
+                label={`Answer image ${index + 1}`}
+                size="retrieval"
+                onChange={(asset, file) =>
+                  updateRetrievalImage("answers", index, asset, file)
+                }
+                onError={(message) => setStatus({ tone: "error", message })}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className={styles.actionRow}>
         <button

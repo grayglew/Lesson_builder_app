@@ -171,12 +171,27 @@ test.describe("Builder accepted UI baseline", () => {
       page.getByLabel("Example image 1", { exact: true }),
     ).toBeAttached();
     await expect(page.getByText("Retrieval images", { exact: true })).toBeVisible();
+    const retrievalToggle = page.getByRole("button", {
+      name: "Show retrieval images",
+    });
+    await expect(retrievalToggle).toHaveAttribute("aria-expanded", "false");
     await expect(
       page.getByLabel("Question image 8", { exact: true }),
-    ).toBeAttached();
+    ).not.toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "Add example slide" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Add LO to retrieval bank" }),
     ).toBeVisible();
+
+    await retrievalToggle.click();
+    await expect(
+      page.getByLabel("Question image 8", { exact: true }),
+    ).toBeAttached();
+    await page
+      .getByRole("button", { name: "Hide retrieval images" })
+      .click();
 
     await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-example.png", {
