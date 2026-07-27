@@ -38,11 +38,17 @@ test.describe("Builder design review", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("http://127.0.0.1:3200/design-review/builder");
 
-    await page.getByRole("button", { name: /Teaching Studio/ }).click();
-    await expect(page.getByRole("button", { name: /Teaching Studio/ })).toHaveAttribute(
+    await page.getByRole("button", { name: /Blueprint Workshop/ }).click();
+    await expect(page.getByRole("button", { name: /Blueprint Workshop/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    await page.getByRole("button", { name: "Dark" }).click();
+    await expect(page.locator('[data-theme="blueprint"][data-mode="dark"]')).toBeVisible();
+    await page.getByRole("button", { name: /Editorial Ledger/ }).click();
+    await expect(page.locator('[data-theme="ledger"][data-mode="dark"]')).toBeVisible();
+    await page.getByRole("button", { name: /Signal Classroom/ }).click();
+    await expect(page.locator('[data-theme="signal"][data-mode="dark"]')).toBeVisible();
     await page.getByRole("button", { name: "Retrieval" }).first().click();
     await expect(page.getByRole("table", { name: "Retrieval bank prototype" })).toBeVisible();
     await page.getByRole("button", { name: "Saved lessons" }).first().click();
@@ -55,6 +61,34 @@ test.describe("Builder design review", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  test("renders every visual direction in light and dark without prototype overflow", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("http://127.0.0.1:3200/design-review/builder");
+
+    for (const direction of [
+      ["Compact Console", "compact"],
+      ["Blueprint Workshop", "blueprint"],
+      ["Editorial Ledger", "ledger"],
+      ["Signal Classroom", "signal"],
+      ["Refined Current", "refined"],
+    ] as const) {
+      await page.getByRole("button", { name: new RegExp(direction[0]) }).click();
+      for (const mode of ["Light", "Dark"] as const) {
+        await page.getByRole("button", { name: mode }).click();
+        const prototype = page.locator(
+          `[data-theme="${direction[1]}"][data-mode="${mode.toLowerCase()}"]`,
+        );
+        await expect(prototype).toBeVisible();
+        const overflow = await prototype.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        );
+        expect(overflow).toBeLessThanOrEqual(1);
+      }
+    }
   });
 
   test("keeps visible phone controls touch-sized", async ({ page }) => {

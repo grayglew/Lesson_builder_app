@@ -14,16 +14,46 @@ describe("BuilderDesignReview", () => {
     render(<BuilderDesignReview />);
 
     const compact = screen.getByRole("button", { name: /Compact Console/ });
-    const studio = screen.getByRole("button", { name: /Teaching Studio/ });
+    const blueprint = screen.getByRole("button", { name: /Blueprint Workshop/ });
+    const ledger = screen.getByRole("button", { name: /Editorial Ledger/ });
+    const signal = screen.getByRole("button", { name: /Signal Classroom/ });
     const refined = screen.getByRole("button", { name: /Refined Current/ });
     expect(compact).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(studio);
-    expect(studio).toHaveAttribute("aria-pressed", "true");
+    await user.click(blueprint);
+    expect(blueprint).toHaveAttribute("aria-pressed", "true");
     expect(compact).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(ledger);
+    expect(ledger).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(signal);
+    expect(signal).toHaveAttribute("aria-pressed", "true");
 
     await user.click(refined);
     expect(refined).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("offers a purpose-built dark mode for every visual direction", async () => {
+    const user = userEvent.setup();
+    render(<BuilderDesignReview />);
+
+    const prototype = document.querySelector("[data-mobile-pattern]");
+    expect(prototype).toHaveAttribute("data-mode", "light");
+
+    await user.click(screen.getByRole("button", { name: "Dark" }));
+    expect(prototype).toHaveAttribute("data-mode", "dark");
+
+    for (const direction of [
+      "Compact Console",
+      "Blueprint Workshop",
+      "Editorial Ledger",
+      "Signal Classroom",
+      "Refined Current",
+    ]) {
+      await user.click(screen.getByRole("button", { name: new RegExp(direction) }));
+      expect(prototype).toHaveAttribute("data-mode", "dark");
+    }
   });
 
   it("offers the key content scenarios without making network requests", async () => {

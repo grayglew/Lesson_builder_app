@@ -29,6 +29,8 @@ import {
   RotateCcw,
   Save,
   Search,
+  Moon,
+  Sun,
   Sparkles,
   Trash2,
   Upload,
@@ -38,7 +40,8 @@ import {
 import { useState } from "react";
 import styles from "./BuilderDesignReview.module.css";
 
-type VisualDirection = "compact" | "studio" | "refined";
+type VisualDirection = "compact" | "blueprint" | "ledger" | "signal" | "refined";
+type Appearance = "light" | "dark";
 type MobilePattern = "dock" | "tabs" | "stack";
 type Scenario = "starter" | "retrieval" | "library";
 type Frame = "desktop" | "tablet" | "mobile";
@@ -60,15 +63,29 @@ const visualDirections: Array<{
     traits: ["Graphite + teal", "Plex typography", "Dense, deliberate"],
   },
   {
-    id: "studio",
+    id: "blueprint",
     eyebrow: "Alternative A",
-    name: "Teaching Studio",
-    description: "A warmer, editorial workspace that gives content more breathing room.",
-    traits: ["Paper + ink", "Accessible type", "Softly structured"],
+    name: "Blueprint Workshop",
+    description: "A technical drafting desk with graph-paper rhythm and precise blue linework.",
+    traits: ["Cobalt blueprint", "Technical grid", "Instrument-like"],
+  },
+  {
+    id: "ledger",
+    eyebrow: "Alternative B",
+    name: "Editorial Ledger",
+    description: "A tactile planning journal with strong typography, paper texture, and red pencil marks.",
+    traits: ["Paper + oxblood", "Serif hierarchy", "Quietly tactile"],
+  },
+  {
+    id: "signal",
+    eyebrow: "Alternative C",
+    name: "Signal Classroom",
+    description: "A graphic, high-energy teaching console inspired by wayfinding and classroom signage.",
+    traits: ["Cobalt + yellow", "Chunky geometry", "Playful clarity"],
   },
   {
     id: "refined",
-    eyebrow: "Alternative B",
+    eyebrow: "Conservative option",
     name: "Refined Current",
     description: "The smallest visual shift: familiar teal surfaces with sharper spacing and controls.",
     traits: ["Familiar palette", "Lower migration risk", "Clearer controls"],
@@ -126,6 +143,7 @@ const savedLessons = [
 
 export function BuilderDesignReview() {
   const [direction, setDirection] = useState<VisualDirection>("compact");
+  const [appearance, setAppearance] = useState<Appearance>("light");
   const [mobilePattern, setMobilePattern] = useState<MobilePattern>("dock");
   const [scenario, setScenario] = useState<Scenario>("starter");
   const [frame, setFrame] = useState<Frame>("desktop");
@@ -149,7 +167,7 @@ export function BuilderDesignReview() {
           <p className={styles.kicker}>Lesson Builder · interface study 01</p>
           <h1>A faster workspace, without changing the lesson workflow.</h1>
           <p className={styles.intro}>
-            Compare three visual treatments and three responsive navigation models using safe,
+            Compare five visual treatments and three responsive navigation models using safe,
             fictional lesson data. Every control in this lab is illustrative; nothing is saved.
           </p>
         </div>
@@ -168,7 +186,7 @@ export function BuilderDesignReview() {
             <span>01</span>
             <h2 id="direction-title">Choose a visual direction</h2>
           </div>
-          <p>Compact Console is selected; alternatives remain live for direct comparison.</p>
+          <p>Five distinct personalities, each with a purpose-built light and dark appearance.</p>
         </div>
         <div className={styles.directionGrid}>
           {visualDirections.map((item) => (
@@ -196,6 +214,9 @@ export function BuilderDesignReview() {
                 {item.traits.map((trait) => (
                   <span key={trait}>{trait}</span>
                 ))}
+              </span>
+              <span className={styles.modeSwatches} aria-hidden>
+                <i>Light</i><i>Dark</i>
               </span>
             </button>
           ))}
@@ -234,6 +255,14 @@ export function BuilderDesignReview() {
               Mobile
             </SegmentButton>
           </ControlGroup>
+          <ControlGroup label="Appearance">
+            <SegmentButton active={appearance === "light"} onClick={() => setAppearance("light")}>
+              <Sun aria-hidden /> Light
+            </SegmentButton>
+            <SegmentButton active={appearance === "dark"} onClick={() => setAppearance("dark")}>
+              <Moon aria-hidden /> Dark
+            </SegmentButton>
+          </ControlGroup>
           <ControlGroup label="State">
             <select
               aria-label="Interface state"
@@ -261,6 +290,7 @@ export function BuilderDesignReview() {
           <div
             className={styles.prototype}
             data-theme={direction}
+            data-mode={appearance}
             data-mobile-pattern={mobilePattern}
             data-mobile-panel={mobilePanel}
             data-deck-collapsed={deckCollapsed}
