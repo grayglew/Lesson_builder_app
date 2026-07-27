@@ -15,7 +15,7 @@ import {
 } from "@/features/builder/schema";
 
 describe("saved lesson production parity", () => {
-  it("sorts planned lessons first, then date and title", () => {
+  it("sorts newest teaching dates first, then title, with undated lessons last", () => {
     const lessons = [
       lessonSummary("taught", "A taught lesson", "2026-01-01", true),
       lessonSummary("later", "Later", "2026-04-02", false),
@@ -25,11 +25,11 @@ describe("saved lesson production parity", () => {
     ];
 
     expect(sortSavedLessons(lessons).map((lesson) => lesson.id)).toEqual([
+      "later",
       "alpha",
       "beta",
-      "later",
-      "undated",
       "taught",
+      "undated",
     ]);
   });
 

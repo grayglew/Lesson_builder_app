@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BuilderShell } from "@/features/builder/BuilderShell";
@@ -7,6 +13,7 @@ import {
   loadBuilderDocument,
   loadBuilderGlobalState,
   renameClassName,
+  saveCurrentLesson,
 } from "@/features/builder/api-client";
 import {
   loadV2CachedDocument,
@@ -34,6 +41,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
     }),
     renameClassName: vi.fn(),
     archiveClassName: vi.fn(),
+    saveCurrentLesson: vi.fn(),
     syncBuilderDocument: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -51,6 +59,7 @@ describe("BuilderShell legacy UI parity", () => {
     });
     vi.mocked(loadV2CachedDocument).mockResolvedValue(null);
     vi.mocked(saveV2CachedDocument).mockResolvedValue(undefined);
+    vi.mocked(saveCurrentLesson).mockReset();
     useBuilderStore
       .getState()
       .hydrate(createInitialBuilderDocument("2026-07-18T06:00:00.000Z"));
@@ -79,9 +88,11 @@ describe("BuilderShell legacy UI parity", () => {
     expect(screen.getByLabelText("Lesson title")).toBeInTheDocument();
     expect(screen.getByLabelText("Class")).toBeInTheDocument();
     expect(screen.getByLabelText("Date of teaching")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    const newLessonButton = screen.getByRole("button", { name: "New lesson" });
+    expect(saveButton).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save as" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New lesson" })).toBeInTheDocument();
+    expect(newLessonButton).toHaveClass(...Array.from(saveButton.classList));
     expect(
       screen.queryByLabelText("Migration pending"),
     ).not.toBeInTheDocument();
@@ -138,6 +149,122 @@ describe("BuilderShell legacy UI parity", () => {
     expect(
       screen.getByRole("heading", { name: "1 slide" }),
     ).toBeInTheDocument();
+  });
+
+  it("requires a title and class before creating and saving a new lesson", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.title = "Current lesson";
+    document.className = "Year 10";
+    document.classNames = ["Year 9", "Year 10"];
+    document.slides = [{ id: "current-slide", type: "blank", title: "Current" }];
+    document.retrievalItems = [
+      {
+        id: "retrieval-1",
+        lo: "Existing retrieval item",
+        className: "Year 9",
+        spacingFactor: 1.3,
+        currentImageSlot: 1,
+        seenCount: 0,
+        selected: false,
+        images: [],
+        answerImages: [],
+      },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(saveCurrentLesson).mockResolvedValue({
+      id: "new-lesson-id",
+      title: "New algebra lesson",
+      className: "Year 9",
+      teachingDate: "2026-07-27",
+      byteSize: 100,
+      taughtAt: "",
+      isTaught: false,
+      createdAt: "2026-07-27T10:00:00.000Z",
+      updatedAt: "2026-07-27T10:00:00.000Z",
+    });
+
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await user.click(screen.getByRole("button", { name: "New lesson" }));
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Create and save a new lesson",
+    });
+    const submit = within(dialog).getByRole("button", {
+      name: "Create and save lesson",
+    });
+    expect(submit).toBeDisabled();
+
+    await user.type(within(dialog).getByLabelText("Lesson title"), "New algebra lesson");
+    expect(submit).toBeDisabled();
+    await user.selectOptions(within(dialog).getByLabelText("Class"), "Year 9");
+    expect(submit).toBeEnabled();
+    await user.click(submit);
+
+    await waitFor(() =>
+      expect(saveCurrentLesson).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "New algebra lesson",
+          className: "Year 9",
+          activeLessonId: "",
+          slides: [],
+        }),
+        { copy: true },
+      ),
+    );
+    await waitFor(() =>
+      expect(useBuilderStore.getState().document).toEqual(
+        expect.objectContaining({
+          title: "New algebra lesson",
+          className: "Year 9",
+          activeLessonId: "new-lesson-id",
+          slides: [],
+          retrievalItems: document.retrievalItems,
+        }),
+      ),
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Create and save a new lesson" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the current lesson when creating the new lesson fails", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.title = "Lesson that must stay open";
+    document.className = "Year 10";
+    document.classNames = ["Year 9", "Year 10"];
+    document.slides = [{ id: "safe-slide", type: "blank", title: "Safe" }];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(saveCurrentLesson).mockRejectedValue(new Error("Save failed"));
+
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await user.click(screen.getByRole("button", { name: "New lesson" }));
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Create and save a new lesson",
+    });
+    await user.type(within(dialog).getByLabelText("Lesson title"), "Failed lesson");
+    await user.selectOptions(within(dialog).getByLabelText("Class"), "Year 9");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Create and save lesson" }),
+    );
+
+    await waitFor(() =>
+      expect(useBuilderStore.getState().status).toEqual({
+        tone: "error",
+        message: "Save failed",
+      }),
+    );
+    expect(useBuilderStore.getState().document.title).toBe(
+      "Lesson that must stay open",
+    );
+    expect(useBuilderStore.getState().document.slides).toEqual([
+      expect.objectContaining({ id: "safe-slide" }),
+    ]);
+    expect(dialog).toBeInTheDocument();
   });
 
   it("inserts a placeholder below the selected preview slide", async () => {

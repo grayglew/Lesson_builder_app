@@ -20,6 +20,7 @@ import { ImpersonationControl } from "./ImpersonationControl";
 import latexStyles from "./LatexComposer.module.css";
 import { LatexComposer } from "./LatexComposer";
 import { LessonTransferActions } from "./LessonTransferActions";
+import { NewLessonDialog } from "./NewLessonDialog";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
 import { RetrievalComposer } from "./RetrievalComposer";
@@ -27,7 +28,10 @@ import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
 import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
-import { type BuilderSlide } from "./schema";
+import {
+  type BuilderSlide,
+  createInitialBuilderDocument,
+} from "./schema";
 import {
   selectDocument,
   useBuilderStore,
@@ -112,6 +116,7 @@ export function BuilderShell({
   const [busyAction, setBusyAction] = useState("");
   const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
+  const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
 
@@ -300,7 +305,7 @@ export function BuilderShell({
     }
   }
 
-  function startNewLesson() {
+  function resetCurrentLesson() {
     if (
       window.confirm(
         "Start a new lesson? Unsaved changes in the current workspace will be replaced.",
@@ -308,6 +313,76 @@ export function BuilderShell({
     ) {
       reset();
       setActiveTool("starter");
+    }
+  }
+
+  async function createAndSaveNewLesson(details: {
+    title: string;
+    className: string;
+  }) {
+    const nextDocument = {
+      ...createInitialBuilderDocument(),
+      title: details.title,
+      className: details.className,
+      classNames: [...document.classNames],
+      retrievalItems: document.retrievalItems,
+      slideTemplates: document.slideTemplates,
+    };
+
+    setBusyAction("new-lesson");
+    setStatus({
+      tone: "working",
+      message: `Creating and saving "${details.title}"...`,
+    });
+
+    try {
+      const saved = await saveCurrentLesson(nextDocument, { copy: true });
+      const savedDocument = {
+        ...nextDocument,
+        title: saved.title,
+        className: saved.className,
+        teachingDate: saved.teachingDate,
+        activeLessonId: saved.id,
+        activeLessonSavedAt: saved.updatedAt,
+        lessonUpdatedAt: saved.updatedAt,
+        classNames: Array.from(
+          new Set([saved.className, ...nextDocument.classNames].filter(Boolean)),
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+
+      hydrate(savedDocument);
+      setActiveTool("starter");
+      setNewLessonDialogOpen(false);
+
+      try {
+        await Promise.all([
+          saveV2CachedDocument(savedDocument),
+          syncBuilderDocument(savedDocument),
+        ]);
+        setStatus({
+          tone: "success",
+          message: `Created and saved "${saved.title}".`,
+        });
+      } catch (error) {
+        setStatus({
+          tone: "warning",
+          message: errorMessage(
+            error,
+            `"${saved.title}" was saved, but the workspace recovery copy could not be updated.`,
+          ),
+        });
+      }
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(
+          error,
+          "Could not create the new lesson. The current lesson is unchanged.",
+        ),
+      });
+    } finally {
+      setBusyAction("");
     }
   }
 
@@ -425,19 +500,20 @@ export function BuilderShell({
               {busyAction === "save" ? "Saving..." : "Save"}
             </button>
             <button
+              className={`${styles.primaryButton} ${styles.compactButton}`}
+              type="button"
+              disabled={Boolean(busyAction)}
+              onClick={() => setNewLessonDialogOpen(true)}
+            >
+              New lesson
+            </button>
+            <button
               className={`${styles.secondaryButton} ${styles.compactButton}`}
               type="button"
               disabled={Boolean(busyAction)}
               onClick={() => void saveLesson(true)}
             >
               {busyAction === "save-copy" ? "Saving..." : "Save as"}
-            </button>
-            <button
-              className={`${styles.secondaryButton} ${styles.compactButton}`}
-              type="button"
-              onClick={startNewLesson}
-            >
-              New lesson
             </button>
           </div>
           <WorkspaceAutosaveIndicator {...workspaceAutosave} />
@@ -618,7 +694,7 @@ export function BuilderShell({
                 type="button"
                 aria-label="Reset lesson"
                 title="Reset lesson"
-                onClick={startNewLesson}
+                onClick={resetCurrentLesson}
               >
                 ↺
               </button>
@@ -697,6 +773,17 @@ export function BuilderShell({
           </ol>
         </aside>
       </div>
+
+      {newLessonDialogOpen ? (
+        <NewLessonDialog
+          busy={busyAction === "new-lesson"}
+          classNames={document.classNames}
+          onClose={() => {
+            if (busyAction !== "new-lesson") setNewLessonDialogOpen(false);
+          }}
+          onSubmit={(details) => void createAndSaveNewLesson(details)}
+        />
+      ) : null}
 
       <div
         className={`${styles.notificationToast} ${styles[status.tone]}`}

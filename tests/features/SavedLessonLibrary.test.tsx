@@ -66,22 +66,22 @@ describe("SavedLessonLibrary production actions", () => {
     });
   });
 
-  it("shows all direct actions, production order, dirty state, and confidence", async () => {
+  it("shows all direct actions, newest-first order, dirty state, and confidence", async () => {
     const user = userEvent.setup();
     render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
 
     const rows = await screen.findAllByRole("row");
-    expect(within(rows[1]).getByText("Confidence lesson")).toBeInTheDocument();
-    expect(within(rows[2]).getByText("Active lesson *")).toBeInTheDocument();
-    expect(rows[2]).toHaveTextContent("unsaved changes");
+    expect(within(rows[1]).getByText("Active lesson *")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("Confidence lesson")).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent("unsaved changes");
     expect(within(rows[3]).getByText("Already taught")).toBeInTheDocument();
-    expect(rows[1]).toHaveStyle({
+    expect(rows[2]).toHaveStyle({
       backgroundColor: "#dcfce7",
       boxShadow: "inset 4px 0 0 #22c55e",
     });
     expect(rows[3]).toHaveClass("bg-slate-100", "opacity-70", "grayscale");
 
-    const activeRow = rows[2];
+    const activeRow = rows[1];
     expect(
       within(activeRow).getByRole("button", { name: "Open lesson" }),
     ).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe("SavedLessonLibrary production actions", () => {
     ).toBeInTheDocument();
 
     await user.click(
-      within(rows[1]).getByRole("button", { name: "View confidence" }),
+      within(rows[2]).getByRole("button", { name: "View confidence" }),
     );
     expect(
       screen.getByRole("dialog", { name: "Confidence: Confidence lesson" }),
@@ -117,7 +117,7 @@ describe("SavedLessonLibrary production actions", () => {
     );
     render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
 
-    const row = (await screen.findAllByRole("row"))[2];
+    const row = (await screen.findAllByRole("row"))[1];
     await user.click(
       within(row).getByRole("button", { name: "Change class" }),
     );
@@ -149,7 +149,7 @@ describe("SavedLessonLibrary production actions", () => {
     vi.mocked(downloadPresenterSlideImages).mockResolvedValue([]);
     render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
 
-    const row = (await screen.findAllByRole("row"))[2];
+    const row = (await screen.findAllByRole("row"))[1];
     await user.click(
       within(row).getByRole("button", {
         name: "Download PowerPoint bundle",
@@ -169,7 +169,7 @@ describe("SavedLessonLibrary production actions", () => {
     );
   });
 
-  it("clears every saved-lesson filter in one action and restores production order", async () => {
+  it("clears every saved-lesson filter in one action and restores newest-first order", async () => {
     const user = userEvent.setup();
     render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
 
@@ -198,8 +198,8 @@ describe("SavedLessonLibrary production actions", () => {
     expect(clearFilters).toBeDisabled();
 
     const rows = screen.getAllByRole("row");
-    expect(within(rows[1]).getByText("Confidence lesson")).toBeInTheDocument();
-    expect(within(rows[2]).getByText("Active lesson *")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Active lesson *")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("Confidence lesson")).toBeInTheDocument();
     expect(within(rows[3]).getByText("Already taught")).toBeInTheDocument();
   });
 });

@@ -32,10 +32,11 @@ export function sortSavedLessons<T extends SavedLessonSummary>(
   lessons: readonly T[],
 ): T[] {
   return [...lessons].sort((left, right) => {
-    if (left.isTaught !== right.isTaught) return left.isTaught ? 1 : -1;
     const leftDate = validTeachingDate(left.teachingDate);
     const rightDate = validTeachingDate(right.teachingDate);
-    const dateOrder = leftDate.localeCompare(rightDate);
+    if (!leftDate && rightDate) return 1;
+    if (leftDate && !rightDate) return -1;
+    const dateOrder = rightDate.localeCompare(leftDate);
     if (dateOrder) return dateOrder;
     return left.title.toLowerCase().localeCompare(right.title.toLowerCase());
   });
@@ -237,7 +238,7 @@ function valueHasImagePayload(value: unknown): boolean {
 }
 
 function validTeachingDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "9999-12-31";
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
 
 function mixHexColor(left: string, right: string, ratio: number) {

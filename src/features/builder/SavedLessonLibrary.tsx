@@ -490,7 +490,12 @@ export function SavedLessonLibrary({
                 <tr>
                   <th className="px-5 py-3 font-semibold">Lesson</th>
                   <th className="px-4 py-3 font-semibold">Class</th>
-                  <th className="px-4 py-3 font-semibold">Teaching date</th>
+                  <th
+                    className="px-4 py-3 font-semibold"
+                    aria-sort="descending"
+                  >
+                    Teaching date <span aria-hidden>↓</span>
+                  </th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold">Size</th>
                   <th className="px-5 py-3 text-right font-semibold">Actions</th>

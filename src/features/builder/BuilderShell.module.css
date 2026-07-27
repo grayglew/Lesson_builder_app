@@ -198,7 +198,7 @@
 
 .lessonQuickActions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin: 14px 0 18px;
 }
@@ -520,6 +520,35 @@
   margin-top: 4px;
   color: var(--builder-muted);
   font-size: 12px;
+}
+
+.newLessonDialog {
+  width: min(520px, 100%);
+}
+
+.newLessonDescription {
+  margin: 0 0 18px;
+  color: var(--builder-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.newLessonForm {
+  display: grid;
+  gap: 16px;
+}
+
+.newLessonForm .fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.newLessonActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
 }
 
 .exampleRetrievalToggle {
