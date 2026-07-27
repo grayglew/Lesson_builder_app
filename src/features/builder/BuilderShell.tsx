@@ -12,6 +12,14 @@ import {
   syncBuilderDocument,
 } from "./api-client";
 import { useAppNotifications } from "./AppNotifications";
+import {
+  CompactAppBar,
+  CompactToolNavigation,
+  CompactWorkspaceHeader,
+  type BuilderShellVariant,
+  type BuilderThemePreference,
+  type BuilderToolName,
+} from "./BuilderCompactChrome";
 import styles from "./BuilderShell.module.css";
 import { BuilderStatusToast } from "./BuilderStatusToast";
 import { CfuComposer } from "./CfuComposer";
@@ -46,20 +54,11 @@ type BuilderShellProps = {
   userEmail: string;
   actorEmail?: string;
   isImpersonating?: boolean;
+  variant?: BuilderShellVariant;
+  initialTheme?: BuilderThemePreference;
 };
 
-type ToolName =
-  | "starter"
-  | "saved-lessons"
-  | "retrieval"
-  | "example"
-  | "worksheet"
-  | "pdf"
-  | "cfu"
-  | "draw"
-  | "templates"
-  | "placeholder"
-  | "math";
+type ToolName = BuilderToolName;
 
 const tools: Array<{ name: ToolName; label: string }> = [
   { name: "starter", label: "Starter" },
@@ -91,8 +90,10 @@ const toolLabels: Record<ToolName, string> = {
 
 export function BuilderShell({
   actorEmail = "",
+  initialTheme = "system",
   isImpersonating = false,
   userEmail,
+  variant = "classic",
 }: BuilderShellProps) {
   const document = useBuilderStore(selectDocument);
   const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
@@ -114,6 +115,7 @@ export function BuilderShell({
   const setStatus = useBuilderStore((state) => state.setStatus);
   const { confirmDialog, promptDialog } = useAppNotifications();
   const [activeTool, setActiveTool] = useState<ToolName>("starter");
+  const [lessonRailCollapsed, setLessonRailCollapsed] = useState(false);
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [busyAction, setBusyAction] = useState("");
   const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
@@ -420,12 +422,31 @@ export function BuilderShell({
   }
 
   return (
-    <main className={styles.page}>
+    <main
+      className={`${styles.page} ${
+        variant === "compact-console" ? styles.compactConsole : ""
+      }`}
+      data-builder-theme={initialTheme}
+      data-builder-variant={variant}
+    >
       <div
         className={`${styles.appShell} ${
           previewCollapsed ? styles.previewCollapsed : ""
-        }`}
+        } ${lessonRailCollapsed ? styles.lessonRailCollapsed : ""}`}
       >
+        {variant === "compact-console" ? (
+          <CompactAppBar
+            title={document.title}
+            className={document.className}
+            teachingDate={document.teachingDate}
+            userEmail={userEmail}
+            cloudMessage={workspaceAutosave.message}
+            busy={Boolean(busyAction)}
+            onLessons={() => setActiveTool("saved-lessons")}
+            onPresent={() => void lessonActions.previewLesson(false)}
+            onSave={() => void saveLesson(false)}
+          />
+        ) : null}
         <aside className={styles.sidebar} aria-label="Lesson builder navigation">
           <div className={styles.brandBlock}>
             <div className={styles.brandMark}>LB</div>
@@ -540,21 +561,30 @@ export function BuilderShell({
           </div>
           <WorkspaceAutosaveIndicator {...workspaceAutosave} />
 
-          <nav className={styles.panelNav} aria-label="Slide tools">
-            {tools.map((tool) => (
-              <button
-                key={tool.name}
-                className={`${styles.navButton} ${
-                  activeTool === tool.name ? styles.navButtonActive : ""
-                }`}
-                type="button"
-                aria-current={activeTool === tool.name ? "page" : undefined}
-                onClick={() => setActiveTool(tool.name)}
-              >
-                {tool.label}
-              </button>
-            ))}
-          </nav>
+          {variant === "compact-console" ? (
+            <CompactToolNavigation
+              activeTool={activeTool}
+              collapsed={lessonRailCollapsed}
+              onCollapse={() => setLessonRailCollapsed((current) => !current)}
+              onSelect={setActiveTool}
+            />
+          ) : (
+            <nav className={styles.panelNav} aria-label="Slide tools">
+              {tools.map((tool) => (
+                <button
+                  key={tool.name}
+                  className={`${styles.navButton} ${
+                    activeTool === tool.name ? styles.navButtonActive : ""
+                  }`}
+                  type="button"
+                  aria-current={activeTool === tool.name ? "page" : undefined}
+                  onClick={() => setActiveTool(tool.name)}
+                >
+                  {tool.label}
+                </button>
+              ))}
+            </nav>
+          )}
 
           <div className={styles.externalTools} aria-label="External tools">
             <a
@@ -589,6 +619,21 @@ export function BuilderShell({
         </aside>
 
         <section className={styles.workspace} aria-label={toolLabels[activeTool]}>
+          {variant === "compact-console" ? (
+            <CompactWorkspaceHeader
+              label={toolLabels[activeTool]}
+              busy={Boolean(busyAction)}
+              onPresent={() => void lessonActions.previewLesson(false)}
+              onSave={() => void saveLesson(false)}
+            />
+          ) : null}
+          <div
+            className={
+              variant === "compact-console"
+                ? styles.compactWorkspaceBody
+                : styles.classicWorkspaceBody
+            }
+          >
           <h2 className={styles.srOnly}>{toolLabels[activeTool]}</h2>
           {activeTool === "starter" ? <StarterComposer /> : null}
           {activeTool === "saved-lessons" ? (
@@ -657,6 +702,7 @@ export function BuilderShell({
             </section>
           ) : null}
           {activeTool === "math" ? <LatexComposer /> : null}
+          </div>
         </section>
 
         <aside className={styles.previewPane} aria-label="Lesson preview">

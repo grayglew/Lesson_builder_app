@@ -432,3 +432,73 @@ describe("BuilderShell legacy UI parity", () => {
     ]);
   });
 });
+
+describe("BuilderShell Compact Console action parity", () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    vi.mocked(loadBuilderDocument).mockResolvedValue(null);
+    vi.mocked(loadBuilderGlobalState).mockResolvedValue({
+      classNames: [],
+      retrievalItems: [],
+      slideTemplates: [],
+      updatedAt: "2026-07-18T06:00:00.000Z",
+    });
+    vi.mocked(loadV2CachedDocument).mockResolvedValue(null);
+    useBuilderStore
+      .getState()
+      .hydrate(createInitialBuilderDocument("2026-07-18T06:00:00.000Z"));
+  });
+
+  it("renders the real shell with all eleven tools and production utilities", async () => {
+    render(
+      <BuilderShell
+        userEmail="teacher@example.com"
+        variant="compact-console"
+        initialTheme="light"
+      />,
+    );
+
+    expect(await screen.findByText("Build / Starter")).toBeInTheDocument();
+    const navigation = screen.getByRole("navigation", { name: "Slide tools" });
+    expect(navigation.querySelectorAll("button[data-active]")).toHaveLength(11);
+    expect(screen.getByRole("button", { name: "Lessons" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Present" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(3);
+    expect(screen.getByRole("button", { name: "New lesson" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save as" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview full lesson" })).toBeInTheDocument();
+
+    await userEvent.setup().click(
+      screen.getByRole("button", { name: "Account and utilities" }),
+    );
+    const accountMenu = screen.getByRole("menu", { name: "Account and utilities" });
+    expect(within(accountMenu).getByRole("menuitem", { name: "Admin dashboard" })).toBeInTheDocument();
+    expect(within(accountMenu).getByRole("menuitem", { name: "Gemini-Expand" })).toBeInTheDocument();
+    expect(within(accountMenu).getByRole("menuitem", { name: "Gemini-Atom" })).toBeInTheDocument();
+    expect(within(accountMenu).getByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+  });
+
+  it("uses the same active tool and insert-after-selection state paths", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.slides = [
+      { id: "first", type: "blank", title: "First" },
+      { id: "second", type: "blank", title: "Second" },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+    await user.click(screen.getAllByRole("button", { name: "Select slide 1 for handout" })[0]);
+    await user.click(screen.getByRole("button", { name: "Placeholder" }));
+    expect(screen.getByText("Build / Placeholder")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add placeholder slide" }));
+
+    expect(useBuilderStore.getState().document.slides.map((slide) => slide.title)).toEqual([
+      "First",
+      "Placeholder",
+      "Second",
+    ]);
+  });
+});

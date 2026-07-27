@@ -1535,3 +1535,462 @@
     max-width: 100%;
   }
 }
+
+/* Compact Console --------------------------------------------------------- */
+
+.classicWorkspaceBody {
+  display: contents;
+}
+
+.compactConsole {
+  --font-builder-sans: "Inter", "Segoe UI", Arial, sans-serif;
+  --font-builder-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --builder-bg: #e7e9e5;
+  --builder-surface: #ffffff;
+  --builder-surface-alt: #edf0ed;
+  --builder-ink: #202624;
+  --builder-muted: #65706c;
+  --builder-line: #c9d0cc;
+  --builder-line-strong: #9da8a3;
+  --builder-accent: #237565;
+  --builder-accent-dark: #15594d;
+  --builder-accent-soft: #dcece7;
+  --builder-warn: #9a5b05;
+  --builder-danger: #a64036;
+  --builder-danger-soft: #f8ded9;
+  --builder-shadow: 0 1rem 2.8rem rgba(25, 36, 32, 0.16);
+  --builder-layer-sticky: 20;
+  --builder-layer-menu: 60;
+  --builder-layer-drawer: 80;
+  --builder-layer-dialog: 100;
+  --builder-layer-toast: 110;
+  background: var(--builder-bg);
+  font-family: var(--font-builder-sans);
+}
+
+.compactConsole .appShell {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 3.5rem auto auto auto;
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+
+.compactAppBar {
+  position: sticky;
+  top: 0;
+  z-index: var(--builder-layer-sticky);
+  display: grid;
+  min-width: 0;
+  min-height: 3.5rem;
+  grid-template-columns: auto minmax(8rem, 1fr) auto auto auto auto auto;
+  align-items: center;
+  gap: 0.45rem;
+  border-bottom: 1px solid var(--builder-line);
+  background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
+  padding: 0 0.65rem;
+  backdrop-filter: blur(0.75rem);
+}
+
+.compactAppBar > button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.25rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compactAppBar svg,
+.compactWorkspaceHeader svg,
+.compactToolNavigation svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.compactBrand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.compactBrand > span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.2rem;
+  background: var(--builder-ink);
+  color: var(--builder-surface);
+  font: 600 0.68rem/1 var(--font-builder-mono), monospace;
+}
+
+.compactBrand div,
+.compactLessonIdentity {
+  display: grid;
+  min-width: 0;
+}
+
+.compactBrand strong,
+.compactLessonIdentity strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactBrand small,
+.compactLessonIdentity span,
+.compactCloudStatus {
+  overflow: hidden;
+  color: var(--builder-muted);
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactLessonIdentity {
+  border-left: 1px solid var(--builder-line);
+  padding-left: 0.75rem;
+}
+
+.compactCloudStatus {
+  display: flex;
+  max-width: 12rem;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--builder-accent-dark);
+  font-weight: 700;
+}
+
+.compactAppBar .compactSaveButton,
+.compactWorkspaceHeader .compactSaveButton {
+  border-color: var(--builder-accent);
+  background: var(--builder-accent);
+  color: #fff;
+}
+
+.compactAccountEmail {
+  display: block;
+  max-width: 16rem;
+  overflow: hidden;
+  border-top: 1px solid var(--builder-line);
+  padding: 0.6rem 0.65rem 0.35rem;
+  color: var(--builder-muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactConsole .sidebar,
+.compactConsole .previewPane {
+  background: var(--builder-surface);
+  backdrop-filter: none;
+}
+
+.compactConsole .sidebar {
+  padding: 0.8rem;
+}
+
+.compactConsole .brandBlock {
+  margin-bottom: 1rem;
+}
+
+.compactConsole .brandMark {
+  border-radius: 0.2rem;
+  background: var(--builder-ink);
+}
+
+.compactToolNavigation {
+  display: grid;
+  gap: 0;
+  margin: 1rem -0.8rem -0.8rem;
+  border-top: 1px solid var(--builder-line);
+}
+
+.compactRailHeading {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.8rem;
+}
+
+.compactRailHeading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.compactRailHeading button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: var(--builder-muted);
+  cursor: pointer;
+}
+
+.compactToolNavigation details {
+  border-top: 1px solid var(--builder-line);
+}
+
+.compactToolNavigation summary {
+  display: flex;
+  min-height: 2.75rem;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--builder-surface-alt);
+  padding: 0.55rem 0.8rem;
+  color: var(--builder-muted);
+  font: 600 0.65rem/1 var(--font-builder-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.compactToolNavigation summary::-webkit-details-marker {
+  display: none;
+}
+
+.compactToolNavigation details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.compactToolNavigation details > div {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.25rem 0.35rem;
+}
+
+.compactToolNavigation details button {
+  min-height: 2.75rem;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0.18rem;
+  background: transparent;
+  color: var(--builder-muted);
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compactToolNavigation details button[data-active="true"] {
+  border-left-color: var(--builder-accent);
+  background: var(--builder-accent-soft);
+  color: var(--builder-accent-dark);
+  font-weight: 700;
+}
+
+.compactConsole .workspace {
+  padding: 0;
+  background: var(--builder-bg);
+}
+
+.compactWorkspaceHeader {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--builder-layer-sticky) - 1);
+  display: flex;
+  min-height: 4.2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-bottom: 1px solid var(--builder-line);
+  background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
+  padding: 0.65rem 0.85rem;
+  backdrop-filter: blur(0.75rem);
+}
+
+.compactWorkspaceHeader > div:first-child {
+  min-width: 0;
+}
+
+.compactWorkspaceHeader span {
+  color: var(--builder-muted);
+  font: 600 0.62rem/1 var(--font-builder-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compactWorkspaceHeader h2 {
+  margin: 0.25rem 0 0;
+  font-size: 1.05rem;
+}
+
+.compactWorkspaceHeader > div:last-child {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.compactWorkspaceHeader button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.25rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compactWorkspaceBody {
+  min-height: 0;
+  padding: 0.8rem;
+}
+
+.compactConsole .toolPanel {
+  border-radius: 0.25rem;
+  box-shadow: none;
+}
+
+.compactConsole .previewPane {
+  padding: 0.75rem;
+}
+
+.compactConsole .previewHead {
+  min-height: 3.4rem;
+}
+
+.compactConsole .slideItem {
+  border-radius: 0.25rem;
+  box-shadow: none;
+}
+
+@media (min-width: 1280px) {
+  .compactConsole .appShell {
+    grid-template-columns: minmax(15rem, 15.5rem) minmax(34rem, 1fr) minmax(18rem, 19rem);
+    grid-template-rows: 3.5rem minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .compactConsole .compactAppBar {
+    position: relative;
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .workspace,
+  .compactConsole .previewPane {
+    grid-row: 2;
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .workspace {
+    overflow: auto;
+  }
+
+  .compactConsole .previewPane {
+    overflow: hidden;
+  }
+
+  .compactConsole .previewCollapsed {
+    grid-template-columns: minmax(15rem, 15.5rem) minmax(34rem, 1fr) 3.8rem;
+  }
+
+  .compactConsole .lessonRailCollapsed {
+    grid-template-columns: 3.8rem minmax(34rem, 1fr) minmax(18rem, 19rem);
+  }
+
+  .compactConsole .lessonRailCollapsed.previewCollapsed {
+    grid-template-columns: 3.8rem minmax(34rem, 1fr) 3.8rem;
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar {
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar > :not(.compactToolNavigation) {
+    display: none;
+  }
+
+  .compactConsole .lessonRailCollapsed .compactToolNavigation {
+    margin: 0;
+    border-top: 0;
+  }
+
+  .compactConsole .lessonRailCollapsed .compactRailHeading {
+    justify-content: center;
+    padding: 0.35rem 0;
+  }
+
+  .compactConsole .lessonRailCollapsed .compactRailHeading span,
+  .compactConsole .lessonRailCollapsed .compactToolNavigation details {
+    display: none;
+  }
+}
+
+@media (max-width: 1279px) {
+  .compactConsole {
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  .compactConsole .compactAppBar {
+    grid-template-columns: auto minmax(8rem, 1fr) auto;
+  }
+
+  .compactConsole .compactCloudStatus,
+  .compactConsole .compactAppBar > button:not(.compactSaveButton) {
+    display: none;
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .workspace,
+  .compactConsole .previewPane {
+    min-height: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 639px) {
+  .compactConsole .compactBrand div,
+  .compactConsole .compactLessonIdentity span,
+  .compactConsole .compactAppBar .compactSaveButton {
+    display: none;
+  }
+
+  .compactConsole .compactAppBar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .compactWorkspaceHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .compactWorkspaceHeader > div:last-child,
+  .compactWorkspaceHeader button {
+    width: 100%;
+  }
+}
