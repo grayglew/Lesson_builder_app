@@ -1,19 +1,35 @@
 "use client";
 
 import {
+  Archive,
   BookOpen,
+  BookOpenCheck,
   ChevronDown,
   Cloud,
+  FileText,
+  Files,
   FolderOpen,
+  Layers3,
+  LayoutGrid,
+  LayoutTemplate,
+  ListChecks,
   LogOut,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  PencilRuler,
   Play,
+  Printer,
+  RefreshCw,
+  RotateCcw,
   Save,
   Settings,
+  Sigma,
+  SquareDashed,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { BuilderActionMenu } from "./BuilderActionMenu";
 import styles from "./BuilderShell.module.css";
 
@@ -40,6 +56,7 @@ type CompactAppBarProps = {
   userEmail: string;
   cloudMessage: string;
   busy: boolean;
+  identityControl?: ReactNode;
   onLessons: () => void;
   onPresent: () => void;
   onSave: () => void;
@@ -49,6 +66,7 @@ export function CompactAppBar({
   busy,
   className,
   cloudMessage,
+  identityControl,
   onLessons,
   onPresent,
   onSave,
@@ -94,6 +112,7 @@ export function CompactAppBar({
         <a role="menuitem" href="https://gemini.google.com/gem/1cnUR7VWLpXMmPLX4B7pSBuArHuYzrjwO?usp=sharing" target="_blank" rel="noopener noreferrer">Gemini-Expand</a>
         <a role="menuitem" href="https://gemini.google.com/gem/1J_SwoYOWHaLhibISlDthTgX74F9bGzQy?usp=sharing" target="_blank" rel="noopener noreferrer">Gemini-Atom</a>
         <a role="menuitem" href="/auth/logout"><LogOut aria-hidden /> Log out</a>
+        {identityControl ? <div className={styles.compactIdentityControl}>{identityControl}</div> : null}
         <span className={styles.compactAccountEmail}>{userEmail}</span>
       </BuilderActionMenu>
     </header>
@@ -136,12 +155,12 @@ type CompactToolNavigationProps = {
 
 const groups: Array<{
   label: string;
-  tools: Array<{ name: BuilderToolName; label: string }>;
+  tools: Array<{ name: BuilderToolName; label: string; icon: typeof BookOpen }>;
 }> = [
-  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons" }, { name: "templates", label: "Templates" }] },
-  { label: "Core slides", tools: [{ name: "starter", label: "Starter" }, { name: "retrieval", label: "Retrieval" }, { name: "example", label: "Example" }, { name: "cfu", label: "CFU" }] },
-  { label: "Resources", tools: [{ name: "worksheet", label: "Worksheet" }, { name: "pdf", label: "PDF" }] },
-  { label: "Create", tools: [{ name: "draw", label: "Draw" }, { name: "placeholder", label: "Placeholder" }, { name: "math", label: "LaTeX" }] },
+  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "templates", label: "Templates", icon: LayoutTemplate }] },
+  { label: "Core slides", tools: [{ name: "starter", label: "Starter", icon: LayoutGrid }, { name: "retrieval", label: "Retrieval", icon: RefreshCw }, { name: "example", label: "Example", icon: BookOpenCheck }, { name: "cfu", label: "CFU", icon: ListChecks }] },
+  { label: "Resources", tools: [{ name: "worksheet", label: "Worksheet", icon: Files }, { name: "pdf", label: "PDF", icon: FileText }] },
+  { label: "Create", tools: [{ name: "draw", label: "Draw", icon: PencilRuler }, { name: "placeholder", label: "Placeholder", icon: SquareDashed }, { name: "math", label: "LaTeX", icon: Sigma }] },
 ];
 
 export function CompactToolNavigation({
@@ -191,12 +210,80 @@ export function CompactToolNavigation({
                 data-active={activeTool === tool.name}
                 onClick={() => onSelect(tool.name)}
               >
-                {tool.label}
+                <tool.icon aria-hidden />
+                <span>{tool.label}</span>
               </button>
             ))}
           </div>
         </details>
       ))}
     </nav>
+  );
+}
+
+type CompactDeckHeaderProps = {
+  collapsed: boolean;
+  selectedCount: number;
+  slideCount: number;
+  transferActions: ReactNode;
+  onCollapse: () => void;
+  onHandout: () => void;
+  onPresent: () => void;
+  onReset: () => void;
+};
+
+export function CompactDeckHeader({
+  collapsed,
+  onCollapse,
+  onHandout,
+  onPresent,
+  onReset,
+  selectedCount,
+  slideCount,
+  transferActions,
+}: CompactDeckHeaderProps) {
+  return (
+    <>
+      <div className={styles.compactDeckHeading}>
+        <div>
+          <Layers3 aria-hidden />
+          <span>
+            <small>Deck preview</small>
+            <strong>{slideCount} slide{slideCount === 1 ? "" : "s"}</strong>
+          </span>
+        </div>
+        <button
+          type="button"
+          aria-controls="v2-slide-list"
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Expand lesson preview" : "Collapse lesson preview"}
+          onClick={onCollapse}
+        >
+          {collapsed ? <PanelRightOpen aria-hidden /> : <PanelRightClose aria-hidden />}
+        </button>
+      </div>
+      <div className={styles.compactDeckActions} role="toolbar" aria-label="Deck preview actions">
+        <button
+          type="button"
+          aria-label="Preview full lesson"
+          title="Preview full lesson"
+          onClick={onPresent}
+        >
+          <Play aria-hidden /> <span>Present</span>
+        </button>
+        <button
+          type="button"
+          aria-label={`Open handout from ${selectedCount} selected slide${selectedCount === 1 ? "" : "s"}`}
+          title={`Open handout (${selectedCount} selected)`}
+          onClick={onHandout}
+        >
+          <Printer aria-hidden /> <span>Handout</span>
+        </button>
+        {transferActions}
+        <button className={styles.compactResetButton} type="button" aria-label="Reset lesson" title="Reset lesson" onClick={onReset}>
+          <RotateCcw aria-hidden />
+        </button>
+      </div>
+    </>
   );
 }

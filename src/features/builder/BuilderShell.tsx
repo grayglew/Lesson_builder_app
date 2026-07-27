@@ -14,6 +14,7 @@ import {
 import { useAppNotifications } from "./AppNotifications";
 import {
   CompactAppBar,
+  CompactDeckHeader,
   CompactToolNavigation,
   CompactWorkspaceHeader,
   type BuilderShellVariant,
@@ -442,6 +443,14 @@ export function BuilderShell({
             userEmail={userEmail}
             cloudMessage={workspaceAutosave.message}
             busy={Boolean(busyAction)}
+            identityControl={
+              isImpersonating ? (
+                <ImpersonationControl
+                  actorEmail={actorEmail}
+                  effectiveEmail={userEmail}
+                />
+              ) : null
+            }
             onLessons={() => setActiveTool("saved-lessons")}
             onPresent={() => void lessonActions.previewLesson(false)}
             onSave={() => void saveLesson(false)}
@@ -463,6 +472,19 @@ export function BuilderShell({
             </div>
           </div>
 
+          <div
+            className={
+              variant === "compact-console"
+                ? styles.compactLessonDetails
+                : styles.classicLessonDetails
+            }
+          >
+          {variant === "compact-console" ? (
+            <div className={styles.compactLessonDetailsHead}>
+              <span>Lesson setup</span>
+              <small>Metadata and saving</small>
+            </div>
+          ) : null}
           <label className={styles.fieldLabel} htmlFor="v2-lesson-title">
             Lesson title
           </label>
@@ -560,6 +582,7 @@ export function BuilderShell({
             </button>
           </div>
           <WorkspaceAutosaveIndicator {...workspaceAutosave} />
+          </div>
 
           {variant === "compact-console" ? (
             <CompactToolNavigation
@@ -706,6 +729,18 @@ export function BuilderShell({
         </section>
 
         <aside className={styles.previewPane} aria-label="Lesson preview">
+          {variant === "compact-console" ? (
+            <CompactDeckHeader
+              collapsed={previewCollapsed}
+              selectedCount={selectedPreviewSlideIds.length}
+              slideCount={document.slides.length}
+              transferActions={<LessonTransferActions actions={lessonActions} />}
+              onCollapse={() => setPreviewCollapsed((current) => !current)}
+              onHandout={() => void lessonActions.previewLesson(true)}
+              onPresent={() => void lessonActions.previewLesson(false)}
+              onReset={() => void resetCurrentLesson()}
+            />
+          ) : (
           <div className={styles.previewHead}>
             <div className={styles.previewTitle}>
               <span className={styles.eyebrow}>Deck preview</span>
@@ -768,6 +803,7 @@ export function BuilderShell({
               </button>
             </div>
           </div>
+          )}
 
           <ol id="v2-slide-list" className={styles.slideList}>
             {document.slides.map((slide, index) => (

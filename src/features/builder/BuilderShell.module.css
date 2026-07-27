@@ -1994,3 +1994,405 @@
     width: 100%;
   }
 }
+
+/* Desktop-light completion pass ----------------------------------------- */
+
+.classicLessonDetails {
+  display: contents;
+}
+
+.compactConsole .sidebar {
+  padding: 0;
+}
+
+.compactConsole .brandBlock,
+.compactConsole .externalTools {
+  display: none;
+}
+
+.compactLessonDetails {
+  border-bottom: 1px solid var(--builder-line);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--builder-accent-soft) 42%, transparent), transparent 58%),
+    var(--builder-surface);
+  padding: 0.8rem;
+}
+
+.compactLessonDetailsHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--builder-line);
+}
+
+.compactLessonDetailsHead span {
+  color: var(--builder-ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.compactLessonDetailsHead small {
+  color: var(--builder-muted);
+  font: 600 0.58rem/1 var(--font-builder-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.compactConsole .fieldLabel,
+.compactConsole .eyebrow,
+.compactConsole .assetLabel {
+  color: var(--builder-muted);
+  font-family: var(--font-builder-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.075em;
+}
+
+.compactConsole .textInput,
+.compactConsole .textArea,
+.compactConsole .dataTable textarea,
+.compactConsole .dataTable input[type="number"],
+.compactConsole .dataTable input[type="date"] {
+  min-height: 2.75rem;
+  border-radius: 0.2rem;
+  background: var(--builder-surface);
+}
+
+.compactConsole .classActions,
+.compactConsole .lessonQuickActions {
+  gap: 0.4rem;
+}
+
+.compactConsole .lessonQuickActions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0.8rem;
+}
+
+.compactConsole .lessonQuickActions .primaryButton {
+  grid-column: auto;
+}
+
+.compactConsole .lessonQuickActions .secondaryButton {
+  grid-column: 1 / -1;
+}
+
+.compactConsole .primaryButton,
+.compactConsole .secondaryButton,
+.compactConsole .dangerButton,
+.compactConsole .navButton,
+.compactConsole .exampleRetrievalToggle {
+  min-height: 2.75rem;
+  border-radius: 0.2rem;
+  box-shadow: none;
+}
+
+.compactConsole .primaryButton {
+  background: var(--builder-accent);
+}
+
+.compactConsole .secondaryButton {
+  background: var(--builder-surface);
+}
+
+.compactConsole .compactToolNavigation {
+  margin: 0;
+}
+
+.compactToolNavigation details > div {
+  gap: 0.1rem;
+  padding: 0.3rem 0.45rem 0.45rem;
+}
+
+.compactToolNavigation details button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.compactToolNavigation details button svg {
+  flex: 0 0 auto;
+  color: var(--builder-line-strong);
+}
+
+.compactToolNavigation details button[data-active="true"] svg {
+  color: var(--builder-accent);
+}
+
+.compactIdentityControl {
+  border-top: 1px solid var(--builder-line);
+  padding: 0.55rem 0.65rem;
+}
+
+.compactIdentityControl .impersonationIdentity {
+  gap: 0.35rem;
+}
+
+.compactIdentityControl .impersonationIdentity p {
+  max-width: 15rem;
+  margin: 0;
+  color: var(--builder-muted);
+  font-size: 0.7rem;
+}
+
+.compactIdentityControl .tinyButton {
+  min-height: 2.25rem;
+}
+
+.compactConsole .workspace {
+  background:
+    linear-gradient(var(--builder-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--builder-line) 1px, transparent 1px),
+    var(--builder-bg);
+  background-size: 2rem 2rem;
+  background-position: -1px -1px;
+}
+
+.compactWorkspaceBody {
+  display: grid;
+  align-content: start;
+}
+
+.compactConsole .toolPanel {
+  border: 1px solid var(--builder-line-strong);
+  border-top: 3px solid var(--builder-accent);
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--builder-surface) 97%, transparent);
+  padding: 1rem;
+  box-shadow: 0 0.65rem 1.8rem rgba(29, 39, 35, 0.08);
+}
+
+.compactConsole .panelHead {
+  min-height: 3.1rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.compactConsole .panelHead h3 {
+  font-size: 1rem;
+  letter-spacing: -0.015em;
+}
+
+.compactConsole .retrievalMeta,
+.compactConsole .retrievalEditImageSlot,
+.compactConsole .exampleRetrievalSlot,
+.compactConsole .revisionItem {
+  border-radius: 0.2rem;
+  background: var(--builder-surface-alt);
+}
+
+.compactConsole .starterEditorGrid,
+.compactConsole .exampleMainGrid,
+.compactConsole .exampleRetrievalGrid {
+  gap: 0.7rem;
+}
+
+.compactConsole .slotEditor,
+.compactConsole .exampleMainColumn {
+  min-width: 0;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.2rem;
+  background: var(--builder-surface);
+  padding: 0.7rem;
+}
+
+.compactConsole .imageDrop,
+.compactConsole .retrievalImageDrop {
+  border-radius: 0.18rem;
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 0.6rem, rgba(35, 117, 101, 0.025) 0.6rem 1.2rem),
+    var(--builder-surface);
+}
+
+.compactConsole .tableWrap {
+  border-color: var(--builder-line-strong);
+  border-radius: 0.2rem;
+}
+
+.compactConsole .dataTable {
+  background: var(--builder-surface);
+}
+
+.compactConsole .dataTable th {
+  background: #e3e8e4;
+  font-family: var(--font-builder-mono);
+  letter-spacing: 0.075em;
+}
+
+.compactConsole .dataTable tbody tr:hover {
+  background: color-mix(in srgb, var(--builder-accent-soft) 35%, var(--builder-surface));
+}
+
+.compactConsole .actionRow {
+  margin-top: 1rem;
+  border-top-color: var(--builder-line-strong);
+}
+
+.compactConsole .previewPane {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: 0;
+}
+
+.compactDeckHeading {
+  display: flex;
+  min-height: 3.7rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--builder-line);
+  padding: 0.4rem 0.55rem 0.4rem 0.7rem;
+}
+
+.compactDeckHeading > div,
+.compactDeckHeading > div > span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.compactDeckHeading > div > span {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.compactDeckHeading small {
+  color: var(--builder-muted);
+  font: 600 0.58rem/1 var(--font-builder-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compactDeckHeading strong {
+  font-size: 0.8rem;
+}
+
+.compactDeckHeading button,
+.compactDeckActions > button {
+  display: inline-flex;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.2rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.compactDeckHeading button {
+  border-color: transparent;
+}
+
+.compactDeckActions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.3rem;
+  border-bottom: 1px solid var(--builder-line);
+  background: var(--builder-surface-alt);
+  padding: 0.4rem;
+}
+
+.compactDeckActions > button {
+  flex-direction: column;
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.61rem;
+  font-weight: 700;
+}
+
+.compactDeckActions > button:hover,
+.compactDeckHeading button:hover {
+  border-color: var(--builder-line-strong);
+  background: var(--builder-surface);
+}
+
+.compactDeckActions .transferMenuSummary {
+  width: 100%;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border-color: transparent;
+  border-radius: 0.2rem;
+  background: transparent;
+}
+
+.compactDeckActions .transferMenuContent {
+  right: 0;
+  border-radius: 0.2rem;
+}
+
+.compactResetButton {
+  color: var(--builder-danger) !important;
+}
+
+.compactConsole .slideList {
+  gap: 0.55rem;
+  padding: 0.55rem;
+}
+
+.compactConsole .slideItem {
+  border-radius: 0.2rem;
+  box-shadow: none;
+}
+
+.compactConsole .slideItemActive {
+  border-left: 4px solid var(--builder-accent);
+}
+
+.compactConsole .slideItemSelected {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--builder-accent) 22%, transparent);
+}
+
+.compactConsole .slideToolbar {
+  min-height: 2.75rem;
+  padding: 0.45rem 0.5rem;
+  background: var(--builder-surface-alt);
+}
+
+.compactConsole .slideSelectButton {
+  min-height: 2.25rem;
+}
+
+.compactConsole .miniButton {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border-radius: 0.18rem;
+}
+
+.compactConsole :global(.rounded-xl),
+.compactConsole :global(.rounded-lg),
+.compactConsole :global(.rounded-md) {
+  border-radius: 0.2rem;
+}
+
+.compactConsole :global(.border-slate-200) {
+  border-color: var(--builder-line);
+}
+
+.compactConsole :global(.bg-white) {
+  background-color: var(--builder-surface);
+}
+
+.compactConsole :global(.bg-slate-50) {
+  background-color: var(--builder-surface-alt);
+}
+
+.compactConsole :global(.text-slate-900) {
+  color: var(--builder-ink);
+}
+
+.compactConsole :global(.text-slate-600),
+.compactConsole :global(.text-slate-500) {
+  color: var(--builder-muted);
+}
+
+@media (min-width: 1280px) {
+  .compactConsole .compactWorkspaceBody {
+    padding: 0.9rem;
+  }
+}
