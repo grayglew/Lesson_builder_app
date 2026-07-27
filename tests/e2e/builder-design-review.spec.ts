@@ -1,0 +1,97 @@
+import { expect, test } from "@playwright/test";
+
+const viewports = [
+  { name: "phone-375", width: 375, height: 812 },
+  { name: "phone-414", width: 414, height: 896 },
+  { name: "tablet-portrait", width: 768, height: 1024 },
+  { name: "tablet-landscape", width: 1024, height: 768 },
+  { name: "desktop", width: 1440, height: 900 },
+] as const;
+
+test.describe("Builder design review", () => {
+  for (const viewport of viewports) {
+    test(`${viewport.name} has no document overflow and renders the prototype`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto("http://127.0.0.1:3200/design-review/builder");
+
+      await expect(
+        page.getByRole("heading", {
+          name: "A faster workspace, without changing the lesson workflow.",
+        }),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: /Compact Console/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await expect(page.locator('[data-theme="compact"]').last()).toBeVisible();
+
+      const overflow = await page.evaluate(() => ({
+        body: document.body.scrollWidth - window.innerWidth,
+        document: document.documentElement.scrollWidth - window.innerWidth,
+      }));
+      expect(overflow.body).toBeLessThanOrEqual(1);
+      expect(overflow.document).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test("switches visual directions, scenarios, and mobile navigation models", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("http://127.0.0.1:3200/design-review/builder");
+
+    await page.getByRole("button", { name: /Teaching Studio/ }).click();
+    await expect(page.getByRole("button", { name: /Teaching Studio/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await page.getByRole("button", { name: "Retrieval" }).first().click();
+    await expect(page.getByRole("table", { name: "Retrieval bank prototype" })).toBeVisible();
+    await page.getByRole("button", { name: "Saved lessons" }).first().click();
+    await expect(page.getByRole("heading", { name: "Saved lessons" })).toBeVisible();
+
+    await page.getByRole("button", { name: /Tabbed workspace/ }).click();
+    await expect(page.getByRole("navigation", { name: "Mobile workspace tabs" })).toBeAttached();
+    await page.getByRole("button", { name: /Improved stack/ }).click();
+    await expect(page.getByRole("button", { name: /Improved stack/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  test("keeps visible phone controls touch-sized", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("http://127.0.0.1:3200/design-review/builder");
+    await page.getByRole("button", { name: "Mobile" }).click();
+
+    const undersized = await page.locator("[data-mobile-pattern] button:visible").evaluateAll(
+      (buttons) =>
+        buttons
+          .map((button) => {
+            const rect = button.getBoundingClientRect();
+            return {
+              label: button.getAttribute("aria-label") || button.textContent?.trim() || "button",
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+            };
+          })
+          .filter(({ width, height }) => width < 44 || height < 44),
+    );
+    expect(undersized).toEqual([]);
+  });
+
+  test("renders the safe dialog and notification examples", async ({ page }) => {
+    await page.goto("http://127.0.0.1:3200/design-review/builder");
+    const state = page.getByRole("combobox", { name: "Interface state" });
+    await state.selectOption("dialog");
+    await expect(
+      page.getByRole("alertdialog", { name: "Replace the current lesson?" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Keep current lesson" }).click();
+
+    await state.selectOption("error");
+    await expect(
+      page
+        .getByRole("region", { name: "Explore the working prototype" })
+        .getByRole("alert"),
+    ).toContainText("Couldn’t export the lesson");
+  });
+});
