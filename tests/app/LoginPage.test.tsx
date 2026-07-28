@@ -9,6 +9,16 @@ vi.mock("@/app/login/actions", () => ({
 afterEach(cleanup);
 
 describe("LoginPage builder routing", () => {
+  it("speaks to teachers without implementation or owner-facing copy", async () => {
+    render(await LoginPage({ searchParams: Promise.resolve({}) }));
+
+    expect(
+      document.body,
+    ).toHaveTextContent("Plan clear lessons, keep resources organised, and teach with confidence.");
+    expect(document.body).toHaveTextContent("Continue with your invited teacher account.");
+    expect(document.body).not.toHaveTextContent("Supabase");
+  });
+
   it("uses the unified builder for a normal login", async () => {
     render(await LoginPage({ searchParams: Promise.resolve({}) }));
 

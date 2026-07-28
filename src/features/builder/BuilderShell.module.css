@@ -10,6 +10,7 @@
   --builder-accent-dark: #0b514d;
   --builder-accent-soft: #d9f3ec;
   --builder-warn: #b45309;
+  --builder-warn-soft: #fff3cd;
   --builder-danger: #b42318;
   --builder-danger-soft: #ffe4df;
   --builder-shadow: 0 16px 36px rgba(19, 37, 42, 0.12);
@@ -180,7 +181,7 @@
   border: 1px solid var(--builder-line);
   border-radius: 8px;
   outline: none;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   padding: 10px 11px;
 }
@@ -282,7 +283,7 @@
 
 .secondaryButton {
   border-color: var(--builder-line);
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
 }
 
@@ -327,7 +328,7 @@
   overflow: auto;
   border: 1px solid var(--builder-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--builder-surface) 92%, transparent);
   padding: 18px;
   box-shadow: var(--builder-shadow);
 }
@@ -384,7 +385,7 @@
   width: 100%;
   min-width: 940px;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--builder-surface);
   font-size: 12px;
 }
 
@@ -419,7 +420,7 @@
   min-width: 76px;
   border: 1px solid var(--builder-line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   padding: 7px;
   font: inherit;
@@ -438,7 +439,7 @@
 }
 
 .dueRow {
-  background: #fff8e8;
+  background: color-mix(in srgb, var(--builder-warn-soft) 78%, var(--builder-surface));
 }
 
 .dueRow strong {
@@ -622,7 +623,7 @@
   place-items: center;
   border: 1px dashed var(--builder-line-strong);
   border-radius: 7px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-muted);
   cursor: pointer;
 }
@@ -739,7 +740,7 @@
   outline: none;
   background:
     linear-gradient(135deg, rgba(15, 118, 110, 0.08), transparent),
-    #fff;
+    var(--builder-surface);
   color: var(--builder-muted);
   cursor: pointer;
   text-align: center;
@@ -934,7 +935,7 @@
   place-items: center;
   border: 1px solid var(--builder-line);
   border-radius: 7px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   cursor: pointer;
   font-size: 17px;
@@ -964,7 +965,7 @@
   overflow: hidden;
   border: 1px solid var(--builder-line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--builder-surface);
   padding: 6px;
   box-shadow: var(--builder-shadow);
 }
@@ -1000,7 +1001,7 @@
   display: inline-grid;
   place-items: center;
   border: 1px solid var(--builder-line);
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   cursor: pointer;
 }
@@ -1090,7 +1091,7 @@
   place-items: center;
   border: 1px solid var(--builder-line-strong);
   border-radius: 4px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-accent-dark);
   font-size: 11px;
   font-weight: 900;
@@ -1337,7 +1338,7 @@
   padding: 10px 12px;
   border: 1px solid var(--builder-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
   box-shadow: 0 12px 28px rgba(19, 37, 42, 0.18);
   color: var(--builder-muted);
   font-size: 13px;
@@ -1363,8 +1364,8 @@
 }
 
 .notificationToast.warning {
-  border-color: #f5d58c;
-  background: #fff3cd;
+  border-color: color-mix(in srgb, var(--builder-warn) 48%, var(--builder-line));
+  background: var(--builder-warn-soft);
   color: var(--builder-warn);
 }
 
@@ -1396,7 +1397,7 @@
 }
 
 .toastCloseButton:hover {
-  background: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, currentColor 12%, transparent);
   opacity: 1;
 }
 
@@ -1563,6 +1564,7 @@
   --builder-accent-dark: #15594d;
   --builder-accent-soft: #dcece7;
   --builder-warn: #9a5b05;
+  --builder-warn-soft: #fff3cd;
   --builder-danger: #a64036;
   --builder-danger-soft: #f8ded9;
   --builder-shadow: 0 1rem 2.8rem rgba(25, 36, 32, 0.16);
@@ -1589,6 +1591,7 @@
   --builder-accent-dark: #91d5c4;
   --builder-accent-soft: #183c34;
   --builder-warn: #f2b65f;
+  --builder-warn-soft: #3b301d;
   --builder-danger: #ff9488;
   --builder-danger-soft: #482722;
   --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);
@@ -1608,6 +1611,7 @@
     --builder-accent-dark: #91d5c4;
     --builder-accent-soft: #183c34;
     --builder-warn: #f2b65f;
+    --builder-warn-soft: #3b301d;
     --builder-danger: #ff9488;
     --builder-danger-soft: #482722;
     --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);

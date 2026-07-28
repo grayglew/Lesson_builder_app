@@ -199,6 +199,20 @@ test.describe("Compact Console functional review", () => {
     expect(shellColours.background).toBe("rgb(20, 25, 23)");
     expect(shellColours.colour).toBe("rgb(238, 243, 240)");
 
+    const clearLo = page.getByRole("button", { name: "Clear LO 2" });
+    await expect(clearLo).toBeVisible();
+    expect(await clearLo.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgb(29, 36, 33)");
+
+    await page.getByRole("button", { name: "Placeholder" }).click();
+    await page.getByRole("button", { name: "Add placeholder slide" }).click();
+    const dragHandle = page.getByRole("button", { name: "Drag slide 1 to reorder" });
+    await expect(dragHandle).toBeVisible();
+    expect(await dragHandle.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgb(29, 36, 33)");
+    expect(await dragHandle.evaluate((element) => getComputedStyle(element).color))
+      .toBe("rgb(238, 243, 240)");
+
     await page.getByRole("button", { name: "Reset lesson" }).click();
     const dialog = page.getByRole("dialog", { name: "Start a new lesson?" });
     await expect(dialog).toBeVisible();

@@ -21,17 +21,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
         <div className="max-w-xl">
           <p className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-[#8ed0c0]">
-            Teacher workspace / secure access
+            Lesson planning / secure workspace
           </p>
           <h1 className="mt-4 max-w-[13ch] text-5xl font-semibold leading-[1.03] tracking-[-0.025em]">
-            Build lessons, autosave them, and export the same polished resources from anywhere.
+            Plan clear lessons, keep resources organised, and teach with confidence.
           </h1>
           <p className="mt-5 max-w-[56ch] text-base leading-7 text-[#bdc8c3]">
-            This version keeps the local Lesson Builder workflow but stores lessons, retrieval
-            practice, assets, and backups in your Supabase project.
+            Create, adapt, present, and revisit your lessons from one place. Your classes,
+            retrieval practice, teaching resources, and saved lessons stay ready wherever you
+            teach.
           </p>
         </div>
-        <div className="font-mono text-xs uppercase tracking-[0.1em] text-[#8d9d96]">Private by default / Export when ready</div>
+        <div className="font-mono text-xs uppercase tracking-[0.1em] text-[#8d9d96]">Your lessons stay private / Export when you choose</div>
       </section>
 
       <section className="flex items-center justify-center px-5 py-10">
@@ -46,7 +47,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#247563]">Account access</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-[-0.02em]">Sign in</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            This private workspace is restricted to active teacher accounts.
+            Continue with your invited teacher account.
           </p>
 
           {params.message ? (
@@ -85,7 +86,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </form>
 
           <div className="mt-4 border border-[#d2d8d4] bg-[#f2f4f2] px-4 py-3 text-sm text-slate-600">
-            New email sign-ups are disabled.
+            Need access? Ask your school&apos;s Lesson Builder administrator for an invitation.
           </div>
         </div>
       </section>
