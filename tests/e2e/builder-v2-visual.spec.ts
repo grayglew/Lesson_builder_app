@@ -121,7 +121,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps the accepted three-column builder shell", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await expect(
       page.getByRole("complementary", { name: "Lesson builder navigation" }),
     ).toBeVisible();
@@ -146,7 +146,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Retrieval in the legacy table-and-actions layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Retrieval", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Retrieval bank" })).toBeVisible();
@@ -163,7 +163,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Example in the legacy authoring layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Example", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Example slide" })).toBeVisible();
@@ -201,7 +201,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Worksheet in the legacy file-pair layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Worksheet", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Worksheet slide" })).toBeVisible();
@@ -218,7 +218,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps PDF in the legacy render-controls layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "PDF", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "PDF worksheet" })).toBeVisible();
@@ -233,7 +233,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps CFU in the legacy placement-and-image layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "CFU", exact: true }).click();
 
     await expect(
@@ -250,7 +250,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Draw in the legacy canvas layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Draw", exact: true }).click();
 
     await expect(
@@ -267,7 +267,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps LaTeX in the legacy two-editor layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "LaTeX", exact: true }).click();
 
     await expect(
@@ -288,7 +288,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("opens the standalone presenter from the builder", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     const popupPromise = page.waitForEvent("popup");
 
     await page.getByRole("button", { name: "Preview full lesson" }).click();
@@ -512,7 +512,7 @@ test.describe("Builder accepted UI baseline", () => {
       });
     });
 
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await expect(page.getByRole("heading", { name: "3 slides" })).toBeVisible();
     const builderPdfAspect = await page
       .locator('aside [style*="--preview-slide-aspect"]')

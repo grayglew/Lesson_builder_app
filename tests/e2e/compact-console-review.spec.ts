@@ -69,7 +69,7 @@ test.describe("Compact Console functional review", () => {
       if (message.type() === "error") errors.push(message.text());
     });
 
-    await page.goto("/builder/compact-review?visual=1");
+    await page.goto("/builder?visual=1");
     await expect(page.getByRole("region", { name: "Starter" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Slide tools" })).toBeVisible();
     await expect(page.getByRole("complementary", { name: "Lesson preview" })).toBeVisible();
@@ -98,7 +98,7 @@ test.describe("Compact Console functional review", () => {
   test("keeps tools, menus, and rail controls interactive", async ({ page }) => {
     await stubBuilder(page);
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/builder/compact-review?visual=1");
+    await page.goto("/builder?visual=1");
 
     await page.getByRole("button", { name: "Placeholder" }).click();
     await expect(page.getByRole("region", { name: "Placeholder" })).toBeVisible();
@@ -149,7 +149,7 @@ test.describe("Compact Console functional review", () => {
   test("places the refined rail, deck, retrieval, and library controls correctly", async ({ page }) => {
     await stubBuilder(page);
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/builder/compact-review?visual=1");
+    await page.goto("/builder?visual=1");
 
     const railToggle = page.getByRole("button", { name: "Collapse lesson tools" });
     const lessonSetup = page.getByText("Lesson setup", { exact: true });
@@ -186,7 +186,7 @@ test.describe("Compact Console functional review", () => {
   test("applies and persists dark mode without recolouring lesson previews", async ({ page }) => {
     await stubBuilder(page);
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/builder/compact-review?visual=1&theme=dark");
+    await page.goto("/builder?visual=1&theme=dark");
 
     const shell = page.locator("[data-builder-variant='compact-console']");
     await expect(shell).toHaveAttribute("data-builder-theme", "dark");
@@ -246,7 +246,7 @@ test.describe("Compact Console functional review", () => {
     await stubBuilder(page);
     await page.emulateMedia({ colorScheme: "dark" });
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/builder/compact-review?visual=1&theme=system");
+    await page.goto("/builder?visual=1&theme=system");
 
     const shell = page.locator("[data-builder-variant='compact-console']");
     await expect(shell).toHaveAttribute("data-builder-theme", "system");
@@ -266,7 +266,7 @@ test.describe("Compact Console functional review", () => {
 
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
-      await page.goto("/builder/compact-review?visual=1&theme=light");
+      await page.goto("/builder?visual=1&theme=light");
 
       const dock = page.getByRole("navigation", { name: "Builder workspace" });
       await expect(dock).toBeVisible();
@@ -336,7 +336,7 @@ test.describe("Compact Console functional review", () => {
   test("preserves a composer draft and restores focus around mobile drawers", async ({ page }) => {
     await stubBuilder(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/builder/compact-review?visual=1&theme=dark");
+    await page.goto("/builder?visual=1&theme=dark");
 
     const draft = page.getByLabel("Overall lesson LO");
     await draft.fill("Keep this draft mounted");
