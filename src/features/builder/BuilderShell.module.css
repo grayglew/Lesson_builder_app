@@ -2069,7 +2069,7 @@
   }
 
   .compactConsole .compactCloudStatus,
-  .compactConsole .compactAppBar > button:not(.compactSaveButton) {
+  .compactConsole .compactLessonsButton {
     display: none;
   }
 
@@ -2699,5 +2699,231 @@
 @media (min-width: 1280px) {
   .compactConsole .compactWorkspaceBody {
     padding: 0.9rem;
+  }
+}
+
+/* Compact Console responsive drawers ----------------------------------- */
+
+.compactMobileDock,
+.compactDrawerScrim {
+  display: none;
+}
+
+.compactMobileDock[hidden] {
+  display: none;
+}
+
+@media (max-width: 1279px) {
+  .compactConsole {
+    --compact-mobile-dock-height: 4rem;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .compactConsole .appShell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 3.5rem minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .compactConsole .compactAppBar {
+    position: relative;
+    grid-row: 1;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  }
+
+  .compactConsole .compactCloudStatus,
+  .compactConsole .compactLessonsButton {
+    display: none;
+  }
+
+  .compactConsole .compactAppBar > .compactPresentButton,
+  .compactConsole .compactAppBar > .compactSaveButton {
+    display: inline-flex;
+  }
+
+  .compactConsole .workspace {
+    grid-row: 2;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .compactConsole .compactWorkspaceBody {
+    min-height: 100%;
+    padding-bottom: calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom) + 0.8rem
+    );
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .previewPane {
+    position: fixed;
+    top: 3.5rem;
+    bottom: calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom)
+    );
+    z-index: var(--builder-layer-drawer);
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    box-shadow: var(--builder-shadow);
+    transition: transform 180ms ease, visibility 180ms step-end;
+    visibility: hidden;
+  }
+
+  .compactConsole .sidebar {
+    left: 0;
+    width: min(88vw, 20rem);
+    border-right: 1px solid var(--builder-line);
+    transform: translateX(-105%);
+  }
+
+  .compactConsole .previewPane {
+    right: 0;
+    width: min(92vw, 22rem);
+    border-left: 1px solid var(--builder-line);
+    transform: translateX(105%);
+  }
+
+  .compactConsole[data-mobile-panel="lesson"] .sidebar,
+  .compactConsole[data-mobile-panel="deck"] .previewPane {
+    transform: translateX(0);
+    transition: transform 180ms ease, visibility 0ms;
+    visibility: visible;
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar,
+  .compactConsole .previewCollapsed .previewPane {
+    width: min(88vw, 20rem);
+    padding: 0;
+  }
+
+  .compactConsole .previewCollapsed .previewPane {
+    width: min(92vw, 22rem);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar > :not(.compactLessonDetailsHead),
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead span {
+    display: revert;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading > div {
+    display: flex;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckActions {
+    display: grid;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading {
+    justify-content: space-between;
+    padding: 0.35rem 0;
+  }
+
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead {
+    justify-content: flex-start;
+    padding: 0.2rem 0.45rem;
+    border-bottom: 1px solid var(--builder-line);
+  }
+
+  .compactDrawerScrim {
+    position: fixed;
+    inset: 3.5rem 0 calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom)
+    );
+    z-index: calc(var(--builder-layer-drawer) - 1);
+    display: block;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(8, 14, 12, 0.54);
+    padding: 0;
+    cursor: pointer;
+    backdrop-filter: blur(0.12rem);
+  }
+
+  .compactConsole[data-mobile-panel="lesson"] .compactDrawerScrim {
+    left: min(88vw, 20rem);
+  }
+
+  .compactConsole[data-mobile-panel="deck"] .compactDrawerScrim {
+    right: min(92vw, 22rem);
+  }
+
+  .compactMobileDock {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: calc(var(--builder-layer-drawer) + 1);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-height: calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom)
+    );
+    border-top: 1px solid var(--builder-line);
+    background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
+    padding: 0.25rem max(0.35rem, env(safe-area-inset-right))
+      calc(0.25rem + env(safe-area-inset-bottom))
+      max(0.35rem, env(safe-area-inset-left));
+    box-shadow: 0 -0.5rem 1.8rem rgba(20, 30, 26, 0.13);
+    backdrop-filter: blur(0.8rem);
+  }
+
+  .compactMobileDock button {
+    display: grid;
+    min-width: 2.75rem;
+    min-height: 3.5rem;
+    place-items: center;
+    align-content: center;
+    gap: 0.18rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--builder-muted);
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 750;
+    cursor: pointer;
+  }
+
+  .compactMobileDock button[aria-pressed="true"] {
+    background: var(--builder-accent-soft);
+    color: var(--builder-accent-dark);
+  }
+
+  .compactMobileDock svg {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .compactConsole :is(button, input, select, textarea) {
+    min-height: 2.75rem;
+  }
+
+  .compactConsole button {
+    min-width: 2.75rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .compactConsole .compactPresentButton span,
+  .compactConsole .compactSaveButton span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compactConsole .sidebar,
+  .compactConsole .previewPane {
+    transition: none;
   }
 }

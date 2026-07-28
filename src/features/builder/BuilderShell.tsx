@@ -7,8 +7,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Trash2,
+  X,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import {
   archiveClassName,
   loadBuilderDocument,
@@ -22,7 +23,9 @@ import { useAppNotifications } from "./AppNotifications";
 import {
   CompactAppBar,
   CompactDeckHeader,
+  CompactMobileDock,
   CompactToolNavigation,
+  type CompactMobilePanel,
   type BuilderShellVariant,
   type BuilderThemePreference,
   type BuilderToolName,
@@ -56,6 +59,7 @@ import {
 } from "./store";
 import { useLessonExportActions } from "./useLessonExportActions";
 import { useWorkspaceAutosave } from "./useWorkspaceAutosave";
+import { useActiveDialogFocus } from "./useDialogFocus";
 import { renderLatexDocument } from "./latex";
 import { parseInlineMarkdown } from "./markdown";
 
@@ -129,6 +133,11 @@ export function BuilderShell({
   const [activeTool, setActiveTool] = useState<ToolName>("starter");
   const [lessonRailCollapsed, setLessonRailCollapsed] = useState(false);
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  const [compactMobileViewport, setCompactMobileViewport] = useState(false);
+  const [compactMobilePanel, setCompactMobilePanel] =
+    useState<CompactMobilePanel>("build");
+  const lessonDockButtonRef = useRef<HTMLButtonElement>(null);
+  const deckDockButtonRef = useRef<HTMLButtonElement>(null);
   const [draggedSlideId, setDraggedSlideId] = useState("");
   const [dragOverSlideId, setDragOverSlideId] = useState("");
   const [busyAction, setBusyAction] = useState("");
@@ -137,6 +146,28 @@ export function BuilderShell({
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
+  const lessonDrawerRef = useActiveDialogFocus<HTMLElement>(
+    () => setCompactMobilePanel("build"),
+    variant === "compact-console" &&
+      compactMobileViewport &&
+      compactMobilePanel === "lesson",
+  );
+  const deckDrawerRef = useActiveDialogFocus<HTMLElement>(
+    () => setCompactMobilePanel("build"),
+    variant === "compact-console" &&
+      compactMobileViewport &&
+      compactMobilePanel === "deck",
+  );
+
+  const compactDrawerOpen =
+    variant === "compact-console" &&
+    compactMobileViewport &&
+    compactMobilePanel !== "build";
+
+  function selectCompactTool(tool: ToolName) {
+    setActiveTool(tool);
+    if (compactMobileViewport) setCompactMobilePanel("build");
+  }
 
   function updateThemePreference(preference: BuilderThemePreference) {
     setThemePreference(preference);
@@ -173,6 +204,30 @@ export function BuilderShell({
       else delete root.dataset.builderTheme;
     };
   }, [themePreference, variant]);
+
+  useEffect(() => {
+    if (variant !== "compact-console" || !window.matchMedia) return;
+    const media = window.matchMedia("(max-width: 1279px)");
+    const updateViewport = () => {
+      setCompactMobileViewport(media.matches);
+      if (!media.matches) setCompactMobilePanel("build");
+    };
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, [variant]);
+
+  useEffect(() => {
+    if (!compactDrawerOpen) return;
+    const previousBodyOverflow = window.document.body.style.overflow;
+    const previousRootOverflow = window.document.documentElement.style.overflow;
+    window.document.body.style.overflow = "hidden";
+    window.document.documentElement.style.overflow = "hidden";
+    return () => {
+      window.document.body.style.overflow = previousBodyOverflow;
+      window.document.documentElement.style.overflow = previousRootOverflow;
+    };
+  }, [compactDrawerOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -478,6 +533,9 @@ export function BuilderShell({
       }`}
       data-builder-theme={themePreference}
       data-builder-variant={variant}
+      data-mobile-panel={
+        variant === "compact-console" ? compactMobilePanel : undefined
+      }
     >
       <div
         className={`${styles.appShell} ${
@@ -492,6 +550,7 @@ export function BuilderShell({
             userEmail={userEmail}
             cloudMessage={workspaceAutosave.message}
             busy={Boolean(busyAction)}
+            backgroundInert={compactDrawerOpen}
             identityControl={
               isImpersonating ? (
                 <ImpersonationControl
@@ -501,13 +560,43 @@ export function BuilderShell({
               ) : null
             }
             themePreference={themePreference}
-            onLessons={() => setActiveTool("saved-lessons")}
+            onLessons={() => selectCompactTool("saved-lessons")}
             onPresent={() => void lessonActions.previewLesson(false)}
             onSave={() => void saveLesson(false)}
             onThemeChange={updateThemePreference}
           />
         ) : null}
-        <aside className={styles.sidebar} aria-label="Lesson builder navigation">
+        <aside
+          id="compact-lesson-drawer"
+          ref={lessonDrawerRef}
+          className={styles.sidebar}
+          aria-label="Lesson builder navigation"
+          aria-hidden={
+            compactMobileViewport
+              ? compactMobilePanel !== "lesson"
+              : undefined
+          }
+          aria-modal={
+            compactMobileViewport && compactMobilePanel === "lesson"
+              ? "true"
+              : undefined
+          }
+          inert={
+            compactMobileViewport && compactMobilePanel !== "lesson"
+              ? true
+              : undefined
+          }
+          role={
+            compactMobileViewport && compactMobilePanel === "lesson"
+              ? "dialog"
+              : undefined
+          }
+          tabIndex={
+            compactMobileViewport && compactMobilePanel === "lesson"
+              ? -1
+              : undefined
+          }
+        >
           <div className={styles.brandBlock}>
             <div className={styles.brandMark}>LB</div>
             <div className={styles.brandCopy}>
@@ -527,11 +616,32 @@ export function BuilderShell({
             <div className={styles.compactLessonDetailsHead}>
               <button
                 type="button"
-                aria-label={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
-                title={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
-                onClick={() => setLessonRailCollapsed((current) => !current)}
+                aria-label={
+                  compactMobileViewport
+                    ? "Close lesson drawer"
+                    : lessonRailCollapsed
+                      ? "Expand lesson tools"
+                      : "Collapse lesson tools"
+                }
+                title={
+                  compactMobileViewport
+                    ? "Close lesson drawer"
+                    : lessonRailCollapsed
+                      ? "Expand lesson tools"
+                      : "Collapse lesson tools"
+                }
+                onClick={() => {
+                  if (compactMobileViewport) setCompactMobilePanel("build");
+                  else setLessonRailCollapsed((current) => !current);
+                }}
               >
-                {lessonRailCollapsed ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
+                {compactMobileViewport ? (
+                  <X aria-hidden />
+                ) : lessonRailCollapsed ? (
+                  <PanelLeftOpen aria-hidden />
+                ) : (
+                  <PanelLeftClose aria-hidden />
+                )}
               </button>
               <span>Lesson setup</span>
             </div>
@@ -648,7 +758,7 @@ export function BuilderShell({
           {variant === "compact-console" ? (
             <CompactToolNavigation
               activeTool={activeTool}
-              onSelect={setActiveTool}
+              onSelect={selectCompactTool}
             />
           ) : (
             <nav className={styles.panelNav} aria-label="Slide tools">
@@ -700,7 +810,11 @@ export function BuilderShell({
           </div>
         </aside>
 
-        <section className={styles.workspace} aria-label={toolLabels[activeTool]}>
+        <section
+          className={styles.workspace}
+          aria-label={toolLabels[activeTool]}
+          inert={compactDrawerOpen ? true : undefined}
+        >
           <div
             className={
               variant === "compact-console"
@@ -802,14 +916,46 @@ export function BuilderShell({
           </div>
         </section>
 
-        <aside className={styles.previewPane} aria-label="Lesson preview">
+        <aside
+          id="compact-deck-drawer"
+          ref={deckDrawerRef}
+          className={styles.previewPane}
+          aria-label="Lesson preview"
+          aria-hidden={
+            compactMobileViewport ? compactMobilePanel !== "deck" : undefined
+          }
+          aria-modal={
+            compactMobileViewport && compactMobilePanel === "deck"
+              ? "true"
+              : undefined
+          }
+          inert={
+            compactMobileViewport && compactMobilePanel !== "deck"
+              ? true
+              : undefined
+          }
+          role={
+            compactMobileViewport && compactMobilePanel === "deck"
+              ? "dialog"
+              : undefined
+          }
+          tabIndex={
+            compactMobileViewport && compactMobilePanel === "deck"
+              ? -1
+              : undefined
+          }
+        >
           {variant === "compact-console" ? (
             <CompactDeckHeader
               collapsed={previewCollapsed}
+              mobileDrawer={compactMobileViewport}
               selectedCount={selectedPreviewSlideIds.length}
               slideCount={document.slides.length}
               transferActions={<LessonTransferActions actions={lessonActions} />}
-              onCollapse={() => setPreviewCollapsed((current) => !current)}
+              onCollapse={() => {
+                if (compactMobileViewport) setCompactMobilePanel("build");
+                else setPreviewCollapsed((current) => !current);
+              }}
               onHandout={() => void lessonActions.previewLesson(true)}
               onReset={() => void resetCurrentLesson()}
             />
@@ -1003,6 +1149,26 @@ export function BuilderShell({
             ))}
           </ol>
         </aside>
+
+        {variant === "compact-console" ? (
+          <>
+            {compactDrawerOpen ? (
+              <button
+                className={styles.compactDrawerScrim}
+                type="button"
+                aria-label={`Dismiss ${compactMobilePanel} drawer`}
+                onClick={() => setCompactMobilePanel("build")}
+              />
+            ) : null}
+            <CompactMobileDock
+              activePanel={compactMobilePanel}
+              available={compactMobileViewport}
+              lessonButtonRef={lessonDockButtonRef}
+              deckButtonRef={deckDockButtonRef}
+              onSelect={setCompactMobilePanel}
+            />
+          </>
+        ) : null}
       </div>
 
       {newLessonDialogOpen ? (

@@ -31,8 +31,9 @@ import {
   Sparkles,
   SquareDashed,
   Sun,
+  X,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, type RefObject, useState } from "react";
 import { BuilderActionMenu } from "./BuilderActionMenu";
 import styles from "./BuilderShell.module.css";
 
@@ -66,10 +67,12 @@ type CompactAppBarProps = {
   onPresent: () => void;
   onSave: () => void;
   onThemeChange: (theme: BuilderThemePreference) => void;
+  backgroundInert?: boolean;
 };
 
 export function CompactAppBar({
   busy,
+  backgroundInert = false,
   className,
   cloudMessage,
   identityControl,
@@ -83,7 +86,7 @@ export function CompactAppBar({
   userEmail,
 }: CompactAppBarProps) {
   return (
-    <header className={styles.compactAppBar}>
+    <header className={styles.compactAppBar} inert={backgroundInert || undefined}>
       <div className={styles.compactBrand}>
         <span className={styles.compactBrandMark} aria-hidden>
           <svg viewBox="0 0 32 32">
@@ -104,19 +107,25 @@ export function CompactAppBar({
       <span className={styles.compactCloudStatus} title={cloudMessage}>
         <Cloud aria-hidden /> {cloudMessage}
       </span>
-      <button type="button" onClick={onLessons}>
-        <FolderOpen aria-hidden /> Lessons
+      <button className={styles.compactLessonsButton} type="button" onClick={onLessons}>
+        <FolderOpen aria-hidden /> <span>Lessons</span>
       </button>
-      <button type="button" onClick={onPresent}>
-        <Play aria-hidden /> Present
+      <button
+        className={styles.compactPresentButton}
+        type="button"
+        aria-label="Present"
+        onClick={onPresent}
+      >
+        <Play aria-hidden /> <span>Present</span>
       </button>
       <button
         className={styles.compactSaveButton}
         type="button"
+        aria-label="Save"
         disabled={busy}
         onClick={onSave}
       >
-        <Save aria-hidden /> {busy ? "Saving…" : "Save"}
+        <Save aria-hidden /> <span>{busy ? "Saving…" : "Save"}</span>
       </button>
       <BuilderActionMenu
         label="Account and utilities"
@@ -247,6 +256,7 @@ export function CompactToolNavigation({
 
 type CompactDeckHeaderProps = {
   collapsed: boolean;
+  mobileDrawer?: boolean;
   selectedCount: number;
   slideCount: number;
   transferActions: ReactNode;
@@ -257,6 +267,7 @@ type CompactDeckHeaderProps = {
 
 export function CompactDeckHeader({
   collapsed,
+  mobileDrawer = false,
   onCollapse,
   onHandout,
   onReset,
@@ -277,11 +288,23 @@ export function CompactDeckHeader({
         <button
           type="button"
           aria-controls="v2-slide-list"
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? "Expand lesson preview" : "Collapse lesson preview"}
+          aria-expanded={mobileDrawer ? true : !collapsed}
+          aria-label={
+            mobileDrawer
+              ? "Close deck drawer"
+              : collapsed
+                ? "Expand lesson preview"
+                : "Collapse lesson preview"
+          }
           onClick={onCollapse}
         >
-          {collapsed ? <PanelRightOpen aria-hidden /> : <PanelRightClose aria-hidden />}
+          {mobileDrawer ? (
+            <X aria-hidden />
+          ) : collapsed ? (
+            <PanelRightOpen aria-hidden />
+          ) : (
+            <PanelRightClose aria-hidden />
+          )}
         </button>
       </div>
       <div className={styles.compactDeckActions} role="toolbar" aria-label="Deck preview actions">
@@ -299,5 +322,63 @@ export function CompactDeckHeader({
         </button>
       </div>
     </>
+  );
+}
+
+export type CompactMobilePanel = "lesson" | "build" | "deck";
+
+type CompactMobileDockProps = {
+  activePanel: CompactMobilePanel;
+  available: boolean;
+  lessonButtonRef: RefObject<HTMLButtonElement | null>;
+  deckButtonRef: RefObject<HTMLButtonElement | null>;
+  onSelect: (panel: CompactMobilePanel) => void;
+};
+
+export function CompactMobileDock({
+  activePanel,
+  available,
+  deckButtonRef,
+  lessonButtonRef,
+  onSelect,
+}: CompactMobileDockProps) {
+  return (
+    <nav
+      className={styles.compactMobileDock}
+      aria-label="Builder workspace"
+      hidden={!available}
+      inert={!available || undefined}
+    >
+      <button
+        ref={lessonButtonRef}
+        type="button"
+        aria-controls="compact-lesson-drawer"
+        aria-expanded={activePanel === "lesson"}
+        aria-pressed={activePanel === "lesson"}
+        onClick={() => onSelect("lesson")}
+      >
+        <BookOpen aria-hidden />
+        <span>Lesson</span>
+      </button>
+      <button
+        type="button"
+        aria-pressed={activePanel === "build"}
+        onClick={() => onSelect("build")}
+      >
+        <PencilRuler aria-hidden />
+        <span>Build</span>
+      </button>
+      <button
+        ref={deckButtonRef}
+        type="button"
+        aria-controls="compact-deck-drawer"
+        aria-expanded={activePanel === "deck"}
+        aria-pressed={activePanel === "deck"}
+        onClick={() => onSelect("deck")}
+      >
+        <Layers3 aria-hidden />
+        <span>Deck</span>
+      </button>
+    </nav>
   );
 }

@@ -434,6 +434,28 @@ describe("BuilderShell legacy UI parity", () => {
   });
 });
 
+function installCompactViewportMatchMedia() {
+  const original = Object.getOwnPropertyDescriptor(window, "matchMedia");
+  const media = {
+    matches: true,
+    media: "(max-width: 1279px)",
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  } as unknown as MediaQueryList;
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn(() => media),
+  });
+  return () => {
+    if (original) Object.defineProperty(window, "matchMedia", original);
+    else delete (window as Partial<Window>).matchMedia;
+  };
+}
+
 describe("BuilderShell Compact Console action parity", () => {
   afterEach(() => {
     cleanup();
@@ -510,6 +532,60 @@ describe("BuilderShell Compact Console action parity", () => {
     await user.click(screen.getByRole("menuitemradio", { name: "System theme" }));
     expect(shell).toHaveAttribute("data-builder-theme", "system");
     expect(window.document.cookie).not.toContain("builder-theme=");
+  });
+
+  it("uses mounted, focus-managed Lesson and Deck drawers on compact viewports", async () => {
+    const restoreMatchMedia = installCompactViewportMatchMedia();
+    const user = userEvent.setup();
+
+    try {
+      render(
+        <AppNotificationsProvider>
+          <BuilderShell userEmail="teacher@example.com" variant="compact-console" />
+        </AppNotificationsProvider>,
+      );
+
+      const lessonLo = await screen.findByLabelText("Overall lesson LO");
+      await user.type(lessonLo, "Preserved while navigating");
+      const dock = await screen.findByRole("navigation", { name: "Builder workspace" });
+      const lessonButton = within(dock).getByRole("button", { name: "Lesson" });
+      const deckButton = within(dock).getByRole("button", { name: "Deck" });
+
+      await user.click(lessonButton);
+      const lessonDrawer = await screen.findByRole("dialog", {
+        name: "Lesson builder navigation",
+      });
+      expect(lessonDrawer).toHaveAttribute("aria-modal", "true");
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Close lesson drawer" }),
+      );
+      expect(document.body.style.overflow).toBe("hidden");
+      expect(document.querySelector("section[aria-label='Starter']")).toHaveAttribute("inert");
+
+      await user.click(within(lessonDrawer).getByRole("button", { name: "Add class" }));
+      expect(screen.getByRole("dialog", { name: "Add a class" })).toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog", { name: "Add a class" })).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "Lesson builder navigation" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Close lesson drawer" }));
+      expect(document.activeElement).toBe(lessonButton);
+      expect(document.body.style.overflow).toBe("");
+      expect(screen.getByLabelText("Overall lesson LO")).toHaveValue(
+        "Preserved while navigating",
+      );
+
+      await user.click(deckButton);
+      const deckDrawer = await screen.findByRole("dialog", { name: "Lesson preview" });
+      expect(deckDrawer).toHaveAttribute("aria-modal", "true");
+      await user.keyboard("{Escape}");
+      expect(document.activeElement).toBe(deckButton);
+      expect(screen.getByLabelText("Overall lesson LO")).toHaveValue(
+        "Preserved while navigating",
+      );
+    } finally {
+      restoreMatchMedia();
+    }
   });
 
   it("uses the same active tool and insert-after-selection state paths", async () => {

@@ -113,6 +113,12 @@ export function useActiveDialogFocus<T extends HTMLElement>(
     }
 
     function keepFocusInDialog(event: KeyboardEvent) {
+      const focusedModal =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement.closest<HTMLElement>('[aria-modal="true"]')
+          : null;
+      if (focusedModal && focusedModal !== dialog) return;
+
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();

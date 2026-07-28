@@ -239,4 +239,120 @@ test.describe("Compact Console functional review", () => {
     expect(await shell.evaluate((element) => getComputedStyle(element).backgroundColor))
       .toBe("rgb(20, 25, 23)");
   });
+
+  test("uses reachable drawers and a 44px dock across compact viewports", async ({ page }) => {
+    await stubBuilder(page);
+    const viewports = [
+      { width: 320, height: 568 },
+      { width: 375, height: 812 },
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
+    ];
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await page.goto("/builder/compact-review?visual=1&theme=light");
+
+      const dock = page.getByRole("navigation", { name: "Builder workspace" });
+      await expect(dock).toBeVisible();
+      await expect(page.getByRole("region", { name: "Starter" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Present", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+
+      const overflow = await page.evaluate(() => ({
+        document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        shell:
+          document.querySelector<HTMLElement>("[data-builder-variant='compact-console']")!
+            .scrollWidth -
+          document.querySelector<HTMLElement>("[data-builder-variant='compact-console']")!
+            .clientWidth,
+      }));
+      expect(overflow.document).toBeLessThanOrEqual(0);
+      expect(overflow.shell).toBeLessThanOrEqual(0);
+      expect(
+        await page.getByRole("region", { name: "Starter" }).evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(0);
+
+      for (const button of await dock.getByRole("button").all()) {
+        const box = await button.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+
+      const lessonButton = dock.getByRole("button", { name: "Lesson" });
+      await lessonButton.click();
+      const lessonDrawer = page.getByRole("dialog", {
+        name: "Lesson builder navigation",
+      });
+      await expect(lessonDrawer).toBeVisible();
+      await expect.poll(async () => (await lessonDrawer.boundingBox())?.x ?? -1)
+        .toBeGreaterThanOrEqual(0);
+      const lessonBox = await lessonDrawer.boundingBox();
+      expect(lessonBox).not.toBeNull();
+      expect(lessonBox!.x).toBeGreaterThanOrEqual(0);
+      expect(lessonBox!.x + lessonBox!.width).toBeLessThanOrEqual(viewport.width);
+      expect(
+        await lessonDrawer.evaluate((element) => element.scrollWidth - element.clientWidth),
+      ).toBeLessThanOrEqual(0);
+      await page.getByRole("button", { name: "Close lesson drawer" }).click();
+
+      const deckButton = dock.getByRole("button", { name: "Deck" });
+      await deckButton.click();
+      const deckDrawer = page.getByRole("dialog", { name: "Lesson preview" });
+      await expect(deckDrawer).toBeVisible();
+      await expect.poll(async () => {
+        const box = await deckDrawer.boundingBox();
+        return box ? box.x + box.width : viewport.width + 1;
+      }).toBeLessThanOrEqual(viewport.width);
+      const deckBox = await deckDrawer.boundingBox();
+      expect(deckBox).not.toBeNull();
+      expect(deckBox!.x).toBeGreaterThanOrEqual(0);
+      expect(deckBox!.x + deckBox!.width).toBeLessThanOrEqual(viewport.width);
+      expect(
+        await deckDrawer.evaluate((element) => element.scrollWidth - element.clientWidth),
+      ).toBeLessThanOrEqual(0);
+      await page.getByRole("button", { name: "Close deck drawer" }).click();
+    }
+  });
+
+  test("preserves a composer draft and restores focus around mobile drawers", async ({ page }) => {
+    await stubBuilder(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/builder/compact-review?visual=1&theme=dark");
+
+    const draft = page.getByLabel("Overall lesson LO");
+    await draft.fill("Keep this draft mounted");
+    const workspace = page.getByRole("region", { name: "Starter" });
+    const dock = page.getByRole("navigation", { name: "Builder workspace" });
+    const lessonButton = dock.getByRole("button", { name: "Lesson" });
+
+    await lessonButton.click();
+    const lessonDrawer = page.getByRole("dialog", {
+      name: "Lesson builder navigation",
+    });
+    await expect(lessonDrawer).toBeVisible();
+    await expect(page.getByRole("button", { name: "Close lesson drawer" })).toBeFocused();
+    await expect(workspace).toHaveAttribute("inert", "");
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+    await page.keyboard.press("Shift+Tab");
+    expect(
+      await lessonDrawer.evaluate((drawer) => drawer.contains(document.activeElement)),
+    ).toBe(true);
+
+    await page.getByRole("button", { name: "Dismiss lesson drawer" }).click();
+    await expect(lessonButton).toBeFocused();
+    await expect(draft).toHaveValue("Keep this draft mounted");
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+
+    const deckButton = dock.getByRole("button", { name: "Deck" });
+    await deckButton.click();
+    await expect(page.getByRole("dialog", { name: "Lesson preview" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(deckButton).toBeFocused();
+    await expect(draft).toHaveValue("Keep this draft mounted");
+  });
 });
