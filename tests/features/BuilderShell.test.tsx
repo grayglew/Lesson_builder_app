@@ -435,7 +435,11 @@ describe("BuilderShell legacy UI parity", () => {
 });
 
 describe("BuilderShell Compact Console action parity", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.document.cookie = "builder-theme=; Path=/; Max-Age=0; SameSite=Lax";
+    delete window.document.documentElement.dataset.builderTheme;
+  });
 
   beforeEach(() => {
     vi.mocked(loadBuilderDocument).mockResolvedValue(null);
@@ -480,6 +484,32 @@ describe("BuilderShell Compact Console action parity", () => {
     await userEvent.setup().click(screen.getByText("AI tools", { exact: true }));
     expect(screen.getByRole("link", { name: "Gemini-Expand" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Gemini-Atom" })).toBeInTheDocument();
+  });
+
+  it("switches and persists the Compact Console appearance preference", async () => {
+    const user = userEvent.setup();
+    render(
+      <BuilderShell
+        userEmail="teacher@example.com"
+        variant="compact-console"
+        initialTheme="system"
+      />,
+    );
+
+    const shell = await screen.findByRole("main");
+    expect(shell).toHaveAttribute("data-builder-theme", "system");
+    expect(window.document.documentElement.dataset.builderTheme).toBe("system");
+
+    await user.click(screen.getByRole("button", { name: "Account and utilities" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Dark theme" }));
+    expect(shell).toHaveAttribute("data-builder-theme", "dark");
+    expect(window.document.documentElement.dataset.builderTheme).toBe("dark");
+    expect(window.document.cookie).toContain("builder-theme=dark");
+
+    await user.click(screen.getByRole("button", { name: "Account and utilities" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "System theme" }));
+    expect(shell).toHaveAttribute("data-builder-theme", "system");
+    expect(window.document.cookie).not.toContain("builder-theme=");
   });
 
   it("uses the same active tool and insert-after-selection state paths", async () => {

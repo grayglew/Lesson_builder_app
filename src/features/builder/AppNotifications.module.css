@@ -172,6 +172,60 @@
   background: #f4f7f8;
 }
 
+:global(html[data-builder-theme="dark"]) .dialog {
+  border-color: #3b4741;
+  background: #1d2421;
+  color: #eef3f0;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.58);
+}
+
+:global(html[data-builder-theme="dark"]) .headingCopy p,
+:global(html[data-builder-theme="dark"]) .closeButton,
+:global(html[data-builder-theme="dark"]) .field {
+  color: #aab6b0;
+}
+
+:global(html[data-builder-theme="dark"]) .closeButton:hover,
+:global(html[data-builder-theme="dark"]) .secondaryButton:hover {
+  border-color: #69766f;
+  background: #252d29;
+}
+
+:global(html[data-builder-theme="dark"]) .field input,
+:global(html[data-builder-theme="dark"]) .secondaryButton {
+  border-color: #3b4741;
+  background: #252d29;
+  color: #eef3f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html[data-builder-theme="system"]) .dialog {
+    border-color: #3b4741;
+    background: #1d2421;
+    color: #eef3f0;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.58);
+  }
+
+  :global(html[data-builder-theme="system"]) .headingCopy p,
+  :global(html[data-builder-theme="system"]) .closeButton,
+  :global(html[data-builder-theme="system"]) .field {
+    color: #aab6b0;
+  }
+
+  :global(html[data-builder-theme="system"]) .closeButton:hover,
+  :global(html[data-builder-theme="system"]) .secondaryButton:hover {
+    border-color: #69766f;
+    background: #252d29;
+  }
+
+  :global(html[data-builder-theme="system"]) .field input,
+  :global(html[data-builder-theme="system"]) .secondaryButton {
+    border-color: #3b4741;
+    background: #252d29;
+    color: #eef3f0;
+  }
+}
+
 .dialog button:focus-visible,
 .dialog input:focus-visible {
   outline: 3px solid rgba(15, 118, 110, 0.3);

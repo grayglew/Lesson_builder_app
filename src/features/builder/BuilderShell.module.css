@@ -1572,7 +1572,47 @@
   --builder-layer-dialog: 100;
   --builder-layer-toast: 110;
   background: var(--builder-bg);
+  color: var(--builder-ink);
+  color-scheme: light;
   font-family: var(--font-builder-sans);
+}
+
+.compactConsole[data-builder-theme="dark"] {
+  --builder-bg: #141917;
+  --builder-surface: #1d2421;
+  --builder-surface-alt: #252d29;
+  --builder-ink: #eef3f0;
+  --builder-muted: #aab6b0;
+  --builder-line: #3b4741;
+  --builder-line-strong: #69766f;
+  --builder-accent: #66b9a5;
+  --builder-accent-dark: #91d5c4;
+  --builder-accent-soft: #183c34;
+  --builder-warn: #f2b65f;
+  --builder-danger: #ff9488;
+  --builder-danger-soft: #482722;
+  --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .compactConsole[data-builder-theme="system"] {
+    --builder-bg: #141917;
+    --builder-surface: #1d2421;
+    --builder-surface-alt: #252d29;
+    --builder-ink: #eef3f0;
+    --builder-muted: #aab6b0;
+    --builder-line: #3b4741;
+    --builder-line-strong: #69766f;
+    --builder-accent: #66b9a5;
+    --builder-accent-dark: #91d5c4;
+    --builder-accent-soft: #183c34;
+    --builder-warn: #f2b65f;
+    --builder-danger: #ff9488;
+    --builder-danger-soft: #482722;
+    --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);
+    color-scheme: dark;
+  }
 }
 
 .compactConsole .appShell {
@@ -1713,6 +1753,31 @@
   font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.compactMenuLabel,
+.compactMenuDivider {
+  display: block;
+}
+
+.compactMenuLabel {
+  padding: 0.45rem 0.65rem 0.25rem;
+  color: var(--builder-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compactMenuDivider {
+  height: 1px;
+  margin: 0.25rem 0.35rem;
+  background: var(--builder-line);
+}
+
+.compactConsole :global([role="menuitemradio"][aria-checked="true"]) {
+  background: var(--builder-accent-soft);
+  color: var(--builder-accent-dark);
 }
 
 .compactConsole .sidebar,
@@ -2367,9 +2432,13 @@
 }
 
 .compactConsole .dataTable th {
-  background: #e3e8e4;
+  background: var(--builder-surface-alt);
   font-family: var(--font-builder-mono);
   letter-spacing: 0.075em;
+}
+
+.compactConsole .dueRow {
+  background: color-mix(in srgb, var(--builder-warn) 11%, var(--builder-surface));
 }
 
 .compactConsole .dataTable tbody tr:hover {
@@ -2545,6 +2614,19 @@
   border-color: var(--builder-line);
 }
 
+.compactConsole :global(.border-slate-300),
+.compactConsole :global(.border-slate-400) {
+  border-color: var(--builder-line-strong);
+}
+
+.compactConsole :global(.border-teal-600) {
+  border-color: var(--builder-accent);
+}
+
+.compactConsole :global(.border-red-200) {
+  border-color: color-mix(in srgb, var(--builder-danger) 45%, var(--builder-line));
+}
+
 .compactConsole :global(.bg-white) {
   background-color: var(--builder-surface);
 }
@@ -2553,13 +2635,65 @@
   background-color: var(--builder-surface-alt);
 }
 
+.compactConsole :global(.bg-slate-100) {
+  background-color: color-mix(in srgb, var(--builder-surface-alt) 82%, var(--builder-line));
+}
+
+.compactConsole :global(.bg-teal-50) {
+  background-color: var(--builder-accent-soft);
+}
+
+.compactConsole :global(.bg-emerald-100),
+.compactConsole :global(.bg-blue-100) {
+  background-color: var(--builder-accent-soft);
+}
+
 .compactConsole :global(.text-slate-900) {
   color: var(--builder-ink);
 }
 
+.compactConsole :global(.text-slate-950),
+.compactConsole :global(.text-slate-700) {
+  color: var(--builder-ink);
+}
+
 .compactConsole :global(.text-slate-600),
-.compactConsole :global(.text-slate-500) {
+.compactConsole :global(.text-slate-500),
+.compactConsole :global(.text-slate-400) {
   color: var(--builder-muted);
+}
+
+.compactConsole :global(.text-emerald-800),
+.compactConsole :global(.text-blue-800) {
+  color: var(--builder-accent-dark);
+}
+
+.compactConsole :global(.text-red-700) {
+  color: var(--builder-danger);
+}
+
+.compactConsole[data-builder-theme="dark"] :is(input, select, textarea),
+.compactConsole[data-builder-theme="dark"] :global(.bg-white) {
+  border-color: var(--builder-line);
+  background-color: var(--builder-surface);
+  color: var(--builder-ink);
+}
+
+.compactConsole[data-builder-theme="dark"] :is(input, textarea)::placeholder {
+  color: var(--builder-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .compactConsole[data-builder-theme="system"] :is(input, select, textarea),
+  .compactConsole[data-builder-theme="system"] :global(.bg-white) {
+    border-color: var(--builder-line);
+    background-color: var(--builder-surface);
+    color: var(--builder-ink);
+  }
+
+  .compactConsole[data-builder-theme="system"] :is(input, textarea)::placeholder {
+    color: var(--builder-muted);
+  }
 }
 
 @media (min-width: 1280px) {

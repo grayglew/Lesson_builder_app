@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import {
   getAuthorizedAppContext,
@@ -5,22 +6,31 @@ import {
 } from "@/lib/auth/app-users";
 import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import { BuilderShell } from "@/features/builder/BuilderShell";
+import type { BuilderThemePreference } from "@/features/builder/BuilderCompactChrome";
 
 export const dynamic = "force-dynamic";
+
+function parseTheme(value: string | undefined): BuilderThemePreference {
+  return value === "light" || value === "dark" ? value : "system";
+}
 
 export default async function CompactBuilderReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ visual?: string }>;
+  searchParams: Promise<{ theme?: string; visual?: string }>;
 }) {
   if (process.env.VERCEL_ENV === "production") notFound();
 
-  const { visual } = await searchParams;
+  const { theme, visual } = await searchParams;
+  const initialTheme =
+    process.env.BUILDER_VISUAL_TEST === "1" && visual === "1"
+      ? parseTheme(theme)
+      : parseTheme((await cookies()).get("builder-theme")?.value);
   if (process.env.BUILDER_VISUAL_TEST === "1" && visual === "1") {
     return (
       <AppNotificationsProvider>
         <BuilderShell
-          initialTheme="light"
+          initialTheme={initialTheme}
           userEmail="teacher@example.com"
           variant="compact-console"
         />
@@ -39,7 +49,7 @@ export default async function CompactBuilderReviewPage({
     <AppNotificationsProvider>
       <BuilderShell
         actorEmail={context.actorUser.email || context.actorProfile.email}
-        initialTheme="light"
+        initialTheme={initialTheme}
         isImpersonating={effective.isImpersonating}
         userEmail={
           effective.effectiveUser.email ||

@@ -15,7 +15,9 @@ import {
   LayoutTemplate,
   ListChecks,
   LogOut,
+  Monitor,
   MoreHorizontal,
+  Moon,
   PanelRightClose,
   PanelRightOpen,
   PencilRuler,
@@ -28,6 +30,7 @@ import {
   Sigma,
   Sparkles,
   SquareDashed,
+  Sun,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { BuilderActionMenu } from "./BuilderActionMenu";
@@ -58,9 +61,11 @@ type CompactAppBarProps = {
   cloudMessage: string;
   busy: boolean;
   identityControl?: ReactNode;
+  themePreference: BuilderThemePreference;
   onLessons: () => void;
   onPresent: () => void;
   onSave: () => void;
+  onThemeChange: (theme: BuilderThemePreference) => void;
 };
 
 export function CompactAppBar({
@@ -68,10 +73,12 @@ export function CompactAppBar({
   className,
   cloudMessage,
   identityControl,
+  onThemeChange,
   onLessons,
   onPresent,
   onSave,
   teachingDate,
+  themePreference,
   title,
   userEmail,
 }: CompactAppBarProps) {
@@ -115,6 +122,23 @@ export function CompactAppBar({
         label="Account and utilities"
         triggerContent={<><MoreHorizontal aria-hidden /><span className={styles.srOnly}>Account and utilities</span></>}
       >
+        <span className={styles.compactMenuLabel}>Appearance</span>
+        {([
+          ["system", "System theme", Monitor],
+          ["light", "Light theme", Sun],
+          ["dark", "Dark theme", Moon],
+        ] as const).map(([value, label, Icon]) => (
+          <button
+            key={value}
+            type="button"
+            role="menuitemradio"
+            aria-checked={themePreference === value}
+            onClick={() => onThemeChange(value)}
+          >
+            <Icon aria-hidden /> {label}
+          </button>
+        ))}
+        <span className={styles.compactMenuDivider} />
         <a role="menuitem" href="/admin/users"><Settings aria-hidden /> Admin dashboard</a>
         <a role="menuitem" href="/auth/logout"><LogOut aria-hidden /> Log out</a>
         {identityControl ? <div className={styles.compactIdentityControl}>{identityControl}</div> : null}

@@ -156,6 +156,48 @@
   box-shadow: 0 5px 16px rgba(15, 23, 42, 0.16);
 }
 
+:global(html[data-builder-theme="dark"]) .panel,
+:global(html[data-builder-theme="dark"]) .toolbar {
+  border-color: var(--builder-line);
+  background: var(--builder-surface-alt);
+  color: var(--builder-ink);
+}
+
+:global(html[data-builder-theme="dark"]) .title,
+:global(html[data-builder-theme="dark"]) .sizeLabel,
+:global(html[data-builder-theme="dark"]) .button,
+:global(html[data-builder-theme="dark"]) .closeButton {
+  color: var(--builder-ink);
+}
+
+:global(html[data-builder-theme="dark"]) .button,
+:global(html[data-builder-theme="dark"]) .closeButton {
+  border-color: var(--builder-line);
+  background: var(--builder-surface);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html[data-builder-theme="system"]) .panel,
+  :global(html[data-builder-theme="system"]) .toolbar {
+    border-color: var(--builder-line);
+    background: var(--builder-surface-alt);
+    color: var(--builder-ink);
+  }
+
+  :global(html[data-builder-theme="system"]) .title,
+  :global(html[data-builder-theme="system"]) .sizeLabel,
+  :global(html[data-builder-theme="system"]) .button,
+  :global(html[data-builder-theme="system"]) .closeButton {
+    color: var(--builder-ink);
+  }
+
+  :global(html[data-builder-theme="system"]) .button,
+  :global(html[data-builder-theme="system"]) .closeButton {
+    border-color: var(--builder-line);
+    background: var(--builder-surface);
+  }
+}
+
 @media (max-width: 800px) {
   .toolbar {
     align-items: flex-start;

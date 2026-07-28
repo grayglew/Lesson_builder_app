@@ -105,6 +105,8 @@ export function BuilderShell({
   userEmail,
   variant = "classic",
 }: BuilderShellProps) {
+  const [themePreference, setThemePreference] =
+    useState<BuilderThemePreference>(initialTheme);
   const document = useBuilderStore(selectDocument);
   const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
   const selectedPreviewSlideIds = useBuilderStore(
@@ -136,6 +138,14 @@ export function BuilderShell({
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
 
+  function updateThemePreference(preference: BuilderThemePreference) {
+    setThemePreference(preference);
+    window.document.cookie =
+      preference === "system"
+        ? "builder-theme=; Path=/; Max-Age=0; SameSite=Lax"
+        : `builder-theme=${preference}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  }
+
   function dropSlideAt(targetSlideId: string) {
     if (!draggedSlideId || draggedSlideId === targetSlideId) return;
     const fromIndex = document.slides.findIndex(
@@ -152,6 +162,17 @@ export function BuilderShell({
     setDraggedSlideId("");
     setDragOverSlideId("");
   }
+
+  useEffect(() => {
+    if (variant !== "compact-console") return;
+    const root = window.document.documentElement;
+    const previousTheme = root.dataset.builderTheme;
+    root.dataset.builderTheme = themePreference;
+    return () => {
+      if (previousTheme) root.dataset.builderTheme = previousTheme;
+      else delete root.dataset.builderTheme;
+    };
+  }, [themePreference, variant]);
 
   useEffect(() => {
     let cancelled = false;
@@ -455,7 +476,7 @@ export function BuilderShell({
       className={`${styles.page} ${
         variant === "compact-console" ? styles.compactConsole : ""
       }`}
-      data-builder-theme={initialTheme}
+      data-builder-theme={themePreference}
       data-builder-variant={variant}
     >
       <div
@@ -479,9 +500,11 @@ export function BuilderShell({
                 />
               ) : null
             }
+            themePreference={themePreference}
             onLessons={() => setActiveTool("saved-lessons")}
             onPresent={() => void lessonActions.previewLesson(false)}
             onSave={() => void saveLesson(false)}
+            onThemeChange={updateThemePreference}
           />
         ) : null}
         <aside className={styles.sidebar} aria-label="Lesson builder navigation">

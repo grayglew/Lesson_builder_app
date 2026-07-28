@@ -189,6 +189,60 @@ select.input {
   gap: 0.45rem;
 }
 
+:global([data-builder-theme="dark"]) .panel,
+:global([data-builder-theme="dark"]) .panelFullscreen {
+  border-color: var(--builder-line);
+  background: var(--builder-surface-alt);
+  color: var(--builder-ink);
+  box-shadow: var(--builder-shadow);
+}
+
+:global([data-builder-theme="dark"]) .panelHead h3,
+:global([data-builder-theme="dark"]) .fieldLabel {
+  color: var(--builder-ink);
+}
+
+:global([data-builder-theme="dark"]) .toolButton,
+:global([data-builder-theme="dark"]) .secondaryButton,
+:global([data-builder-theme="dark"]) .dangerButton,
+:global([data-builder-theme="dark"]) .input {
+  border-color: var(--builder-line);
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+}
+
+:global([data-builder-theme="dark"]) .dangerButton {
+  color: var(--builder-danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global([data-builder-theme="system"]) .panel,
+  :global([data-builder-theme="system"]) .panelFullscreen {
+    border-color: var(--builder-line);
+    background: var(--builder-surface-alt);
+    color: var(--builder-ink);
+    box-shadow: var(--builder-shadow);
+  }
+
+  :global([data-builder-theme="system"]) .panelHead h3,
+  :global([data-builder-theme="system"]) .fieldLabel {
+    color: var(--builder-ink);
+  }
+
+  :global([data-builder-theme="system"]) .toolButton,
+  :global([data-builder-theme="system"]) .secondaryButton,
+  :global([data-builder-theme="system"]) .dangerButton,
+  :global([data-builder-theme="system"]) .input {
+    border-color: var(--builder-line);
+    background: var(--builder-surface);
+    color: var(--builder-ink);
+  }
+
+  :global([data-builder-theme="system"]) .dangerButton {
+    color: var(--builder-danger);
+  }
+}
+
 @media (max-width: 800px) {
   .toolbar {
     grid-template-columns: 1fr;

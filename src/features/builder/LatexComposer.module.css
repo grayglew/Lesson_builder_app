@@ -296,3 +296,53 @@
     transform: rotate(90deg);
   }
 }
+
+:global([data-builder-theme="dark"]) .panel,
+:global([data-builder-theme="dark"]) .slideEditor {
+  border-color: var(--builder-line);
+  background: var(--builder-surface-alt);
+  color: var(--builder-ink);
+  box-shadow: var(--builder-shadow);
+}
+
+:global([data-builder-theme="dark"]) .panelHead h3,
+:global([data-builder-theme="dark"]) .slideLabel strong,
+:global([data-builder-theme="dark"]) .fieldLabel,
+:global([data-builder-theme="dark"]) .textArea {
+  color: var(--builder-ink);
+}
+
+:global([data-builder-theme="dark"]) .slideLabel,
+:global([data-builder-theme="dark"]) .textArea {
+  border-color: var(--builder-line);
+}
+
+:global([data-builder-theme="dark"]) .textArea {
+  background: var(--builder-surface);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global([data-builder-theme="system"]) .panel,
+  :global([data-builder-theme="system"]) .slideEditor {
+    border-color: var(--builder-line);
+    background: var(--builder-surface-alt);
+    color: var(--builder-ink);
+    box-shadow: var(--builder-shadow);
+  }
+
+  :global([data-builder-theme="system"]) .panelHead h3,
+  :global([data-builder-theme="system"]) .slideLabel strong,
+  :global([data-builder-theme="system"]) .fieldLabel,
+  :global([data-builder-theme="system"]) .textArea {
+    color: var(--builder-ink);
+  }
+
+  :global([data-builder-theme="system"]) .slideLabel,
+  :global([data-builder-theme="system"]) .textArea {
+    border-color: var(--builder-line);
+  }
+
+  :global([data-builder-theme="system"]) .textArea {
+    background: var(--builder-surface);
+  }
+}

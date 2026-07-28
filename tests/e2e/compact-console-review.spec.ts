@@ -182,4 +182,61 @@ test.describe("Compact Console functional review", () => {
     await expect(sharedTabs.getByRole("button", { name: /^Classes/ })).toBeVisible();
     await expect(sharedTabs.getByRole("button", { name: /^Templates/ })).toHaveCount(0);
   });
+
+  test("applies and persists dark mode without recolouring lesson previews", async ({ page }) => {
+    await stubBuilder(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/builder/compact-review?visual=1&theme=dark");
+
+    const shell = page.locator("[data-builder-variant='compact-console']");
+    await expect(shell).toHaveAttribute("data-builder-theme", "dark");
+    await expect(page.locator("html")).toHaveAttribute("data-builder-theme", "dark");
+
+    const shellColours = await shell.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, colour: style.color };
+    });
+    expect(shellColours.background).toBe("rgb(20, 25, 23)");
+    expect(shellColours.colour).toBe("rgb(238, 243, 240)");
+
+    await page.getByRole("button", { name: "Reset lesson" }).click();
+    const dialog = page.getByRole("dialog", { name: "Start a new lesson?" });
+    await expect(dialog).toBeVisible();
+    expect(await dialog.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgb(29, 36, 33)");
+    await dialog.getByRole("button", { name: "Keep current lesson" }).click();
+
+    await page.getByRole("button", { name: "Saved lessons" }).click();
+    const lessonSearch = page.getByPlaceholder("Lesson title");
+    await expect(lessonSearch).toBeVisible();
+    expect(await lessonSearch.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgb(29, 36, 33)");
+
+    await page.getByRole("button", { name: "Draw", exact: true }).click();
+    const drawingCanvas = page.getByLabel("Drawing canvas");
+    await expect(drawingCanvas).toBeVisible();
+    expect(await drawingCanvas.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgb(255, 255, 255)");
+
+    await page.getByRole("button", { name: "Account and utilities" }).click();
+    const darkChoice = page.getByRole("menuitemradio", { name: "Dark theme" });
+    await expect(darkChoice).toHaveAttribute("aria-checked", "true");
+    await page.getByRole("menuitemradio", { name: "Light theme" }).click();
+    await expect(shell).toHaveAttribute("data-builder-theme", "light");
+    await expect.poll(async () =>
+      (await page.context().cookies()).find((cookie) => cookie.name === "builder-theme")?.value,
+    ).toBe("light");
+  });
+
+  test("follows the operating-system dark preference in system mode", async ({ page }) => {
+    await stubBuilder(page);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/builder/compact-review?visual=1&theme=system");
+
+    const shell = page.locator("[data-builder-variant='compact-console']");
+    await expect(shell).toHaveAttribute("data-builder-theme", "system");
+    expect(await shell.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .toBe("rgb(20, 25, 23)");
+  });
 });

@@ -87,3 +87,29 @@
 :global([data-builder-variant="compact-console"]) .compactOnly {
   display: block;
 }
+
+:global([data-builder-theme="dark"]) .drawButton,
+:global([data-builder-theme="dark"]) .removeButton {
+  border-color: var(--builder-line);
+  background: color-mix(in srgb, var(--builder-surface) 94%, transparent);
+  color: var(--builder-ink);
+  box-shadow: var(--builder-shadow);
+}
+
+:global([data-builder-theme="dark"]) .removeButton {
+  color: var(--builder-danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global([data-builder-theme="system"]) .drawButton,
+  :global([data-builder-theme="system"]) .removeButton {
+    border-color: var(--builder-line);
+    background: color-mix(in srgb, var(--builder-surface) 94%, transparent);
+    color: var(--builder-ink);
+    box-shadow: var(--builder-shadow);
+  }
+
+  :global([data-builder-theme="system"]) .removeButton {
+    color: var(--builder-danger);
+  }
+}
