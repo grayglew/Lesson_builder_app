@@ -1,4 +1,5 @@
 import { renderLatexDocument } from "./latex";
+import { inlineMarkdownToHtml } from "./markdown";
 import {
   loadPdfDocument,
   renderPdfPageToSlide,
@@ -385,7 +386,7 @@ function halfSlideHtml(slide: BuilderSlide) {
     return `<div class="handout-text-panel">
   <h2>${escapeHtml(slide.title || "Template")}</h2>
   <ul>${stringArray(data.bullets)
-    .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
+    .map((bullet) => `<li>${inlineMarkdownToHtml(bullet)}</li>`)
     .join("")}</ul>
 </div>`;
   }

@@ -1,13 +1,23 @@
 "use client";
 
-import { Eraser, PenLine, Plus, RotateCcw, Trash2 } from "lucide-react";
+import {
+  Eraser,
+  Maximize2,
+  Minimize2,
+  PenLine,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
 import styles from "./DrawComposer.module.css";
+import { useAppNotifications } from "./AppNotifications";
 import {
   DRAWING_RESOLUTIONS,
   type DrawingResolution,
@@ -22,6 +32,7 @@ import {
 } from "./drawing";
 import { type BuilderSlide, createBuilderId } from "./schema";
 import { useBuilderStore } from "./store";
+import { useActiveDialogFocus } from "./useDialogFocus";
 
 const DEFAULT_RESOLUTION = DRAWING_RESOLUTIONS[1];
 const DRAWING_COLORS = [
@@ -31,17 +42,33 @@ const DRAWING_COLORS = [
   { value: "#16a34a", label: "Green pen colour" },
 ] as const;
 
-export function DrawComposer() {
+export function DrawComposer({ compact = false }: { compact?: boolean }) {
+  const titleId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeStrokeRef = useRef<DrawingStroke | null>(null);
   const addSlides = useBuilderStore((state) => state.addSlides);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
   const [mode, setMode] = useState<DrawingStroke["mode"]>("pen");
   const [color, setColor] = useState("#2563eb");
   const [penSize, setPenSize] = useState(2);
   const [resolution, setResolution] =
     useState<DrawingResolution>(DEFAULT_RESOLUTION);
+  const [fullscreen, setFullscreen] = useState(false);
+  const panelRef = useActiveDialogFocus<HTMLElement>(
+    () => setFullscreen(false),
+    fullscreen,
+  );
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [fullscreen]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -106,8 +133,17 @@ export function DrawComposer() {
     setStatus({ tone: "success", message: "Undid the last stroke." });
   }
 
-  function clearDrawing() {
-    if (strokes.length && !window.confirm("Clear the drawing canvas?")) return;
+  async function clearDrawing() {
+    if (strokes.length) {
+      const approved = await confirmDialog({
+        title: "Clear the drawing canvas?",
+        description: "All strokes on the current drawing canvas will be removed.",
+        confirmLabel: "Clear canvas",
+        cancelLabel: "Keep drawing",
+        tone: "danger",
+      });
+      if (!approved) return;
+    }
     activeStrokeRef.current = null;
     setStrokes([]);
     setStatus({ tone: "success", message: "Cleared the drawing canvas." });
@@ -157,10 +193,29 @@ export function DrawComposer() {
   }
 
   return (
-    <section className={styles.panel} data-testid="drawing-panel">
+    <section
+      ref={panelRef}
+      className={`${styles.panel} ${compact && fullscreen ? styles.panelFullscreen : ""}`}
+      data-testid="drawing-panel"
+      role={compact && fullscreen ? "dialog" : undefined}
+      aria-modal={compact && fullscreen ? "true" : undefined}
+      aria-labelledby={titleId}
+      tabIndex={compact && fullscreen ? -1 : undefined}
+    >
       <div className={styles.panelHead}>
-        <h3>High-resolution drawing</h3>
+        <h3 id={titleId}>High-resolution drawing</h3>
         <div className={styles.inlineActions}>
+          {compact ? (
+            <button
+              className={`${styles.secondaryButton} ${styles.compactButton}`}
+              type="button"
+              aria-label={fullscreen ? "Exit full screen drawing" : "Open full screen drawing"}
+              onClick={() => setFullscreen((current) => !current)}
+            >
+              {fullscreen ? <Minimize2 size={15} aria-hidden /> : <Maximize2 size={15} aria-hidden />}
+              {fullscreen ? "Exit full screen" : "Full screen"}
+            </button>
+          ) : null}
           <button
             className={`${styles.secondaryButton} ${styles.compactButton}`}
             type="button"
@@ -172,7 +227,7 @@ export function DrawComposer() {
           <button
             className={`${styles.dangerButton} ${styles.compactButton}`}
             type="button"
-            onClick={clearDrawing}
+            onClick={() => void clearDrawing()}
           >
             <Trash2 size={15} aria-hidden />
             Clear

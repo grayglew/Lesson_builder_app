@@ -118,7 +118,7 @@ describe("production A4 handout export", () => {
         id: "template",
         type: "template",
         title: "Method",
-        bullets: ["First step", "Second step"],
+        bullets: ["**First** step", "Use `x` carefully"],
       },
       {
         id: "placeholder",
@@ -168,6 +168,8 @@ describe("production A4 handout export", () => {
       result.html.match(/aria-label="Half-page handout slides"/g),
     ).toHaveLength(2);
     expect(result.html).toContain("<h2>Method</h2>");
+    expect(result.html).toContain("<li><strong>First</strong> step</li>");
+    expect(result.html).toContain("<li>Use <code>x</code> carefully</li>");
     expect(result.html).toContain("Show your working.");
     expect(result.html).toContain('class="latex-frac"');
     expect(result.html).toContain(".latex-frac{display:inline-grid");

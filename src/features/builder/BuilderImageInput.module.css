@@ -25,3 +25,91 @@
   border-color: #0f766e;
   color: #0f766e;
 }
+
+.compactOnly {
+  display: none;
+}
+
+:global([data-builder-variant="compact-console"]) .actions {
+  position: absolute;
+  top: 1.35rem;
+  right: 0.35rem;
+  z-index: 2;
+  gap: 0.3rem;
+}
+
+:global([data-builder-variant="compact-console"]) .drawButton,
+:global([data-builder-variant="compact-console"]) .removeButton {
+  display: inline-flex;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.2rem;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.94);
+  color: #334155;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 0.2rem 0.75rem rgba(15, 23, 42, 0.12);
+}
+
+:global([data-builder-variant="compact-console"]) .drawButton:hover,
+:global([data-builder-variant="compact-console"]) .removeButton:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+:global([data-builder-variant="compact-console"]) .removeButton {
+  color: #b42318;
+}
+
+:global([data-builder-variant="compact-console"]) .removeButton:hover {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+:global([data-builder-variant="compact-console"]) .buttonText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:global([data-builder-variant="compact-console"]) .compactOnly {
+  display: block;
+}
+
+:global([data-builder-theme="dark"]) .drawButton,
+:global([data-builder-theme="dark"]) .removeButton {
+  border-color: var(--builder-line);
+  background: color-mix(in srgb, var(--builder-surface) 94%, transparent);
+  color: var(--builder-ink);
+  box-shadow: var(--builder-shadow);
+}
+
+:global([data-builder-theme="dark"]) .removeButton {
+  color: var(--builder-danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global([data-builder-theme="system"]) .drawButton,
+  :global([data-builder-theme="system"]) .removeButton {
+    border-color: var(--builder-line);
+    background: color-mix(in srgb, var(--builder-surface) 94%, transparent);
+    color: var(--builder-ink);
+    box-shadow: var(--builder-shadow);
+  }
+
+  :global([data-builder-theme="system"]) .removeButton {
+    color: var(--builder-danger);
+  }
+}

@@ -18,6 +18,7 @@ import {
   saveRetrievalItem,
   saveSlideTemplates,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import {
   type RetrievalItem,
   type SlideTemplate,
@@ -42,10 +43,14 @@ export function GlobalDataEditor({
   onBack,
   initialView = "retrieval",
   embedded = false,
+  compact = false,
+  visibleViews,
 }: {
   onBack: () => void;
   initialView?: DataView;
   embedded?: boolean;
+  compact?: boolean;
+  visibleViews?: DataView[];
 }) {
   const document = useBuilderStore(selectDocument);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
@@ -53,7 +58,13 @@ export function GlobalDataEditor({
     (state) => state.insertTemplateSlide,
   );
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [view, setView] = useState<DataView>(initialView);
+  const availableViews = visibleViews ?? ["retrieval", "classes", "templates"];
+  const sectionTitle =
+    availableViews.length === 1 && availableViews[0] === "templates"
+      ? "Templates"
+      : "Shared builder data";
   const [busy, setBusy] = useState(false);
   const [classText, setClassText] = useState(document.classNames.join("\n"));
   const [templates, setTemplates] = useState<SlideTemplate[]>(() =>
@@ -151,7 +162,14 @@ export function GlobalDataEditor({
       (item) => item.id === retrievalDraft.id,
     );
     if (!existing) return;
-    if (!window.confirm(`Archive "${existing.lo}" from the retrieval bank?`)) {
+    const approved = await confirmDialog({
+      title: "Archive this learning objective?",
+      description: `"${existing.lo}" will be removed from the active retrieval bank.`,
+      confirmLabel: "Archive LO",
+      cancelLabel: "Keep LO",
+      tone: "danger",
+    });
+    if (!approved) {
       return;
     }
     setBusy(true);
@@ -232,9 +250,16 @@ export function GlobalDataEditor({
     );
   }
 
-  function deleteTemplate() {
+  async function deleteTemplate() {
     if (!activeTemplate) return;
-    if (!window.confirm(`Remove "${activeTemplate.title}" from the draft template list?`)) {
+    const approved = await confirmDialog({
+      title: "Remove this draft template?",
+      description: `"${activeTemplate.title}" will be removed from the draft list.`,
+      confirmLabel: "Remove template",
+      cancelLabel: "Keep template",
+      tone: "danger",
+    });
+    if (!approved) {
       return;
     }
     const next = templates.filter((template) => template.id !== activeTemplate.id);
@@ -252,17 +277,21 @@ export function GlobalDataEditor({
               Back to lesson
             </button>
           ) : null}
-          <h2 className="text-xl font-semibold">Shared builder data</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Edit drafts locally, then use the explicit save or archive action for each section.
-          </p>
+          <h2 className="text-xl font-semibold">{sectionTitle}</h2>
+          {!compact ? (
+            <p className="mt-1 text-sm text-slate-500">
+              Edit drafts locally, then use the explicit save or archive action for each section.
+            </p>
+          ) : null}
         </div>
 
-        <nav className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-3" aria-label="Shared data sections">
-          <DataTab active={view === "retrieval"} onClick={() => setView("retrieval")} icon={<BookOpenCheck className="size-4" />} label={`Retrieval (${document.retrievalItems.length})`} />
-          <DataTab active={view === "classes"} onClick={() => setView("classes")} icon={<GraduationCap className="size-4" />} label={`Classes (${document.classNames.length})`} />
-          <DataTab active={view === "templates"} onClick={() => setView("templates")} icon={<LayoutTemplate className="size-4" />} label={`Templates (${templates.length})`} />
-        </nav>
+        {availableViews.length > 1 ? (
+          <nav className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-3" aria-label="Shared data sections">
+            {availableViews.includes("retrieval") ? <DataTab active={view === "retrieval"} onClick={() => setView("retrieval")} icon={<BookOpenCheck className="size-4" />} label={`Retrieval (${document.retrievalItems.length})`} /> : null}
+            {availableViews.includes("classes") ? <DataTab active={view === "classes"} onClick={() => setView("classes")} icon={<GraduationCap className="size-4" />} label={`Classes (${document.classNames.length})`} /> : null}
+            {availableViews.includes("templates") ? <DataTab active={view === "templates"} onClick={() => setView("templates")} icon={<LayoutTemplate className="size-4" />} label={`Templates (${templates.length})`} /> : null}
+          </nav>
+        ) : null}
 
         {view === "retrieval" ? (
           <div className="grid min-h-[620px] lg:grid-cols-[minmax(360px,1fr)_minmax(360px,1fr)]">
@@ -385,11 +414,23 @@ export function GlobalDataEditor({
                     </label>
                     <label>
                       <span className="field-title mb-1.5">Bullets (one per line)</span>
+                      {compact ? (
+                        <details className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                          <summary className="cursor-pointer font-semibold text-slate-900">Markdown formatting guide</summary>
+                          <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 text-xs leading-5">
+                            <p><code>**bold**</code> or <code>__bold__</code> produces <strong>bold text</strong>.</p>
+                            <p><code>*italic*</code> or <code>_italic_</code> produces <em>italic text</em>.</p>
+                            <p><code>`code`</code> produces inline <code>code-style text</code>.</p>
+                            <p><code>[label](https://example.com)</code> produces a clickable web link.</p>
+                            <p>Each new line becomes a separate bullet. Headings, images, tables, nested lists, and multiline Markdown are not supported.</p>
+                          </div>
+                        </details>
+                      ) : null}
                       <textarea className={`${inputClass} min-h-72 resize-y`} value={activeTemplate.bullets.join("\n")} onChange={(event) => updateTemplate({ bullets: event.target.value.split("\n") })} />
                     </label>
                   </div>
                   <div className="mt-5 flex flex-wrap justify-between gap-2">
-                    <button className="danger-action" type="button" onClick={deleteTemplate}>
+                    <button className="danger-action" type="button" onClick={() => void deleteTemplate()}>
                       <Trash2 className="size-4" aria-hidden />
                       Remove from draft
                     </button>

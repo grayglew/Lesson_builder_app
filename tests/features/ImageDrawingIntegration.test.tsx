@@ -55,6 +55,10 @@ describe("per-entry image drawing integration", () => {
     const user = userEvent.setup();
     render(<ExampleComposer />);
 
+    expect(screen.getAllByRole("button", { name: /^Draw / })).toHaveLength(4);
+    await user.click(
+      screen.getByRole("button", { name: "Show retrieval images" }),
+    );
     expect(screen.getAllByRole("button", { name: /^Draw / })).toHaveLength(20);
     await user.click(
       screen.getByRole("button", { name: "Draw Answer image 8" }),

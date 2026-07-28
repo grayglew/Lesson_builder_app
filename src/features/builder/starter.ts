@@ -1,8 +1,8 @@
 import type { BuilderAsset, RetrievalItem } from "./schema";
+import { retrievalNextDueDate } from "@/lib/retrieval-schedule";
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_STARTER_ITEMS = 4;
-const DEFAULT_SPACING_FACTOR = 1.3;
 
 export function getRetrievalNextDueDate(
   item: RetrievalItem,
@@ -14,13 +14,12 @@ export function getRetrievalNextDueDate(
     ? String(item.lastTaught)
     : fallbackDate;
   if (seenCount <= 0) return lastTaught;
-
-  const spacing = coerceSpacing(item.spacingFactor || DEFAULT_SPACING_FACTOR);
-  const days = Math.max(
-    1,
-    Math.round(spacing * (0.5 * seenCount * seenCount + 0.5 * seenCount)),
+  return retrievalNextDueDate(
+    lastTaught,
+    item.spacingFactor,
+    seenCount,
+    fallbackDate,
   );
-  return addDays(lastTaught, days, fallbackDate);
 }
 
 export function isRetrievalItemDue(
@@ -130,23 +129,6 @@ function normalizeClassName(value: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
-}
-
-function coerceSpacing(value: unknown): number {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return DEFAULT_SPACING_FACTOR;
-  return Math.min(2, Math.max(1, Number(number.toFixed(1))));
-}
-
-function addDays(
-  isoDate: string,
-  days: number,
-  fallbackDate: string,
-): string {
-  const date = dateFromIso(isoDate) ?? dateFromIso(fallbackDate);
-  if (!date) return fallbackDate;
-  date.setDate(date.getDate() + Number(days || 0));
-  return formatIsoDate(date);
 }
 
 function dateFromIso(value: unknown): Date | null {

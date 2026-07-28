@@ -121,7 +121,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps the accepted three-column builder shell", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await expect(
       page.getByRole("complementary", { name: "Lesson builder navigation" }),
     ).toBeVisible();
@@ -146,7 +146,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Retrieval in the legacy table-and-actions layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Retrieval", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Retrieval bank" })).toBeVisible();
@@ -163,7 +163,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Example in the legacy authoring layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Example", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Example slide" })).toBeVisible();
@@ -171,12 +171,27 @@ test.describe("Builder accepted UI baseline", () => {
       page.getByLabel("Example image 1", { exact: true }),
     ).toBeAttached();
     await expect(page.getByText("Retrieval images", { exact: true })).toBeVisible();
+    const retrievalToggle = page.getByRole("button", {
+      name: "Show retrieval images",
+    });
+    await expect(retrievalToggle).toHaveAttribute("aria-expanded", "false");
     await expect(
       page.getByLabel("Question image 8", { exact: true }),
-    ).toBeAttached();
+    ).not.toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "Add example slide" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Add LO to retrieval bank" }),
     ).toBeVisible();
+
+    await retrievalToggle.click();
+    await expect(
+      page.getByLabel("Question image 8", { exact: true }),
+    ).toBeAttached();
+    await page
+      .getByRole("button", { name: "Hide retrieval images" })
+      .click();
 
     await setAcceptedBaselineDate(page);
     await expect(page).toHaveScreenshot("builder-v2-example.png", {
@@ -186,7 +201,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Worksheet in the legacy file-pair layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Worksheet", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Worksheet slide" })).toBeVisible();
@@ -203,7 +218,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps PDF in the legacy render-controls layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "PDF", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "PDF worksheet" })).toBeVisible();
@@ -218,7 +233,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps CFU in the legacy placement-and-image layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "CFU", exact: true }).click();
 
     await expect(
@@ -235,7 +250,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps Draw in the legacy canvas layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "Draw", exact: true }).click();
 
     await expect(
@@ -252,7 +267,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("keeps LaTeX in the legacy two-editor layout", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await page.getByRole("button", { name: "LaTeX", exact: true }).click();
 
     await expect(
@@ -273,7 +288,7 @@ test.describe("Builder accepted UI baseline", () => {
   });
 
   test("opens the standalone presenter from the builder", async ({ page }) => {
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     const popupPromise = page.waitForEvent("popup");
 
     await page.getByRole("button", { name: "Preview full lesson" }).click();
@@ -497,7 +512,7 @@ test.describe("Builder accepted UI baseline", () => {
       });
     });
 
-    await page.goto("/builder?visual=1");
+    await page.goto("/builder?visual=1&variant=classic");
     await expect(page.getByRole("heading", { name: "3 slides" })).toBeVisible();
     const builderPdfAspect = await page
       .locator('aside [style*="--preview-slide-aspect"]')
@@ -540,7 +555,6 @@ test.describe("Builder accepted UI baseline", () => {
     await expect(presenter.locator("[data-live-retrieval-next]").first()).toHaveText(
       "Loaded",
     );
-    presenter.on("dialog", (dialog) => void dialog.accept());
     await presenter.getByRole("button", { name: "Save to Builder" }).click();
     await expect.poll(() => liveApiRequests).toContain(
       "http://127.0.0.1:3100/api/builder-lessons/taught",
@@ -548,6 +562,11 @@ test.describe("Builder accepted UI baseline", () => {
     await expect(
       presenter.getByRole("button", { name: "Save to Builder" }),
     ).toBeEnabled();
+    await expect(
+      presenter.locator(".presenter-notification", {
+        hasText: "Saved taught lesson to Lesson Builder.",
+      }),
+    ).toBeVisible();
     await expect(presenter.getByText("Student code: ABC-123")).toBeVisible();
     await presenter.getByRole("button", { name: "Update students" }).click();
     await expect.poll(() => liveApiRequests).toContain(
@@ -556,6 +575,11 @@ test.describe("Builder accepted UI baseline", () => {
     await expect(
       presenter.getByRole("button", { name: "Update students" }),
     ).toBeEnabled();
+    await expect(
+      presenter.locator(".presenter-notification", {
+        hasText: "Student view updated.",
+      }),
+    ).toBeVisible();
     await expect(
       presenter.getByRole("button", { name: "Previous slide" }),
     ).toHaveCount(0);

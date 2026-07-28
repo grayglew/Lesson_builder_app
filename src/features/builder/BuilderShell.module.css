@@ -10,6 +10,7 @@
   --builder-accent-dark: #0b514d;
   --builder-accent-soft: #d9f3ec;
   --builder-warn: #b45309;
+  --builder-warn-soft: #fff3cd;
   --builder-danger: #b42318;
   --builder-danger-soft: #ffe4df;
   --builder-shadow: 0 16px 36px rgba(19, 37, 42, 0.12);
@@ -167,13 +168,20 @@
   margin: 0;
 }
 
+.classActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .textInput,
 .textArea {
   width: 100%;
   border: 1px solid var(--builder-line);
   border-radius: 8px;
   outline: none;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   padding: 10px 11px;
 }
@@ -191,7 +199,7 @@
 
 .lessonQuickActions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin: 14px 0 18px;
 }
@@ -275,7 +283,7 @@
 
 .secondaryButton {
   border-color: var(--builder-line);
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
 }
 
@@ -320,7 +328,7 @@
   overflow: auto;
   border: 1px solid var(--builder-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--builder-surface) 92%, transparent);
   padding: 18px;
   box-shadow: var(--builder-shadow);
 }
@@ -377,7 +385,7 @@
   width: 100%;
   min-width: 940px;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--builder-surface);
   font-size: 12px;
 }
 
@@ -412,7 +420,7 @@
   min-width: 76px;
   border: 1px solid var(--builder-line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   padding: 7px;
   font: inherit;
@@ -431,7 +439,7 @@
 }
 
 .dueRow {
-  background: #fff8e8;
+  background: color-mix(in srgb, var(--builder-warn-soft) 78%, var(--builder-surface));
 }
 
 .dueRow strong {
@@ -515,6 +523,74 @@
   font-size: 12px;
 }
 
+.newLessonDialog {
+  width: min(520px, 100%);
+}
+
+.newLessonDescription {
+  margin: 0 0 18px;
+  color: var(--builder-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.newLessonForm {
+  display: grid;
+  gap: 16px;
+}
+
+.newLessonForm .fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.newLessonActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.exampleRetrievalToggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid var(--builder-line);
+  border-radius: 7px;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.exampleRetrievalToggle:hover {
+  border-color: var(--builder-accent);
+  color: var(--builder-accent);
+}
+
+.exampleRetrievalToggle:focus-visible {
+  outline: 2px solid var(--builder-accent);
+  outline-offset: 2px;
+}
+
+.exampleRetrievalChevron {
+  width: 16px;
+  height: 16px;
+  transition: transform 160ms ease;
+}
+
+.exampleRetrievalChevronExpanded {
+  transform: rotate(180deg);
+}
+
 .retrievalEditImageGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -547,7 +623,7 @@
   place-items: center;
   border: 1px dashed var(--builder-line-strong);
   border-radius: 7px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-muted);
   cursor: pointer;
 }
@@ -639,6 +715,7 @@
 }
 
 .assetEditor {
+  position: relative;
   min-width: 0;
 }
 
@@ -663,7 +740,7 @@
   outline: none;
   background:
     linear-gradient(135deg, rgba(15, 118, 110, 0.08), transparent),
-    #fff;
+    var(--builder-surface);
   color: var(--builder-muted);
   cursor: pointer;
   text-align: center;
@@ -858,7 +935,7 @@
   place-items: center;
   border: 1px solid var(--builder-line);
   border-radius: 7px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   cursor: pointer;
   font-size: 17px;
@@ -888,7 +965,7 @@
   overflow: hidden;
   border: 1px solid var(--builder-line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--builder-surface);
   padding: 6px;
   box-shadow: var(--builder-shadow);
 }
@@ -924,7 +1001,7 @@
   display: inline-grid;
   place-items: center;
   border: 1px solid var(--builder-line);
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-ink);
   cursor: pointer;
 }
@@ -1014,7 +1091,7 @@
   place-items: center;
   border: 1px solid var(--builder-line-strong);
   border-radius: 4px;
-  background: #fff;
+  background: var(--builder-surface);
   color: var(--builder-accent-dark);
   font-size: 11px;
   font-weight: 900;
@@ -1261,12 +1338,18 @@
   padding: 10px 12px;
   border: 1px solid var(--builder-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
   box-shadow: 0 12px 28px rgba(19, 37, 42, 0.18);
   color: var(--builder-muted);
   font-size: 13px;
   font-weight: 650;
   line-height: 1.35;
+  animation: toastEnter 160ms ease-out;
+}
+
+.notificationToast > span {
+  min-width: 0;
+  flex: 1;
 }
 
 .notificationToast.success {
@@ -1281,8 +1364,8 @@
 }
 
 .notificationToast.warning {
-  border-color: #f5d58c;
-  background: #fff3cd;
+  border-color: color-mix(in srgb, var(--builder-warn) 48%, var(--builder-line));
+  background: var(--builder-warn-soft);
   color: var(--builder-warn);
 }
 
@@ -1291,6 +1374,49 @@
   width: 20px;
   height: 20px;
   animation: spin 0.9s linear infinite;
+}
+
+.toastIcon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.toastCloseButton {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.toastCloseButton:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  opacity: 1;
+}
+
+.toastCloseButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notificationToast {
+    animation: none;
+  }
 }
 
 .loadingPage {
@@ -1409,5 +1535,1399 @@
 
   .brandCopy p {
     max-width: 100%;
+  }
+}
+
+.markdownLink {
+  color: var(--builder-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+/* Compact Console --------------------------------------------------------- */
+
+.classicWorkspaceBody {
+  display: contents;
+}
+
+.compactConsole {
+  --font-builder-sans: "Inter", "Segoe UI", Arial, sans-serif;
+  --font-builder-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --builder-bg: #e7e9e5;
+  --builder-surface: #ffffff;
+  --builder-surface-alt: #edf0ed;
+  --builder-ink: #202624;
+  --builder-muted: #65706c;
+  --builder-line: #c9d0cc;
+  --builder-line-strong: #9da8a3;
+  --builder-accent: #237565;
+  --builder-accent-dark: #15594d;
+  --builder-accent-soft: #dcece7;
+  --builder-warn: #9a5b05;
+  --builder-warn-soft: #fff3cd;
+  --builder-danger: #a64036;
+  --builder-danger-soft: #f8ded9;
+  --builder-shadow: 0 1rem 2.8rem rgba(25, 36, 32, 0.16);
+  --builder-layer-sticky: 20;
+  --builder-layer-menu: 60;
+  --builder-layer-drawer: 80;
+  --builder-layer-dialog: 100;
+  --builder-layer-toast: 110;
+  background: var(--builder-bg);
+  color: var(--builder-ink);
+  color-scheme: light;
+  font-family: var(--font-builder-sans);
+}
+
+.compactConsole[data-builder-theme="dark"] {
+  --builder-bg: #141917;
+  --builder-surface: #1d2421;
+  --builder-surface-alt: #252d29;
+  --builder-ink: #eef3f0;
+  --builder-muted: #aab6b0;
+  --builder-line: #3b4741;
+  --builder-line-strong: #69766f;
+  --builder-accent: #66b9a5;
+  --builder-accent-dark: #91d5c4;
+  --builder-accent-soft: #183c34;
+  --builder-warn: #f2b65f;
+  --builder-warn-soft: #3b301d;
+  --builder-danger: #ff9488;
+  --builder-danger-soft: #482722;
+  --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .compactConsole[data-builder-theme="system"] {
+    --builder-bg: #141917;
+    --builder-surface: #1d2421;
+    --builder-surface-alt: #252d29;
+    --builder-ink: #eef3f0;
+    --builder-muted: #aab6b0;
+    --builder-line: #3b4741;
+    --builder-line-strong: #69766f;
+    --builder-accent: #66b9a5;
+    --builder-accent-dark: #91d5c4;
+    --builder-accent-soft: #183c34;
+    --builder-warn: #f2b65f;
+    --builder-warn-soft: #3b301d;
+    --builder-danger: #ff9488;
+    --builder-danger-soft: #482722;
+    --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);
+    color-scheme: dark;
+  }
+}
+
+.compactConsole .appShell {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 3.5rem auto auto auto;
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+
+.compactAppBar {
+  position: sticky;
+  top: 0;
+  z-index: var(--builder-layer-sticky);
+  display: grid;
+  min-width: 0;
+  min-height: 3.5rem;
+  grid-template-columns: auto minmax(8rem, 1fr) auto auto auto auto auto;
+  align-items: center;
+  gap: 0.45rem;
+  border-bottom: 1px solid var(--builder-line);
+  background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
+  padding: 0 0.65rem;
+  backdrop-filter: blur(0.75rem);
+}
+
+.compactAppBar > button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.25rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compactAppBar svg,
+.compactWorkspaceHeader svg,
+.compactToolNavigation svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.compactBrand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.compactBrand > span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.2rem;
+  background: var(--builder-ink);
+  color: var(--builder-surface);
+  font: 600 0.68rem/1 var(--font-builder-mono), monospace;
+}
+
+.compactBrand .compactBrandMark {
+  border: 1px solid #27312d;
+  background: #1d2723;
+  color: #f8faf8;
+}
+
+.compactBrandMark svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: currentColor;
+}
+
+.compactBrandMark .compactBrandAccent {
+  fill: #dc6d57;
+}
+
+.compactBrand div,
+.compactLessonIdentity {
+  display: grid;
+  min-width: 0;
+}
+
+.compactBrand strong,
+.compactLessonIdentity strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactBrand small,
+.compactLessonIdentity span,
+.compactCloudStatus {
+  overflow: hidden;
+  color: var(--builder-muted);
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactLessonIdentity {
+  border-left: 1px solid var(--builder-line);
+  padding-left: 0.75rem;
+}
+
+.compactCloudStatus {
+  display: flex;
+  max-width: 12rem;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--builder-accent-dark);
+  font-weight: 700;
+}
+
+.compactAppBar .compactSaveButton,
+.compactWorkspaceHeader .compactSaveButton {
+  border-color: var(--builder-accent);
+  background: var(--builder-accent);
+  color: #fff;
+}
+
+.compactAccountEmail {
+  display: block;
+  max-width: 16rem;
+  overflow: hidden;
+  border-top: 1px solid var(--builder-line);
+  padding: 0.6rem 0.65rem 0.35rem;
+  color: var(--builder-muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactMenuLabel,
+.compactMenuDivider {
+  display: block;
+}
+
+.compactMenuLabel {
+  padding: 0.45rem 0.65rem 0.25rem;
+  color: var(--builder-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compactMenuDivider {
+  height: 1px;
+  margin: 0.25rem 0.35rem;
+  background: var(--builder-line);
+}
+
+.compactConsole :global([role="menuitemradio"][aria-checked="true"]) {
+  background: var(--builder-accent-soft);
+  color: var(--builder-accent-dark);
+}
+
+.compactConsole .sidebar,
+.compactConsole .previewPane {
+  background: var(--builder-surface);
+  backdrop-filter: none;
+}
+
+.compactConsole .sidebar {
+  padding: 0.8rem;
+}
+
+.compactConsole .brandBlock {
+  margin-bottom: 1rem;
+}
+
+.compactConsole .brandMark {
+  border-radius: 0.2rem;
+  background: var(--builder-ink);
+}
+
+.compactToolNavigation {
+  display: grid;
+  gap: 0;
+  margin: 1rem -0.8rem -0.8rem;
+  border-top: 1px solid var(--builder-line);
+}
+
+.compactRailHeading {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.8rem;
+}
+
+.compactRailHeading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.compactRailHeading button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: var(--builder-muted);
+  cursor: pointer;
+}
+
+.compactToolNavigation details {
+  border-top: 1px solid var(--builder-line);
+}
+
+.compactToolNavigation summary {
+  display: flex;
+  min-height: 2.75rem;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--builder-surface-alt);
+  padding: 0.55rem 0.8rem;
+  color: var(--builder-muted);
+  font: 600 0.65rem/1 var(--font-builder-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.compactToolNavigation summary::-webkit-details-marker {
+  display: none;
+}
+
+.compactToolNavigation details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.compactToolNavigation details > div {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.25rem 0.35rem;
+}
+
+.compactToolNavigation details button,
+.compactToolNavigation details a {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0.18rem;
+  background: transparent;
+  color: var(--builder-muted);
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.compactToolNavigation details button[data-active="true"] {
+  border-left-color: var(--builder-accent);
+  background: var(--builder-accent-soft);
+  color: var(--builder-accent-dark);
+  font-weight: 700;
+}
+
+.compactConsole .workspace {
+  padding: 0;
+  background: var(--builder-surface-alt);
+}
+
+.compactWorkspaceHeader {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--builder-layer-sticky) - 1);
+  display: flex;
+  min-height: 4.2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-bottom: 1px solid var(--builder-line);
+  background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
+  padding: 0.65rem 0.85rem;
+  backdrop-filter: blur(0.75rem);
+}
+
+.compactWorkspaceHeader > div:first-child {
+  min-width: 0;
+}
+
+.compactWorkspaceHeader span {
+  color: var(--builder-muted);
+  font: 600 0.62rem/1 var(--font-builder-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compactWorkspaceHeader h2 {
+  margin: 0.25rem 0 0;
+  font-size: 1.05rem;
+}
+
+.compactWorkspaceHeader > div:last-child {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.compactWorkspaceHeader button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.25rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compactWorkspaceBody {
+  min-height: 0;
+  padding: 0.8rem;
+}
+
+.compactConsole .toolPanel {
+  border-radius: 0.25rem;
+  box-shadow: none;
+}
+
+.compactConsole .previewPane {
+  padding: 0.75rem;
+}
+
+.compactConsole .previewHead {
+  min-height: 3.4rem;
+}
+
+.compactConsole .slideItem {
+  border-radius: 0.25rem;
+  box-shadow: none;
+}
+
+@media (min-width: 1280px) {
+  .compactConsole .appShell {
+    grid-template-columns: minmax(15rem, 15.5rem) minmax(34rem, 1fr) minmax(18rem, 19rem);
+    grid-template-rows: 3.5rem minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .compactConsole .compactAppBar {
+    position: relative;
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .workspace,
+  .compactConsole .previewPane {
+    grid-row: 2;
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .workspace {
+    overflow: auto;
+  }
+
+  .compactConsole .previewPane {
+    overflow: hidden;
+  }
+
+  .compactConsole .previewCollapsed {
+    grid-template-columns: minmax(15rem, 15.5rem) minmax(34rem, 1fr) 3.8rem;
+  }
+
+  .compactConsole .previewCollapsed .previewPane {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading {
+    justify-content: center;
+    padding: 0.4rem 0;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading > div,
+  .compactConsole .previewCollapsed .compactDeckActions {
+    display: none;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading button {
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    padding: 0;
+  }
+
+  .compactConsole .lessonRailCollapsed {
+    grid-template-columns: 3.8rem minmax(34rem, 1fr) minmax(18rem, 19rem);
+  }
+
+  .compactConsole .lessonRailCollapsed.previewCollapsed {
+    grid-template-columns: 3.8rem minmax(34rem, 1fr) 3.8rem;
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar {
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar > :not(.compactLessonDetailsHead) {
+    display: none;
+  }
+
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead {
+    justify-content: center;
+    padding: 0.2rem 0;
+    border-bottom: 0;
+  }
+
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead span {
+    display: none;
+  }
+}
+
+@media (max-width: 1279px) {
+  .compactConsole {
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  .compactConsole .compactAppBar {
+    grid-template-columns: auto minmax(8rem, 1fr) auto;
+  }
+
+  .compactConsole .compactCloudStatus,
+  .compactConsole .compactLessonsButton {
+    display: none;
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .workspace,
+  .compactConsole .previewPane {
+    min-height: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 639px) {
+  .compactConsole .compactBrand div,
+  .compactConsole .compactLessonIdentity span,
+  .compactConsole .compactAppBar .compactSaveButton {
+    display: none;
+  }
+
+  .compactConsole .compactAppBar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .compactWorkspaceHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .compactWorkspaceHeader > div:last-child,
+  .compactWorkspaceHeader button {
+    width: 100%;
+  }
+}
+
+/* Desktop-light completion pass ----------------------------------------- */
+
+.classicLessonDetails {
+  display: contents;
+}
+
+.compactConsole .sidebar {
+  padding: 0;
+}
+
+.compactConsole .brandBlock,
+.compactConsole .externalTools {
+  display: none;
+}
+
+.compactLessonDetails {
+  border-bottom: 1px solid var(--builder-line);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--builder-accent-soft) 42%, transparent), transparent 58%),
+    var(--builder-surface);
+  padding: 0.8rem;
+}
+
+.compactLessonDetailsHead {
+  display: flex;
+  min-height: 3.15rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.45rem;
+  border-bottom: 1px solid var(--builder-line);
+  background: var(--builder-surface);
+}
+
+.compactLessonDetailsHead span {
+  color: var(--builder-ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.compactLessonDetailsHead button {
+  display: grid;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: var(--builder-muted);
+  cursor: pointer;
+}
+
+.compactLessonDetailsHead button:hover {
+  background: var(--builder-surface-alt);
+  color: var(--builder-ink);
+}
+
+.compactConsole .fieldLabel,
+.compactConsole .eyebrow,
+.compactConsole .assetLabel {
+  color: var(--builder-muted);
+  font-family: var(--font-builder-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.075em;
+}
+
+.compactConsole .textInput,
+.compactConsole .textArea,
+.compactConsole .dataTable textarea,
+.compactConsole .dataTable input[type="number"],
+.compactConsole .dataTable input[type="date"] {
+  min-height: 2.75rem;
+  border-radius: 0.2rem;
+  background: var(--builder-surface);
+}
+
+.compactConsole .classActions,
+.compactConsole .lessonQuickActions {
+  gap: 0.4rem;
+}
+
+.compactConsole .lessonQuickActions {
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 0.8rem;
+}
+
+.compactConsole .lessonQuickActions .primaryButton {
+  grid-column: auto;
+}
+
+.compactConsole .lessonQuickActions .secondaryButton {
+  grid-column: 1 / -1;
+}
+
+.compactConsole .primaryButton,
+.compactConsole .secondaryButton,
+.compactConsole .dangerButton,
+.compactConsole .navButton {
+  min-height: 2.75rem;
+  border-radius: 0.2rem;
+  box-shadow: none;
+}
+
+.compactConsole .exampleRetrievalToggle {
+  min-height: 2.75rem;
+  margin-left: auto;
+  padding: 0 0.65rem;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
+  box-shadow: none;
+  color: var(--builder-accent-strong);
+  font: 700 0.72rem/1 var(--builder-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.compactConsole .exampleRetrievalToggle:hover {
+  background: var(--builder-accent-soft);
+}
+
+.compactConsole .primaryButton {
+  background: var(--builder-accent);
+}
+
+.compactConsole .secondaryButton {
+  background: var(--builder-surface);
+}
+
+.compactConsole .compactToolNavigation {
+  margin: 0;
+}
+
+.compactToolNavigation details > div {
+  gap: 0.1rem;
+  padding: 0.3rem 0.45rem 0.45rem;
+}
+
+.compactToolNavigation details button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.compactToolNavigation details button svg {
+  flex: 0 0 auto;
+  color: var(--builder-line-strong);
+}
+
+.compactToolNavigation details button[data-active="true"] svg {
+  color: var(--builder-accent);
+}
+
+.compactToolNavigation details a svg {
+  flex: 0 0 auto;
+  color: var(--builder-accent);
+}
+
+.compactIdentityControl {
+  border-top: 1px solid var(--builder-line);
+  padding: 0.55rem 0.65rem;
+}
+
+.compactIdentityControl .impersonationIdentity {
+  gap: 0.35rem;
+}
+
+.compactIdentityControl .impersonationIdentity p {
+  max-width: 15rem;
+  margin: 0;
+  color: var(--builder-muted);
+  font-size: 0.7rem;
+}
+
+.compactIdentityControl .tinyButton {
+  min-height: 2.25rem;
+}
+
+.compactConsole .workspace {
+  background: var(--builder-surface-alt);
+}
+
+.compactWorkspaceBody {
+  display: grid;
+  align-content: start;
+}
+
+.compactConsole .toolPanel {
+  border: 1px solid var(--builder-line-strong);
+  border-top: 3px solid var(--builder-accent);
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--builder-surface) 97%, transparent);
+  padding: 1rem;
+  box-shadow: 0 0.65rem 1.8rem rgba(29, 39, 35, 0.08);
+}
+
+.compactConsole .panelHead {
+  min-height: 3.1rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.compactConsole .panelHead h3 {
+  font-size: 1rem;
+  letter-spacing: -0.015em;
+}
+
+.compactConsole [data-testid="retrieval-panel"] .panelHead .inlineActions {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 0.15rem 0.1rem 0.3rem;
+}
+
+.compactConsole [data-testid="retrieval-panel"] .panelHead .inlineActions > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.tableHeaderMenu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+.compactConsole .tableHeaderMenu :global(button[aria-haspopup="menu"]) {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border-color: transparent;
+  padding: 0;
+  background: transparent;
+}
+
+.compactConsole .tableHeaderMenu :global(button[aria-haspopup="menu"]):hover,
+.compactConsole .tableHeaderMenu :global(button[aria-haspopup="menu"]:focus-visible) {
+  border-color: var(--builder-line-strong);
+  background: var(--builder-surface);
+}
+
+.compactConsole .retrievalMeta,
+.compactConsole .retrievalEditImageSlot,
+.compactConsole .exampleRetrievalSlot,
+.compactConsole .revisionItem {
+  border-radius: 0.2rem;
+  background: var(--builder-surface-alt);
+}
+
+.compactConsole .starterEditorGrid,
+.compactConsole .exampleMainGrid,
+.compactConsole .exampleRetrievalGrid {
+  gap: 0.7rem;
+}
+
+.compactConsole .assetPairGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.compactConsole .assetPairGrid > * .imageDrop {
+  min-height: 10rem;
+}
+
+.compactConsole .exampleMainGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.compactConsole .exampleMainColumn {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.compactConsole .exampleMainColumn .imageDrop {
+  min-height: 12rem;
+}
+
+.compactConsole .slotEditor,
+.compactConsole .exampleMainColumn {
+  min-width: 0;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.2rem;
+  background: var(--builder-surface);
+  padding: 0.7rem;
+}
+
+.compactConsole .imageDrop,
+.compactConsole .retrievalImageDrop {
+  width: 100%;
+  border-radius: 0.18rem;
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 0.6rem, rgba(35, 117, 101, 0.025) 0.6rem 1.2rem),
+    var(--builder-surface);
+}
+
+.compactConsole .imageDropMessage small {
+  display: none;
+}
+
+.compactConsole .imageDropMessage {
+  gap: 0.35rem;
+  padding: 1.25rem 2.8rem 1.25rem 1rem;
+}
+
+.compactConsole .subsectionHead {
+  min-height: 3.15rem;
+  align-items: center;
+  border: 1px solid var(--builder-line);
+  border-left: 3px solid var(--builder-accent);
+  background: var(--builder-surface-alt);
+  padding: 0.4rem 0.45rem 0.4rem 0.75rem;
+  margin-top: 1rem;
+}
+
+.compactConsole .subsectionHead h4 {
+  font-size: 0.78rem;
+}
+
+.compactConsole .tableWrap {
+  border-color: var(--builder-line-strong);
+  border-radius: 0.2rem;
+}
+
+.compactConsole .dataTable {
+  background: var(--builder-surface);
+}
+
+.compactConsole .dataTable th {
+  background: var(--builder-surface-alt);
+  font-family: var(--font-builder-mono);
+  letter-spacing: 0.075em;
+}
+
+.compactConsole .dueRow {
+  background: color-mix(in srgb, var(--builder-warn) 11%, var(--builder-surface));
+}
+
+.compactConsole .dataTable tbody tr:hover {
+  background: color-mix(in srgb, var(--builder-accent-soft) 35%, var(--builder-surface));
+}
+
+.compactConsole .actionRow {
+  margin-top: 1rem;
+  border-top-color: var(--builder-line-strong);
+}
+
+.compactConsole .previewPane {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: 0;
+}
+
+.compactDeckHeading {
+  display: flex;
+  min-height: 3.7rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--builder-line);
+  padding: 0.4rem 0.55rem 0.4rem 0.7rem;
+}
+
+.compactDeckHeading > div,
+.compactDeckHeading > div > span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.compactDeckHeading > div > span {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.compactDeckHeading small {
+  color: var(--builder-muted);
+  font: 600 0.58rem/1 var(--font-builder-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compactDeckHeading strong {
+  font-size: 0.8rem;
+}
+
+.compactDeckHeading button,
+.compactDeckActions > button {
+  display: inline-flex;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.2rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.compactDeckHeading button {
+  border-color: transparent;
+}
+
+.compactDeckActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem;
+  border-bottom: 1px solid var(--builder-line);
+  background: var(--builder-surface-alt);
+  padding: 0.4rem;
+}
+
+.compactDeckActions > button {
+  flex-direction: column;
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.61rem;
+  font-weight: 700;
+}
+
+.compactDeckActions > button:hover,
+.compactDeckHeading button:hover {
+  border-color: var(--builder-line-strong);
+  background: var(--builder-surface);
+}
+
+.compactDeckActions .transferMenuSummary {
+  width: 100%;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border-color: transparent;
+  border-radius: 0.2rem;
+  background: transparent;
+}
+
+.compactDeckActions .transferMenuContent {
+  right: 0;
+  border-radius: 0.2rem;
+}
+
+.compactResetButton {
+  color: var(--builder-danger) !important;
+}
+
+.compactConsole .slideList {
+  gap: 0.55rem;
+  padding: 0.55rem;
+}
+
+.compactConsole .slideItem {
+  border-radius: 0.2rem;
+  box-shadow: none;
+}
+
+.compactConsole .slideItemActive {
+  border-left: 4px solid var(--builder-accent);
+}
+
+.compactConsole .slideItemSelected {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--builder-accent) 22%, transparent);
+}
+
+.compactConsole .slideItemDragging {
+  opacity: 0.45;
+}
+
+.compactConsole .slideItem[data-drag-over="true"] {
+  border-color: var(--builder-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--builder-accent) 22%, transparent);
+}
+
+.compactConsole .slideDragHandle {
+  flex: 0 0 auto;
+  cursor: grab;
+}
+
+.compactConsole .slideDragHandle:active {
+  cursor: grabbing;
+}
+
+.compactConsole .slideToolbar {
+  min-height: 2.75rem;
+  padding: 0.45rem 0.5rem;
+  background: var(--builder-surface-alt);
+}
+
+.compactConsole .slideSelectButton {
+  flex: 1 1 auto;
+  min-height: 2.25rem;
+}
+
+.compactConsole .miniButton {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border-radius: 0.18rem;
+}
+
+.compactConsole :global(.rounded-xl),
+.compactConsole :global(.rounded-lg),
+.compactConsole :global(.rounded-md) {
+  border-radius: 0.2rem;
+}
+
+.compactConsole :global(.border-slate-200) {
+  border-color: var(--builder-line);
+}
+
+.compactConsole :global(.border-slate-300),
+.compactConsole :global(.border-slate-400) {
+  border-color: var(--builder-line-strong);
+}
+
+.compactConsole :global(.border-teal-600) {
+  border-color: var(--builder-accent);
+}
+
+.compactConsole :global(.border-red-200) {
+  border-color: color-mix(in srgb, var(--builder-danger) 45%, var(--builder-line));
+}
+
+.compactConsole :global(.bg-white) {
+  background-color: var(--builder-surface);
+}
+
+.compactConsole :global(.bg-slate-50) {
+  background-color: var(--builder-surface-alt);
+}
+
+.compactConsole :global(.bg-slate-100) {
+  background-color: color-mix(in srgb, var(--builder-surface-alt) 82%, var(--builder-line));
+}
+
+.compactConsole :global(.bg-teal-50) {
+  background-color: var(--builder-accent-soft);
+}
+
+.compactConsole :global(.bg-emerald-100),
+.compactConsole :global(.bg-blue-100) {
+  background-color: var(--builder-accent-soft);
+}
+
+.compactConsole :global(.text-slate-900) {
+  color: var(--builder-ink);
+}
+
+.compactConsole :global(.text-slate-950),
+.compactConsole :global(.text-slate-700) {
+  color: var(--builder-ink);
+}
+
+.compactConsole :global(.text-slate-600),
+.compactConsole :global(.text-slate-500),
+.compactConsole :global(.text-slate-400) {
+  color: var(--builder-muted);
+}
+
+.compactConsole :global(.text-emerald-800),
+.compactConsole :global(.text-blue-800) {
+  color: var(--builder-accent-dark);
+}
+
+.compactConsole :global(.text-red-700) {
+  color: var(--builder-danger);
+}
+
+.compactConsole[data-builder-theme="dark"] :is(input, select, textarea),
+.compactConsole[data-builder-theme="dark"] :global(.bg-white) {
+  border-color: var(--builder-line);
+  background-color: var(--builder-surface);
+  color: var(--builder-ink);
+}
+
+.compactConsole[data-builder-theme="dark"] :is(input, textarea)::placeholder {
+  color: var(--builder-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .compactConsole[data-builder-theme="system"] :is(input, select, textarea),
+  .compactConsole[data-builder-theme="system"] :global(.bg-white) {
+    border-color: var(--builder-line);
+    background-color: var(--builder-surface);
+    color: var(--builder-ink);
+  }
+
+  .compactConsole[data-builder-theme="system"] :is(input, textarea)::placeholder {
+    color: var(--builder-muted);
+  }
+}
+
+@media (min-width: 1280px) {
+  .compactConsole .compactWorkspaceBody {
+    padding: 0.9rem;
+  }
+}
+
+/* Compact Console responsive drawers ----------------------------------- */
+
+.compactMobileDock,
+.compactDrawerScrim {
+  display: none;
+}
+
+.compactMobileDock[hidden] {
+  display: none;
+}
+
+@media (max-width: 1279px) {
+  .compactConsole {
+    --compact-mobile-dock-height: 4rem;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .compactConsole .appShell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 3.5rem minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .compactConsole .compactAppBar {
+    position: relative;
+    grid-row: 1;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  }
+
+  .compactConsole .compactCloudStatus,
+  .compactConsole .compactLessonsButton {
+    display: none;
+  }
+
+  .compactConsole .compactAppBar > .compactPresentButton,
+  .compactConsole .compactAppBar > .compactSaveButton {
+    display: inline-flex;
+  }
+
+  .compactConsole .workspace {
+    grid-row: 2;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .compactConsole .compactWorkspaceBody {
+    min-height: 100%;
+    padding-bottom: calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom) + 0.8rem
+    );
+  }
+
+  .compactConsole .sidebar,
+  .compactConsole .previewPane {
+    position: fixed;
+    top: 3.5rem;
+    bottom: calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom)
+    );
+    z-index: var(--builder-layer-drawer);
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    box-shadow: var(--builder-shadow);
+    transition: transform 180ms ease, visibility 180ms step-end;
+    visibility: hidden;
+  }
+
+  .compactConsole .sidebar {
+    left: 0;
+    width: min(88vw, 20rem);
+    border-right: 1px solid var(--builder-line);
+    transform: translateX(-105%);
+  }
+
+  .compactConsole .previewPane {
+    right: 0;
+    width: min(92vw, 22rem);
+    border-left: 1px solid var(--builder-line);
+    transform: translateX(105%);
+  }
+
+  .compactConsole[data-mobile-panel="lesson"] .sidebar,
+  .compactConsole[data-mobile-panel="deck"] .previewPane {
+    transform: translateX(0);
+    transition: transform 180ms ease, visibility 0ms;
+    visibility: visible;
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar,
+  .compactConsole .previewCollapsed .previewPane {
+    width: min(88vw, 20rem);
+    padding: 0;
+  }
+
+  .compactConsole .previewCollapsed .previewPane {
+    width: min(92vw, 22rem);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .compactConsole .lessonRailCollapsed .sidebar > :not(.compactLessonDetailsHead),
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead span {
+    display: revert;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading > div {
+    display: flex;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckActions {
+    display: grid;
+  }
+
+  .compactConsole .previewCollapsed .compactDeckHeading {
+    justify-content: space-between;
+    padding: 0.35rem 0;
+  }
+
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead {
+    justify-content: flex-start;
+    padding: 0.2rem 0.45rem;
+    border-bottom: 1px solid var(--builder-line);
+  }
+
+  .compactDrawerScrim {
+    position: fixed;
+    inset: 3.5rem 0 calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom)
+    );
+    z-index: calc(var(--builder-layer-drawer) - 1);
+    display: block;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(8, 14, 12, 0.54);
+    padding: 0;
+    cursor: pointer;
+    backdrop-filter: blur(0.12rem);
+  }
+
+  .compactConsole[data-mobile-panel="lesson"] .compactDrawerScrim {
+    left: min(88vw, 20rem);
+  }
+
+  .compactConsole[data-mobile-panel="deck"] .compactDrawerScrim {
+    right: min(92vw, 22rem);
+  }
+
+  .compactMobileDock {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: calc(var(--builder-layer-drawer) + 1);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-height: calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom)
+    );
+    border-top: 1px solid var(--builder-line);
+    background: color-mix(in srgb, var(--builder-surface) 96%, transparent);
+    padding: 0.25rem max(0.35rem, env(safe-area-inset-right))
+      calc(0.25rem + env(safe-area-inset-bottom))
+      max(0.35rem, env(safe-area-inset-left));
+    box-shadow: 0 -0.5rem 1.8rem rgba(20, 30, 26, 0.13);
+    backdrop-filter: blur(0.8rem);
+  }
+
+  .compactMobileDock button {
+    display: grid;
+    min-width: 2.75rem;
+    min-height: 3.5rem;
+    place-items: center;
+    align-content: center;
+    gap: 0.18rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--builder-muted);
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 750;
+    cursor: pointer;
+  }
+
+  .compactMobileDock button[aria-pressed="true"] {
+    background: var(--builder-accent-soft);
+    color: var(--builder-accent-dark);
+  }
+
+  .compactMobileDock svg {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .compactConsole :is(button, input, select, textarea) {
+    min-height: 2.75rem;
+  }
+
+  .compactConsole button {
+    min-width: 2.75rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .compactConsole .compactPresentButton span,
+  .compactConsole .compactSaveButton span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compactConsole .sidebar,
+  .compactConsole .previewPane {
+    transition: none;
   }
 }

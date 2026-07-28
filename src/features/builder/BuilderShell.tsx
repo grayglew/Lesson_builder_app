@@ -1,14 +1,38 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
-import { type CSSProperties, useEffect, useState } from "react";
 import {
+  GripVertical,
+  LoaderCircle,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Trash2,
+  X,
+} from "lucide-react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
+import {
+  archiveClassName,
   loadBuilderDocument,
+  loadBuilderGlobalState,
+  renameClassName,
   saveClassNames,
   saveCurrentLesson,
   syncBuilderDocument,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
+import {
+  CompactAppBar,
+  CompactDeckHeader,
+  CompactMobileDock,
+  CompactToolNavigation,
+  type CompactMobilePanel,
+  type BuilderShellVariant,
+  type BuilderThemePreference,
+  type BuilderToolName,
+} from "./BuilderCompactChrome";
 import styles from "./BuilderShell.module.css";
+import { BuilderStatusToast } from "./BuilderStatusToast";
+import { BuilderActionMenu } from "./BuilderActionMenu";
 import { CfuComposer } from "./CfuComposer";
 import { DrawComposer } from "./DrawComposer";
 import { ExampleComposer } from "./ExampleComposer";
@@ -17,6 +41,7 @@ import { ImpersonationControl } from "./ImpersonationControl";
 import latexStyles from "./LatexComposer.module.css";
 import { LatexComposer } from "./LatexComposer";
 import { LessonTransferActions } from "./LessonTransferActions";
+import { NewLessonDialog } from "./NewLessonDialog";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
 import { RetrievalComposer } from "./RetrievalComposer";
@@ -24,33 +49,29 @@ import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
 import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
-import { type BuilderSlide } from "./schema";
+import {
+  type BuilderSlide,
+  createInitialBuilderDocument,
+} from "./schema";
 import {
   selectDocument,
   useBuilderStore,
 } from "./store";
 import { useLessonExportActions } from "./useLessonExportActions";
 import { useWorkspaceAutosave } from "./useWorkspaceAutosave";
+import { useActiveDialogFocus } from "./useDialogFocus";
 import { renderLatexDocument } from "./latex";
+import { parseInlineMarkdown } from "./markdown";
 
 type BuilderShellProps = {
   userEmail: string;
   actorEmail?: string;
   isImpersonating?: boolean;
+  variant?: BuilderShellVariant;
+  initialTheme?: BuilderThemePreference;
 };
 
-type ToolName =
-  | "starter"
-  | "saved-lessons"
-  | "retrieval"
-  | "example"
-  | "worksheet"
-  | "pdf"
-  | "cfu"
-  | "draw"
-  | "templates"
-  | "placeholder"
-  | "math";
+type ToolName = BuilderToolName;
 
 const tools: Array<{ name: ToolName; label: string }> = [
   { name: "starter", label: "Starter" },
@@ -76,22 +97,26 @@ const toolLabels: Record<ToolName, string> = {
   cfu: "CFU",
   draw: "Draw",
   templates: "Templates",
+  "shared-data": "Shared data",
   placeholder: "Placeholder",
   math: "LaTeX",
 };
 
 export function BuilderShell({
   actorEmail = "",
+  initialTheme = "system",
   isImpersonating = false,
   userEmail,
+  variant = "classic",
 }: BuilderShellProps) {
+  const [themePreference, setThemePreference] =
+    useState<BuilderThemePreference>(initialTheme);
   const document = useBuilderStore(selectDocument);
   const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
   const selectedPreviewSlideIds = useBuilderStore(
     (state) => state.selectedPreviewSlideIds,
   );
   const hydrated = useBuilderStore((state) => state.hydrated);
-  const status = useBuilderStore((state) => state.status);
   const hydrate = useBuilderStore((state) => state.hydrate);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const reset = useBuilderStore((state) => state.reset);
@@ -104,12 +129,105 @@ export function BuilderShell({
   const moveSlide = useBuilderStore((state) => state.moveSlide);
   const removeSlide = useBuilderStore((state) => state.removeSlide);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog, promptDialog } = useAppNotifications();
   const [activeTool, setActiveTool] = useState<ToolName>("starter");
+  const [lessonRailCollapsed, setLessonRailCollapsed] = useState(false);
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  const [compactMobileViewport, setCompactMobileViewport] = useState(false);
+  const [compactMobilePanel, setCompactMobilePanel] =
+    useState<CompactMobilePanel>("build");
+  const lessonDockButtonRef = useRef<HTMLButtonElement>(null);
+  const deckDockButtonRef = useRef<HTMLButtonElement>(null);
+  const [draggedSlideId, setDraggedSlideId] = useState("");
+  const [dragOverSlideId, setDragOverSlideId] = useState("");
   const [busyAction, setBusyAction] = useState("");
+  const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
+  const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
+  const lessonDrawerRef = useActiveDialogFocus<HTMLElement>(
+    () => setCompactMobilePanel("build"),
+    variant === "compact-console" &&
+      compactMobileViewport &&
+      compactMobilePanel === "lesson",
+  );
+  const deckDrawerRef = useActiveDialogFocus<HTMLElement>(
+    () => setCompactMobilePanel("build"),
+    variant === "compact-console" &&
+      compactMobileViewport &&
+      compactMobilePanel === "deck",
+  );
+
+  const compactDrawerOpen =
+    variant === "compact-console" &&
+    compactMobileViewport &&
+    compactMobilePanel !== "build";
+
+  function selectCompactTool(tool: ToolName) {
+    setActiveTool(tool);
+    if (compactMobileViewport) setCompactMobilePanel("build");
+  }
+
+  function updateThemePreference(preference: BuilderThemePreference) {
+    setThemePreference(preference);
+    window.document.cookie =
+      preference === "system"
+        ? "builder-theme=; Path=/; Max-Age=0; SameSite=Lax"
+        : `builder-theme=${preference}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  }
+
+  function dropSlideAt(targetSlideId: string) {
+    if (!draggedSlideId || draggedSlideId === targetSlideId) return;
+    const fromIndex = document.slides.findIndex(
+      (slide) => slide.id === draggedSlideId,
+    );
+    const targetIndex = document.slides.findIndex(
+      (slide) => slide.id === targetSlideId,
+    );
+    if (fromIndex < 0 || targetIndex < 0) return;
+    const direction = fromIndex < targetIndex ? 1 : -1;
+    for (let move = 0; move < Math.abs(targetIndex - fromIndex); move += 1) {
+      moveSlide(draggedSlideId, direction);
+    }
+    setDraggedSlideId("");
+    setDragOverSlideId("");
+  }
+
+  useEffect(() => {
+    if (variant !== "compact-console") return;
+    const root = window.document.documentElement;
+    const previousTheme = root.dataset.builderTheme;
+    root.dataset.builderTheme = themePreference;
+    return () => {
+      if (previousTheme) root.dataset.builderTheme = previousTheme;
+      else delete root.dataset.builderTheme;
+    };
+  }, [themePreference, variant]);
+
+  useEffect(() => {
+    if (variant !== "compact-console" || !window.matchMedia) return;
+    const media = window.matchMedia("(max-width: 1279px)");
+    const updateViewport = () => {
+      setCompactMobileViewport(media.matches);
+      if (!media.matches) setCompactMobilePanel("build");
+    };
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, [variant]);
+
+  useEffect(() => {
+    if (!compactDrawerOpen) return;
+    const previousBodyOverflow = window.document.body.style.overflow;
+    const previousRootOverflow = window.document.documentElement.style.overflow;
+    window.document.body.style.overflow = "hidden";
+    window.document.documentElement.style.overflow = "hidden";
+    return () => {
+      window.document.body.style.overflow = previousBodyOverflow;
+      window.document.documentElement.style.overflow = previousRootOverflow;
+    };
+  }, [compactDrawerOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +283,33 @@ export function BuilderShell({
     };
   }, [hydrate, setStatus]);
 
+  useEffect(() => {
+    if (!hydrated || activeTool !== "retrieval") return;
+    const controller = new AbortController();
+
+    async function refreshRetrievalData() {
+      setRetrievalRefreshing(true);
+      try {
+        const global = await loadBuilderGlobalState(controller.signal);
+        if (!controller.signal.aborted) updateGlobalData(global);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setStatus({
+          tone: "warning",
+          message: errorMessage(
+            error,
+            "Could not refresh retrieval items; the last loaded copy is still available.",
+          ),
+        });
+      } finally {
+        if (!controller.signal.aborted) setRetrievalRefreshing(false);
+      }
+    }
+
+    void refreshRetrievalData();
+    return () => controller.abort();
+  }, [activeTool, document.className, hydrated, setStatus, updateGlobalData]);
+
   async function saveLesson(copy: boolean) {
     if (!document.className.trim()) {
       setStatus({ tone: "error", message: "Choose a class before saving." });
@@ -195,7 +340,13 @@ export function BuilderShell({
   }
 
   async function addClass() {
-    const entered = window.prompt("Class name", "");
+    const entered = await promptDialog({
+      title: "Add a class",
+      description: "Enter the class name to add to Lesson Builder.",
+      inputLabel: "Class name",
+      confirmLabel: "Add class",
+      required: true,
+    });
     if (entered === null) return;
     const className = entered.trim();
     if (!className) return;
@@ -215,14 +366,152 @@ export function BuilderShell({
     }
   }
 
-  function startNewLesson() {
-    if (
-      window.confirm(
-        "Start a new lesson? Unsaved changes in the current workspace will be replaced.",
-      )
-    ) {
+  async function renameSelectedClass() {
+    const currentName = document.className.trim();
+    if (!currentName) return;
+    const entered = await promptDialog({
+      title: "Rename class",
+      description: `Choose a new name for "${currentName}".`,
+      inputLabel: "Class name",
+      initialValue: currentName,
+      confirmLabel: "Rename class",
+      required: true,
+    });
+    if (entered === null) return;
+    const nextName = entered.replace(/\s+/g, " ").trim();
+    if (!nextName || nextName === currentName) return;
+
+    setBusyAction("rename-class");
+    try {
+      const global = await renameClassName(currentName, nextName);
+      updateMetadata({ className: nextName });
+      updateGlobalData(global);
+      setStatus({
+        tone: "success",
+        message: `Renamed class "${currentName}" to "${nextName}".`,
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(error, "Could not rename the class."),
+      });
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function deleteSelectedClass() {
+    const className = document.className.trim();
+    if (!className) return;
+    const approved = await confirmDialog({
+      title: `Delete ${className}?`,
+      description:
+        "Its retrieval schedule will be archived. Saved lessons will be kept.",
+      confirmLabel: "Delete class",
+      cancelLabel: "Keep class",
+      tone: "danger",
+    });
+    if (!approved) {
+      return;
+    }
+
+    setBusyAction("delete-class");
+    try {
+      const global = await archiveClassName(className);
+      updateMetadata({ className: "" });
+      updateGlobalData(global);
+      setStatus({ tone: "success", message: `Deleted class "${className}".` });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(error, "Could not delete the class."),
+      });
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function resetCurrentLesson() {
+    const approved = await confirmDialog({
+      title: "Start a new lesson?",
+      description: "Unsaved changes in the current workspace will be replaced.",
+      confirmLabel: "Start new lesson",
+      cancelLabel: "Keep current lesson",
+      tone: "warning",
+    });
+    if (approved) {
       reset();
       setActiveTool("starter");
+    }
+  }
+
+  async function createAndSaveNewLesson(details: {
+    title: string;
+    className: string;
+  }) {
+    const nextDocument = {
+      ...createInitialBuilderDocument(),
+      title: details.title,
+      className: details.className,
+      classNames: [...document.classNames],
+      retrievalItems: document.retrievalItems,
+      slideTemplates: document.slideTemplates,
+    };
+
+    setBusyAction("new-lesson");
+    setStatus({
+      tone: "working",
+      message: `Creating and saving "${details.title}"...`,
+    });
+
+    try {
+      const saved = await saveCurrentLesson(nextDocument, { copy: true });
+      const savedDocument = {
+        ...nextDocument,
+        title: saved.title,
+        className: saved.className,
+        teachingDate: saved.teachingDate,
+        activeLessonId: saved.id,
+        activeLessonSavedAt: saved.updatedAt,
+        lessonUpdatedAt: saved.updatedAt,
+        classNames: Array.from(
+          new Set([saved.className, ...nextDocument.classNames].filter(Boolean)),
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+
+      hydrate(savedDocument);
+      setActiveTool("starter");
+      setNewLessonDialogOpen(false);
+
+      try {
+        await Promise.all([
+          saveV2CachedDocument(savedDocument),
+          syncBuilderDocument(savedDocument),
+        ]);
+        setStatus({
+          tone: "success",
+          message: `Created and saved "${saved.title}".`,
+        });
+      } catch (error) {
+        setStatus({
+          tone: "warning",
+          message: errorMessage(
+            error,
+            `"${saved.title}" was saved, but the workspace recovery copy could not be updated.`,
+          ),
+        });
+      }
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(
+          error,
+          "Could not create the new lesson. The current lesson is unchanged.",
+        ),
+      });
+    } finally {
+      setBusyAction("");
     }
   }
 
@@ -238,13 +527,76 @@ export function BuilderShell({
   }
 
   return (
-    <main className={styles.page}>
+    <main
+      className={`${styles.page} ${
+        variant === "compact-console" ? styles.compactConsole : ""
+      }`}
+      data-builder-theme={themePreference}
+      data-builder-variant={variant}
+      data-mobile-panel={
+        variant === "compact-console" ? compactMobilePanel : undefined
+      }
+    >
       <div
         className={`${styles.appShell} ${
           previewCollapsed ? styles.previewCollapsed : ""
-        }`}
+        } ${lessonRailCollapsed ? styles.lessonRailCollapsed : ""}`}
       >
-        <aside className={styles.sidebar} aria-label="Lesson builder navigation">
+        {variant === "compact-console" ? (
+          <CompactAppBar
+            title={document.title}
+            className={document.className}
+            teachingDate={document.teachingDate}
+            userEmail={userEmail}
+            cloudMessage={workspaceAutosave.message}
+            busy={Boolean(busyAction)}
+            backgroundInert={compactDrawerOpen}
+            identityControl={
+              isImpersonating ? (
+                <ImpersonationControl
+                  actorEmail={actorEmail}
+                  effectiveEmail={userEmail}
+                />
+              ) : null
+            }
+            themePreference={themePreference}
+            onLessons={() => selectCompactTool("saved-lessons")}
+            onPresent={() => void lessonActions.previewLesson(false)}
+            onSave={() => void saveLesson(false)}
+            onThemeChange={updateThemePreference}
+          />
+        ) : null}
+        <aside
+          id="compact-lesson-drawer"
+          ref={lessonDrawerRef}
+          className={styles.sidebar}
+          aria-label="Lesson builder navigation"
+          aria-hidden={
+            compactMobileViewport
+              ? compactMobilePanel !== "lesson"
+              : undefined
+          }
+          aria-modal={
+            compactMobileViewport && compactMobilePanel === "lesson"
+              ? "true"
+              : undefined
+          }
+          inert={
+            compactMobileViewport && compactMobilePanel !== "lesson"
+              ? true
+              : undefined
+          }
+          role={
+            compactMobileViewport && compactMobilePanel === "lesson"
+              ? "dialog"
+              : undefined
+          }
+          tabIndex={
+            compactMobileViewport && compactMobilePanel === "lesson"
+              ? -1
+              : undefined
+          }
+        >
           <div className={styles.brandBlock}>
             <div className={styles.brandMark}>LB</div>
             <div className={styles.brandCopy}>
@@ -260,6 +612,48 @@ export function BuilderShell({
             </div>
           </div>
 
+          {variant === "compact-console" ? (
+            <div className={styles.compactLessonDetailsHead}>
+              <button
+                type="button"
+                aria-label={
+                  compactMobileViewport
+                    ? "Close lesson drawer"
+                    : lessonRailCollapsed
+                      ? "Expand lesson tools"
+                      : "Collapse lesson tools"
+                }
+                title={
+                  compactMobileViewport
+                    ? "Close lesson drawer"
+                    : lessonRailCollapsed
+                      ? "Expand lesson tools"
+                      : "Collapse lesson tools"
+                }
+                onClick={() => {
+                  if (compactMobileViewport) setCompactMobilePanel("build");
+                  else setLessonRailCollapsed((current) => !current);
+                }}
+              >
+                {compactMobileViewport ? (
+                  <X aria-hidden />
+                ) : lessonRailCollapsed ? (
+                  <PanelLeftOpen aria-hidden />
+                ) : (
+                  <PanelLeftClose aria-hidden />
+                )}
+              </button>
+              <span>Lesson setup</span>
+            </div>
+          ) : null}
+
+          <div
+            className={
+              variant === "compact-console"
+                ? styles.compactLessonDetails
+                : styles.classicLessonDetails
+            }
+          >
           <label className={styles.fieldLabel} htmlFor="v2-lesson-title">
             Lesson title
           </label>
@@ -298,6 +692,24 @@ export function BuilderShell({
               </option>
             ))}
           </select>
+          <div className={styles.classActions} aria-label="Selected class actions">
+            <button
+              className={`${styles.secondaryButton} ${styles.tinyButton}`}
+              type="button"
+              disabled={!document.className || Boolean(busyAction)}
+              onClick={() => void renameSelectedClass()}
+            >
+              {busyAction === "rename-class" ? "Renaming..." : "Rename class"}
+            </button>
+            <button
+              className={`${styles.dangerButton} ${styles.tinyButton}`}
+              type="button"
+              disabled={!document.className || Boolean(busyAction)}
+              onClick={() => void deleteSelectedClass()}
+            >
+              {busyAction === "delete-class" ? "Deleting..." : "Delete class"}
+            </button>
+          </div>
 
           <label className={styles.fieldLabel} htmlFor="v2-teaching-date">
             Date of teaching
@@ -313,6 +725,7 @@ export function BuilderShell({
           />
 
           <div className={styles.lessonQuickActions} aria-label="Lesson save actions">
+            {variant === "classic" ? (
             <button
               className={`${styles.primaryButton} ${styles.compactButton}`}
               type="button"
@@ -320,6 +733,15 @@ export function BuilderShell({
               onClick={() => void saveLesson(false)}
             >
               {busyAction === "save" ? "Saving..." : "Save"}
+            </button>
+            ) : null}
+            <button
+              className={`${styles.primaryButton} ${styles.compactButton}`}
+              type="button"
+              disabled={Boolean(busyAction)}
+              onClick={() => setNewLessonDialogOpen(true)}
+            >
+              New lesson
             </button>
             <button
               className={`${styles.secondaryButton} ${styles.compactButton}`}
@@ -329,31 +751,32 @@ export function BuilderShell({
             >
               {busyAction === "save-copy" ? "Saving..." : "Save as"}
             </button>
-            <button
-              className={`${styles.secondaryButton} ${styles.compactButton}`}
-              type="button"
-              onClick={startNewLesson}
-            >
-              New lesson
-            </button>
           </div>
           <WorkspaceAutosaveIndicator {...workspaceAutosave} />
+          </div>
 
-          <nav className={styles.panelNav} aria-label="Slide tools">
-            {tools.map((tool) => (
-              <button
-                key={tool.name}
-                className={`${styles.navButton} ${
-                  activeTool === tool.name ? styles.navButtonActive : ""
-                }`}
-                type="button"
-                aria-current={activeTool === tool.name ? "page" : undefined}
-                onClick={() => setActiveTool(tool.name)}
-              >
-                {tool.label}
-              </button>
-            ))}
-          </nav>
+          {variant === "compact-console" ? (
+            <CompactToolNavigation
+              activeTool={activeTool}
+              onSelect={selectCompactTool}
+            />
+          ) : (
+            <nav className={styles.panelNav} aria-label="Slide tools">
+              {tools.map((tool) => (
+                <button
+                  key={tool.name}
+                  className={`${styles.navButton} ${
+                    activeTool === tool.name ? styles.navButtonActive : ""
+                  }`}
+                  type="button"
+                  aria-current={activeTool === tool.name ? "page" : undefined}
+                  onClick={() => setActiveTool(tool.name)}
+                >
+                  {tool.label}
+                </button>
+              ))}
+            </nav>
+          )}
 
           <div className={styles.externalTools} aria-label="External tools">
             <a
@@ -387,28 +810,62 @@ export function BuilderShell({
           </div>
         </aside>
 
-        <section className={styles.workspace} aria-label={toolLabels[activeTool]}>
+        <section
+          className={styles.workspace}
+          aria-label={toolLabels[activeTool]}
+          inert={compactDrawerOpen ? true : undefined}
+        >
+          <div
+            className={
+              variant === "compact-console"
+                ? styles.compactWorkspaceBody
+                : styles.classicWorkspaceBody
+            }
+          >
           <h2 className={styles.srOnly}>{toolLabels[activeTool]}</h2>
           {activeTool === "starter" ? <StarterComposer /> : null}
           {activeTool === "saved-lessons" ? (
             <div className={styles.toolPanel}>
               <SavedLessonLibrary
                 embedded
+                compact={variant === "compact-console"}
                 onBack={() => setActiveTool("starter")}
               />
             </div>
           ) : null}
-          {activeTool === "retrieval" ? <RetrievalComposer /> : null}
-          {activeTool === "example" ? <ExampleComposer /> : null}
+          {activeTool === "retrieval" ? (
+            <RetrievalComposer
+              compact={variant === "compact-console"}
+              refreshing={retrievalRefreshing}
+            />
+          ) : null}
+          {activeTool === "example" ? (
+            <ExampleComposer compact={variant === "compact-console"} />
+          ) : null}
           {activeTool === "worksheet" ? <WorksheetComposer /> : null}
           {activeTool === "pdf" ? <PdfComposer /> : null}
           {activeTool === "cfu" ? <CfuComposer /> : null}
-          {activeTool === "draw" ? <DrawComposer /> : null}
+          {activeTool === "draw" ? (
+            <DrawComposer compact={variant === "compact-console"} />
+          ) : null}
           {activeTool === "templates" ? (
             <div className={styles.toolPanel}>
               <GlobalDataEditor
                 embedded
+                compact={variant === "compact-console"}
                 initialView="templates"
+                visibleViews={variant === "compact-console" ? ["templates"] : undefined}
+                onBack={() => setActiveTool("starter")}
+              />
+            </div>
+          ) : null}
+          {activeTool === "shared-data" ? (
+            <div className={styles.toolPanel}>
+              <GlobalDataEditor
+                embedded
+                compact
+                initialView="retrieval"
+                visibleViews={["retrieval", "classes"]}
                 onBack={() => setActiveTool("starter")}
               />
             </div>
@@ -453,10 +910,56 @@ export function BuilderShell({
               </div>
             </section>
           ) : null}
-          {activeTool === "math" ? <LatexComposer /> : null}
+          {activeTool === "math" ? (
+            <LatexComposer compact={variant === "compact-console"} />
+          ) : null}
+          </div>
         </section>
 
-        <aside className={styles.previewPane} aria-label="Lesson preview">
+        <aside
+          id="compact-deck-drawer"
+          ref={deckDrawerRef}
+          className={styles.previewPane}
+          aria-label="Lesson preview"
+          aria-hidden={
+            compactMobileViewport ? compactMobilePanel !== "deck" : undefined
+          }
+          aria-modal={
+            compactMobileViewport && compactMobilePanel === "deck"
+              ? "true"
+              : undefined
+          }
+          inert={
+            compactMobileViewport && compactMobilePanel !== "deck"
+              ? true
+              : undefined
+          }
+          role={
+            compactMobileViewport && compactMobilePanel === "deck"
+              ? "dialog"
+              : undefined
+          }
+          tabIndex={
+            compactMobileViewport && compactMobilePanel === "deck"
+              ? -1
+              : undefined
+          }
+        >
+          {variant === "compact-console" ? (
+            <CompactDeckHeader
+              collapsed={previewCollapsed}
+              mobileDrawer={compactMobileViewport}
+              selectedCount={selectedPreviewSlideIds.length}
+              slideCount={document.slides.length}
+              transferActions={<LessonTransferActions actions={lessonActions} />}
+              onCollapse={() => {
+                if (compactMobileViewport) setCompactMobilePanel("build");
+                else setPreviewCollapsed((current) => !current);
+              }}
+              onHandout={() => void lessonActions.previewLesson(true)}
+              onReset={() => void resetCurrentLesson()}
+            />
+          ) : (
           <div className={styles.previewHead}>
             <div className={styles.previewTitle}>
               <span className={styles.eyebrow}>Deck preview</span>
@@ -513,12 +1016,13 @@ export function BuilderShell({
                 type="button"
                 aria-label="Reset lesson"
                 title="Reset lesson"
-                onClick={startNewLesson}
+                onClick={() => void resetCurrentLesson()}
               >
                 ↺
               </button>
             </div>
           </div>
+          )}
 
           <ol id="v2-slide-list" className={styles.slideList}>
             {document.slides.map((slide, index) => (
@@ -530,9 +1034,43 @@ export function BuilderShell({
                     : ""
                 } ${
                   slide.id === selectedSlideId ? styles.slideItemActive : ""
+                } ${
+                  draggedSlideId === slide.id ? styles.slideItemDragging : ""
                 }`}
+                data-drag-over={dragOverSlideId === slide.id || undefined}
+                onDragOver={(event) => {
+                  if (variant !== "compact-console" || !draggedSlideId) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOverSlideId(slide.id);
+                }}
+                onDrop={(event) => {
+                  if (variant !== "compact-console") return;
+                  event.preventDefault();
+                  dropSlideAt(slide.id);
+                }}
               >
                 <div className={styles.slideToolbar}>
+                  {variant === "compact-console" ? (
+                    <button
+                      className={`${styles.miniButton} ${styles.slideDragHandle}`}
+                      type="button"
+                      draggable
+                      aria-label={`Drag slide ${index + 1} to reorder`}
+                      title="Drag to reorder"
+                      onDragStart={(event) => {
+                        setDraggedSlideId(slide.id);
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", slide.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedSlideId("");
+                        setDragOverSlideId("");
+                      }}
+                    >
+                      <GripVertical size={15} aria-hidden />
+                    </button>
+                  ) : null}
                   <button
                     className={styles.slideSelectButton}
                     type="button"
@@ -550,6 +1088,24 @@ export function BuilderShell({
                     role="group"
                     aria-label={`Slide ${index + 1} actions`}
                   >
+                    {variant === "compact-console" ? (
+                      <BuilderActionMenu
+                          label={`More actions for slide ${index + 1}`}
+                          triggerContent={
+                            <>
+                              <MoreHorizontal size={15} aria-hidden />
+                              <span className={styles.srOnly}>
+                                More actions for slide {index + 1}
+                              </span>
+                            </>
+                          }
+                        >
+                          <button type="button" disabled={index === 0} onClick={() => moveSlide(slide.id, -1)}>Move up</button>
+                          <button type="button" disabled={index === document.slides.length - 1} onClick={() => moveSlide(slide.id, 1)}>Move down</button>
+                          <button type="button" style={{ color: "#b42318" }} onClick={() => removeSlide(slide.id)}><Trash2 size={15} aria-hidden /> Delete slide</button>
+                      </BuilderActionMenu>
+                    ) : (
+                      <>
                     <button
                       className={styles.miniButton}
                       type="button"
@@ -576,6 +1132,8 @@ export function BuilderShell({
                     >
                       ×
                     </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <button
@@ -591,18 +1149,40 @@ export function BuilderShell({
             ))}
           </ol>
         </aside>
+
+        {variant === "compact-console" ? (
+          <>
+            {compactDrawerOpen ? (
+              <button
+                className={styles.compactDrawerScrim}
+                type="button"
+                aria-label={`Dismiss ${compactMobilePanel} drawer`}
+                onClick={() => setCompactMobilePanel("build")}
+              />
+            ) : null}
+            <CompactMobileDock
+              activePanel={compactMobilePanel}
+              available={compactMobileViewport}
+              lessonButtonRef={lessonDockButtonRef}
+              deckButtonRef={deckDockButtonRef}
+              onSelect={setCompactMobilePanel}
+            />
+          </>
+        ) : null}
       </div>
 
-      <div
-        className={`${styles.notificationToast} ${styles[status.tone]}`}
-        role="status"
-        aria-live="polite"
-      >
-        {status.tone === "working" ? (
-          <LoaderCircle aria-hidden className={styles.toastSpinner} />
-        ) : null}
-        {status.message}
-      </div>
+      {newLessonDialogOpen ? (
+        <NewLessonDialog
+          busy={busyAction === "new-lesson"}
+          classNames={document.classNames}
+          onClose={() => {
+            if (busyAction !== "new-lesson") setNewLessonDialogOpen(false);
+          }}
+          onSubmit={(details) => void createAndSaveNewLesson(details)}
+        />
+      ) : null}
+
+      <BuilderStatusToast />
     </main>
   );
 }
@@ -637,7 +1217,7 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
         <h4>{label}</h4>
         <ul className={styles.templateBullets}>
           {stringArray(data.bullets).map((bullet, index) => (
-            <li key={index}>{bullet}</li>
+            <li key={index}><InlineMarkdown value={bullet} /></li>
           ))}
         </ul>
       </SlideFrame>
@@ -755,6 +1335,19 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
       </div>
     </SlideFrame>
   );
+}
+
+function InlineMarkdown({ value }: { value: string }) {
+  return parseInlineMarkdown(value).map((part, index) => {
+    const key = `${part.type}-${index}`;
+    if (part.type === "strong") return <strong key={key}>{part.text}</strong>;
+    if (part.type === "emphasis") return <em key={key}>{part.text}</em>;
+    if (part.type === "code") return <code key={key}>{part.text}</code>;
+    if (part.type === "link") {
+      return <span key={key} className={styles.markdownLink}>{part.text}</span>;
+    }
+    return part.text;
+  });
 }
 
 function SlideFrame({

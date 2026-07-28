@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Pencil } from "lucide-react";
+import { ImagePlus, Pencil, Trash2 } from "lucide-react";
 import { type ClipboardEvent, useRef, useState } from "react";
 import localStyles from "./BuilderImageInput.module.css";
 import styles from "./BuilderShell.module.css";
@@ -109,15 +109,20 @@ export function BuilderImageInput({
           onClick={() => setIsDrawing(true)}
         >
           <Pencil size={14} aria-hidden />
-          {asset ? "Draw over image" : "Draw image"}
+          <span className={localStyles.buttonText}>
+            {asset ? "Draw over image" : "Draw image"}
+          </span>
         </button>
         {asset ? (
           <button
-            className={styles.removeAssetButton}
+            className={`${styles.removeAssetButton} ${localStyles.removeButton}`}
             type="button"
+            aria-label={`Remove ${label}`}
+            title={`Remove ${label}`}
             onClick={() => onChange(null)}
           >
-            Remove {label.toLowerCase()}
+            <Trash2 className={localStyles.compactOnly} size={14} aria-hidden />
+            <span className={localStyles.buttonText}>Remove {label.toLowerCase()}</span>
           </button>
         ) : null}
       </div>

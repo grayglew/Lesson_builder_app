@@ -81,7 +81,7 @@ export const useBuilderStore = create<BuilderStore>()(
     hydrate: (input) =>
       set((state) => {
         state.document = normalizeBuilderDocument(input);
-        state.selectedSlideId = state.document.slides[0]?.id ?? null;
+        state.selectedSlideId = null;
         state.selectedPreviewSlideIds = [];
         state.hydrated = true;
         state.status = idleStatus;
@@ -106,7 +106,7 @@ export const useBuilderStore = create<BuilderStore>()(
           slideTemplates: state.document.slideTemplates,
           updatedAt: new Date().toISOString(),
         };
-        state.selectedSlideId = state.document.slides[0]?.id ?? null;
+        state.selectedSlideId = null;
         state.selectedPreviewSlideIds = [];
         state.status = {
           tone: "success",

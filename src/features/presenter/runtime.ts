@@ -754,17 +754,20 @@ export function mountPresenterRuntime(
     bindClick(selectors.highlighterButton, () => setMode("highlighter"));
     bindClick(selectors.eraserButton, () => setMode("eraser"));
     bindClick(selectors.undoButton, () => undo());
-    bindClick(selectors.clearButton, () => {
+    let clearConfirmationPending = false;
+    bindClick(selectors.clearButton, async () => {
+      if (clearConfirmationPending) return;
       const current = clonePresenterAnnotations(annotations);
       const hasAnnotations = Object.values(current).some(
         (strokes) => strokes.length > 0,
       );
-      if (
-        hasAnnotations &&
-        options.confirmClear &&
-        !options.confirmClear(current)
-      ) {
-        return;
+      if (hasAnnotations && options.confirmClear) {
+        clearConfirmationPending = true;
+        try {
+          if (!(await options.confirmClear(current))) return;
+        } finally {
+          clearConfirmationPending = false;
+        }
       }
       clear();
     });
@@ -902,7 +905,14 @@ export function autoMountPresenterRuntime(): PresenterRuntimeController | null {
     return null;
   }
   const controller = mountPresenterRuntime({
-    confirmClear: () => window.confirm("Clear all presenter annotations?"),
+    confirmClear: () =>
+      window.__lessonPresenterNotifications?.confirm({
+        title: "Clear all annotations?",
+        description: "All pen and highlighter marks in this presenter will be removed.",
+        confirmLabel: "Clear annotations",
+        cancelLabel: "Keep annotations",
+        tone: "danger",
+      }) ?? Promise.resolve(false),
     onPinchZoom: (scale, clientPoint) => {
       document.dispatchEvent(
         new CustomEvent("lessonpresenterpinch", {

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DrawComposer } from "@/features/builder/DrawComposer";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import { createInitialBuilderDocument } from "@/features/builder/schema";
 import { useBuilderStore } from "@/features/builder/store";
 
@@ -117,18 +118,45 @@ describe("DrawComposer", () => {
 
   it("confirms before clearing a populated canvas", async () => {
     const user = userEvent.setup();
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<DrawComposer />);
+    render(
+      <AppNotificationsProvider>
+        <DrawComposer />
+      </AppNotificationsProvider>,
+    );
     const canvas = screen.getByLabelText("Drawing canvas");
     fireEvent.pointerDown(canvas, { clientX: 10, clientY: 10, pointerId: 1 });
     fireEvent.pointerUp(canvas, { clientX: 10, clientY: 10, pointerId: 1 });
 
     await user.click(screen.getByRole("button", { name: "Clear" }));
 
-    expect(confirm).toHaveBeenCalledWith("Clear the drawing canvas?");
+    expect(
+      screen.getByRole("alertdialog", { name: "Clear the drawing canvas?" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep drawing" }));
     await user.click(
       screen.getByRole("button", { name: "Save drawing as slide" }),
     );
     expect(useBuilderStore.getState().document.slides).toHaveLength(1);
+  });
+
+  it("opens the same drawing surface fullscreen and restores focus on Escape", async () => {
+    const user = userEvent.setup();
+    render(<DrawComposer compact />);
+
+    const fullscreenButton = screen.getByRole("button", {
+      name: "Open full screen drawing",
+    });
+    await user.click(fullscreenButton);
+
+    expect(
+      screen.getByRole("dialog", { name: "High-resolution drawing" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Drawing canvas")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(
+      screen.queryByRole("dialog", { name: "High-resolution drawing" }),
+    ).not.toBeInTheDocument();
+    expect(fullscreenButton).toHaveFocus();
   });
 });

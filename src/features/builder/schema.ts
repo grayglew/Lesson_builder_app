@@ -309,11 +309,12 @@ export function normalizeBuilderDocument(input: unknown): BuilderDocument {
   const className = asString(source.className);
   const retrievalItems = parseArray(retrievalItemSchema, source.retrievalItems);
   const sourceClassNames = asStringArray(source.classNames);
+  const hasExplicitClassNames = Array.isArray(source.classNames);
   const classNames = uniqueStrings([
     className,
     ...sourceClassNames,
     ...retrievalItems.map((item) => item.className),
-    ...DEFAULT_CLASS_NAMES,
+    ...(hasExplicitClassNames ? [] : DEFAULT_CLASS_NAMES),
   ]);
 
   return builderDocumentSchema.parse({
@@ -365,17 +366,21 @@ export function mergeWorkspaceAndGlobal(
 ): BuilderDocument {
   const workspace = normalizeBuilderDocument(workspaceInput);
   const global = normalizeBuilderDocument(globalInput ?? {});
+  const hasManagedClassList = Array.isArray(asRecord(globalInput).classNames);
   const updatedAt = newestTimestamp(workspace.updatedAt, global.updatedAt);
 
   return builderDocumentSchema.parse({
     ...workspace,
     schemaVersion: 2,
-    classNames: uniqueStrings([
-      workspace.className,
-      ...global.classNames,
-      ...global.retrievalItems.map((item) => item.className),
-      ...DEFAULT_CLASS_NAMES,
-    ]),
+    classNames: uniqueStrings(
+      hasManagedClassList || global.retrievalItems.length
+        ? [
+            workspace.className,
+            ...global.classNames,
+            ...global.retrievalItems.map((item) => item.className),
+          ]
+        : [workspace.className, ...workspace.classNames],
+    ),
     retrievalItems: global.retrievalItems,
     slideTemplates: global.slideTemplates,
     updatedAt,

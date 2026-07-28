@@ -173,6 +173,16 @@ export async function loadBuilderDocument(): Promise<BuilderDocument | null> {
   return mergeWorkspaceAndGlobal(workspace ?? {}, global?.state ?? {});
 }
 
+export async function loadBuilderGlobalState(signal?: AbortSignal) {
+  const response = await fetch("/api/builder-global/bootstrap", {
+    credentials: "same-origin",
+    cache: "no-store",
+    signal,
+  });
+  const result = await readJson(response, globalBootstrapSchema);
+  return normalizeGlobalState(result.state);
+}
+
 export function syncBuilderDocument(
   document: BuilderDocument,
   options: { expectedRevision?: string } = {},
@@ -496,6 +506,26 @@ export async function saveClassNames(classNames: string[]) {
   const result = await postJson(
     "/api/builder-global/classes",
     { classNames },
+    globalMutationSchema,
+  );
+  return normalizeGlobalState(result.state);
+}
+
+export async function renameClassName(currentName: string, nextName: string) {
+  const result = await requestJson(
+    "/api/builder-global/classes",
+    "PATCH",
+    { currentName, nextName },
+    globalMutationSchema,
+  );
+  return normalizeGlobalState(result.state);
+}
+
+export async function archiveClassName(className: string) {
+  const result = await requestJson(
+    "/api/builder-global/classes",
+    "DELETE",
+    { className },
     globalMutationSchema,
   );
   return normalizeGlobalState(result.state);

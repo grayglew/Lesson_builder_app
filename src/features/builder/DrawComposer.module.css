@@ -6,6 +6,27 @@
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
 }
 
+.panelFullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  height: 100dvh;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: 14px;
+  background: #eef2f0;
+  box-shadow: none;
+}
+
+.panelFullscreen .canvasFrame {
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
 .panelHead,
 .inlineActions,
 .actionRow {
@@ -154,6 +175,72 @@ select.input {
 
 .actionRow {
   margin-top: 16px;
+}
+
+:global([data-builder-variant="compact-console"]) .secondaryButton,
+:global([data-builder-variant="compact-console"]) .dangerButton,
+:global([data-builder-variant="compact-console"]) .primaryButton {
+  white-space: nowrap;
+}
+
+:global([data-builder-variant="compact-console"]) .actionRow .primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+:global([data-builder-theme="dark"]) .panel,
+:global([data-builder-theme="dark"]) .panelFullscreen {
+  border-color: var(--builder-line);
+  background: var(--builder-surface-alt);
+  color: var(--builder-ink);
+  box-shadow: var(--builder-shadow);
+}
+
+:global([data-builder-theme="dark"]) .panelHead h3,
+:global([data-builder-theme="dark"]) .fieldLabel {
+  color: var(--builder-ink);
+}
+
+:global([data-builder-theme="dark"]) .toolButton,
+:global([data-builder-theme="dark"]) .secondaryButton,
+:global([data-builder-theme="dark"]) .dangerButton,
+:global([data-builder-theme="dark"]) .input {
+  border-color: var(--builder-line);
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+}
+
+:global([data-builder-theme="dark"]) .dangerButton {
+  color: var(--builder-danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global([data-builder-theme="system"]) .panel,
+  :global([data-builder-theme="system"]) .panelFullscreen {
+    border-color: var(--builder-line);
+    background: var(--builder-surface-alt);
+    color: var(--builder-ink);
+    box-shadow: var(--builder-shadow);
+  }
+
+  :global([data-builder-theme="system"]) .panelHead h3,
+  :global([data-builder-theme="system"]) .fieldLabel {
+    color: var(--builder-ink);
+  }
+
+  :global([data-builder-theme="system"]) .toolButton,
+  :global([data-builder-theme="system"]) .secondaryButton,
+  :global([data-builder-theme="system"]) .dangerButton,
+  :global([data-builder-theme="system"]) .input {
+    border-color: var(--builder-line);
+    background: var(--builder-surface);
+    color: var(--builder-ink);
+  }
+
+  :global([data-builder-theme="system"]) .dangerButton {
+    color: var(--builder-danger);
+  }
 }
 
 @media (max-width: 800px) {

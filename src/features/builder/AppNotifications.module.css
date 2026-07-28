@@ -1,0 +1,257 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: grid;
+  overflow: auto;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 27, 31, 0.58);
+  backdrop-filter: blur(5px);
+}
+
+.dialog {
+  width: min(500px, 100%);
+  overflow: hidden;
+  border: 1px solid #cad7d7;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(5, 19, 23, 0.3);
+  color: #172124;
+}
+
+.dialog form {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.headingCopy h2,
+.headingCopy p {
+  margin: 0;
+}
+
+.headingCopy h2 {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.headingCopy p {
+  margin-top: 6px;
+  color: #5b6a70;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.iconWrap,
+.closeButton {
+  display: grid;
+  place-items: center;
+}
+
+.iconWrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #d9f3ec;
+  color: #0f766e;
+}
+
+.warning .iconWrap {
+  background: #fff3cd;
+  color: #b45309;
+}
+
+.danger .iconWrap {
+  background: #ffe4df;
+  color: #b42318;
+}
+
+.iconWrap svg,
+.closeButton svg {
+  width: 20px;
+  height: 20px;
+}
+
+.closeButton {
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #5b6a70;
+  cursor: pointer;
+}
+
+.closeButton:hover {
+  border-color: #cad7d7;
+  background: #f4f7f8;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  color: #37474c;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.field input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cad7d7;
+  border-radius: 8px;
+  background: #fff;
+  color: #172124;
+  padding: 9px 11px;
+  font: inherit;
+  font-weight: 500;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: #b42318;
+}
+
+.field small {
+  color: #b42318;
+  font-weight: 650;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: #0f766e;
+  color: #fff;
+}
+
+.dangerButton {
+  background: #b42318;
+  color: #fff;
+}
+
+.secondaryButton {
+  border-color: #cad7d7;
+  background: #fff;
+  color: #172124;
+}
+
+.primaryButton:hover {
+  background: #0b514d;
+}
+
+.dangerButton:hover {
+  background: #8f1d14;
+}
+
+.secondaryButton:hover {
+  background: #f4f7f8;
+}
+
+:global(html[data-builder-theme="dark"]) .dialog {
+  border-color: #3b4741;
+  background: #1d2421;
+  color: #eef3f0;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.58);
+}
+
+:global(html[data-builder-theme="dark"]) .headingCopy p,
+:global(html[data-builder-theme="dark"]) .closeButton,
+:global(html[data-builder-theme="dark"]) .field {
+  color: #aab6b0;
+}
+
+:global(html[data-builder-theme="dark"]) .closeButton:hover,
+:global(html[data-builder-theme="dark"]) .secondaryButton:hover {
+  border-color: #69766f;
+  background: #252d29;
+}
+
+:global(html[data-builder-theme="dark"]) .field input,
+:global(html[data-builder-theme="dark"]) .secondaryButton {
+  border-color: #3b4741;
+  background: #252d29;
+  color: #eef3f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html[data-builder-theme="system"]) .dialog {
+    border-color: #3b4741;
+    background: #1d2421;
+    color: #eef3f0;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.58);
+  }
+
+  :global(html[data-builder-theme="system"]) .headingCopy p,
+  :global(html[data-builder-theme="system"]) .closeButton,
+  :global(html[data-builder-theme="system"]) .field {
+    color: #aab6b0;
+  }
+
+  :global(html[data-builder-theme="system"]) .closeButton:hover,
+  :global(html[data-builder-theme="system"]) .secondaryButton:hover {
+    border-color: #69766f;
+    background: #252d29;
+  }
+
+  :global(html[data-builder-theme="system"]) .field input,
+  :global(html[data-builder-theme="system"]) .secondaryButton {
+    border-color: #3b4741;
+    background: #252d29;
+    color: #eef3f0;
+  }
+}
+
+.dialog button:focus-visible,
+.dialog input:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.3);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .dialog form {
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog {
+    animation: dialogEnter 150ms ease-out;
+  }
+
+  @keyframes dialogEnter {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+  }
+}

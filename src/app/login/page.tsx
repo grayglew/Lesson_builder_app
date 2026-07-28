@@ -1,4 +1,4 @@
-import { BookOpen, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { normalizeBuilderReturnPath } from "@/lib/builder/access";
 import { signIn } from "./actions";
 
@@ -13,47 +13,45 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
 
   return (
-    <main className="grid min-h-screen grid-cols-1 bg-slate-50 lg:grid-cols-[minmax(0,0.92fr)_minmax(460px,1fr)]">
-      <section className="hidden border-r border-slate-200 bg-white px-12 py-10 lg:flex lg:flex-col lg:justify-between">
-        <div className="flex items-center gap-3 text-slate-950">
-          <span className="grid size-10 place-items-center rounded-md bg-blue-600 text-white">
-            <BookOpen size={21} />
-          </span>
+    <main className="grid min-h-screen grid-cols-1 bg-[#e7e9e5] text-[#1d2723] lg:grid-cols-[minmax(0,0.92fr)_minmax(460px,1fr)]">
+      <section className="hidden border-r border-[#35433d] bg-[#1d2723] px-12 py-10 text-[#f7f8f6] lg:flex lg:flex-col lg:justify-between">
+        <div className="flex items-center gap-3">
+          <BuilderMark />
           <span className="text-lg font-semibold">Lesson Builder</span>
         </div>
         <div className="max-w-xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-blue-700">
-            Online workspace
+          <p className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-[#8ed0c0]">
+            Lesson planning / secure workspace
           </p>
-          <h1 className="mt-4 text-5xl font-semibold leading-[1.03] tracking-normal text-slate-950">
-            Build lessons, autosave them, and export the same polished resources from anywhere.
+          <h1 className="mt-4 max-w-[13ch] text-5xl font-semibold leading-[1.03] tracking-[-0.025em]">
+            Plan clear lessons, keep resources organised, and teach with confidence.
           </h1>
-          <p className="mt-5 text-lg leading-8 text-slate-600">
-            This version keeps the local Lesson Builder workflow but stores lessons, retrieval
-            practice, assets, and backups in your Supabase project.
+          <p className="mt-5 max-w-[56ch] text-base leading-7 text-[#bdc8c3]">
+            Create, adapt, present, and revisit your lessons from one place. Your classes,
+            retrieval practice, teaching resources, and saved lessons stay ready wherever you
+            teach.
           </p>
         </div>
-        <div className="text-sm text-slate-500">Private by default. Export when you are ready.</div>
+        <div className="font-mono text-xs uppercase tracking-[0.1em] text-[#8d9d96]">Your lessons stay private / Export when you choose</div>
       </section>
 
       <section className="flex items-center justify-center px-5 py-10">
-        <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="w-full max-w-md border border-[#aeb8b3] border-t-[3px] border-t-[#247563] bg-white p-7 shadow-[0_18px_50px_rgba(29,39,35,0.12)]">
           <div className="mb-6 lg:hidden">
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-md bg-blue-600 text-white">
-                <BookOpen size={21} />
-              </span>
+              <BuilderMark />
               <span className="text-lg font-semibold">Lesson Builder</span>
             </div>
           </div>
 
-          <h2 className="text-2xl font-semibold tracking-normal">Sign in</h2>
+          <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#247563]">Account access</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.02em]">Sign in</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            This private workspace is restricted to active teacher accounts.
+            Continue with your invited teacher account.
           </p>
 
           {params.message ? (
-            <div className="mt-5 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <div className="mt-5 border border-[#9dcbbf] bg-[#edf7f3] px-4 py-3 text-sm text-[#155b4d]">
               {params.message}
             </div>
           ) : null}
@@ -63,7 +61,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <label className="grid gap-2 text-sm font-medium text-slate-700">
               Email
               <input
-                className="h-11 rounded-md border border-slate-300 px-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="h-11 border border-[#aeb8b3] px-3 outline-none transition focus:border-[#247563] focus:ring-2 focus:ring-[#d9eee8]"
                 name="email"
                 type="email"
                 autoComplete="email"
@@ -73,7 +71,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <label className="grid gap-2 text-sm font-medium text-slate-700">
               Password
               <input
-                className="h-11 rounded-md border border-slate-300 px-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="h-11 border border-[#aeb8b3] px-3 outline-none transition focus:border-[#247563] focus:ring-2 focus:ring-[#d9eee8]"
                 name="password"
                 type="password"
                 autoComplete="current-password"
@@ -81,17 +79,29 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 required
               />
             </label>
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700">
+            <button className="inline-flex h-11 items-center justify-center gap-2 bg-[#247563] px-4 text-sm font-semibold text-white transition hover:bg-[#195a4c]">
               <LogIn size={17} />
               Sign in
             </button>
           </form>
 
-          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            New email sign-ups are disabled.
+          <div className="mt-4 border border-[#d2d8d4] bg-[#f2f4f2] px-4 py-3 text-sm text-slate-600">
+            Need access? Ask your school&apos;s Lesson Builder administrator for an invitation.
           </div>
         </div>
       </section>
     </main>
+  );
+}
+
+function BuilderMark() {
+  return (
+    <span className="grid size-10 place-items-center border border-[#35433d] bg-[#1d2723] text-white" aria-hidden>
+      <svg className="size-6 fill-current" viewBox="0 0 32 32">
+        <path d="M6 6h15v4H10v12h11v4H6z" />
+        <path d="M17 12h9v14h-9v-4h5v-6h-5z" />
+        <path className="fill-[#dc6d57]" d="m19 6 7 7h-7z" />
+      </svg>
+    </span>
   );
 }

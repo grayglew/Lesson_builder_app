@@ -1,0 +1,67 @@
+.root {
+  position: relative;
+}
+
+.trigger {
+  display: inline-flex;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.25rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  border-color: var(--builder-line-strong);
+  background: var(--builder-surface-alt);
+}
+
+.menu {
+  position: fixed;
+  z-index: var(--builder-layer-menu, 60);
+  display: grid;
+  width: max-content;
+  min-width: 13.5rem;
+  gap: 0.15rem;
+  border: 1px solid var(--builder-line);
+  border-radius: 0.35rem;
+  background: var(--builder-surface);
+  box-shadow: var(--builder-shadow);
+  padding: 0.3rem;
+}
+
+.menu :global(a),
+.menu :global(button) {
+  display: flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--builder-ink);
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu :global(a:hover),
+.menu :global(button:hover),
+.menu :global(a:focus-visible),
+.menu :global(button:focus-visible) {
+  background: var(--builder-surface-alt);
+}

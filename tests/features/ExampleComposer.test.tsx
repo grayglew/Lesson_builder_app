@@ -8,6 +8,7 @@ import {
   uploadRetrievalImage,
 } from "@/features/builder/api-client";
 import { ExampleComposer } from "@/features/builder/ExampleComposer";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import {
   createInitialBuilderDocument,
   type RetrievalItem,
@@ -130,9 +131,12 @@ describe("ExampleComposer", () => {
     useBuilderStore
       .getState()
       .updateGlobalData({ retrievalItems: [existing] });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
-    render(<ExampleComposer />);
+    render(
+      <AppNotificationsProvider>
+        <ExampleComposer />
+      </AppNotificationsProvider>,
+    );
 
     await user.type(
       screen.getByLabelText("Learning objective"),
@@ -146,6 +150,7 @@ describe("ExampleComposer", () => {
     await user.click(
       screen.getByRole("button", { name: "Add LO to retrieval bank" }),
     );
+    await user.click(screen.getByRole("button", { name: "Replace entry" }));
 
     await waitFor(() => expect(saveRetrievalItem).toHaveBeenCalledOnce());
     expect(saveRetrievalItem).toHaveBeenCalledWith(
@@ -168,6 +173,9 @@ describe("ExampleComposer", () => {
     const user = userEvent.setup();
     render(<ExampleComposer />);
 
+    await user.click(
+      screen.getByRole("button", { name: "Show retrieval images" }),
+    );
     expect(screen.getAllByLabelText(/^Question image \d$/)).toHaveLength(8);
     expect(screen.getAllByLabelText(/^Answer image \d$/)).toHaveLength(8);
     await user.type(
@@ -190,6 +198,46 @@ describe("ExampleComposer", () => {
       expect.objectContaining({ name: "retrieval.png" }),
     );
     expect(clearRetrievalImage).toHaveBeenCalledTimes(7);
+  });
+
+  it("keeps the actions visible while retrieval image inputs are collapsed", async () => {
+    const user = userEvent.setup();
+    render(<ExampleComposer />);
+
+    const toggle = screen.getByRole("button", {
+      name: "Show retrieval images",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("Question image 1")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add example slide" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Add LO to retrieval bank" }),
+    ).toBeVisible();
+
+    await user.click(toggle);
+
+    expect(
+      screen.getByRole("button", { name: "Hide retrieval images" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByLabelText(/^Question image \d$/)).toHaveLength(8);
+    expect(screen.getAllByLabelText(/^Answer image \d$/)).toHaveLength(8);
+
+    await user.click(
+      screen.getByRole("button", { name: "Hide retrieval images" }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Show retrieval images" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("Question image 1")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add example slide" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Add LO to retrieval bank" }),
+    ).toBeVisible();
   });
 
   it("shows an automatic debounced database match without a separate check button", async () => {

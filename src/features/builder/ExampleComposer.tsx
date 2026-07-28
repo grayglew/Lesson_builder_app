@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, LoaderCircle, Plus } from "lucide-react";
+import { ChevronDown, Database, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   clearRetrievalImage,
@@ -9,6 +9,7 @@ import {
   type RetrievalLookupResult,
   uploadRetrievalImage,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
 import {
@@ -38,11 +39,12 @@ type LiveLookupState =
 const emptyImageDrafts = () =>
   Array.from({ length: 8 }, (): ImageDraft => ({ asset: null }));
 
-export function ExampleComposer() {
+export function ExampleComposer({ compact = false }: { compact?: boolean }) {
   const document = useBuilderStore(selectDocument);
   const addSlides = useBuilderStore((state) => state.addSlides);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [lo, setLo] = useState("");
   const [spacingFactor, setSpacingFactor] = useState(1.3);
   const [image1, setImage1] = useState<BuilderAsset | null>(null);
@@ -51,6 +53,8 @@ export function ExampleComposer() {
   const [answerImage2, setAnswerImage2] = useState<BuilderAsset | null>(null);
   const [questions, setQuestions] = useState<ImageDraft[]>(emptyImageDrafts);
   const [answers, setAnswers] = useState<ImageDraft[]>(emptyImageDrafts);
+  const [retrievalImagesExpanded, setRetrievalImagesExpanded] =
+    useState(false);
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [liveLookup, setLiveLookup] = useState<LiveLookupState>({
     state: "idle",
@@ -163,13 +167,16 @@ export function ExampleComposer() {
       trimmedLo,
       document.className,
     );
-    if (
-      existing &&
-      !window.confirm(
-        "This LO already exists in the retrieval bank. Updating it will replace the spacing, last taught date, seen count, and any retrieval images you have added here. Continue?",
-      )
-    ) {
-      return;
+    if (existing) {
+      const approved = await confirmDialog({
+        title: "Replace the existing retrieval entry?",
+        description:
+          "This LO already exists. Updating it will replace its spacing, last-taught date, seen count, and retrieval images.",
+        confirmLabel: "Replace entry",
+        cancelLabel: "Keep existing entry",
+        tone: "warning",
+      });
+      if (!approved) return;
     }
 
     setIsSavingBank(true);
@@ -353,37 +360,64 @@ export function ExampleComposer() {
       <div className={styles.subsectionHead}>
         <div>
           <h4>Retrieval images</h4>
-          <p>
+          <p
+            id="v2-example-retrieval-images-description"
+            className={compact ? styles.srOnly : undefined}
+          >
             Optional question and answer images are paired by the number of
             times this LO has been seen.
           </p>
         </div>
+        <button
+          className={styles.exampleRetrievalToggle}
+          type="button"
+          aria-expanded={retrievalImagesExpanded}
+          aria-controls="v2-example-retrieval-images"
+          aria-describedby="v2-example-retrieval-images-description"
+          title={compact ? "Optional question and answer images are paired by the number of times this LO has been seen." : undefined}
+          onClick={() => setRetrievalImagesExpanded((expanded) => !expanded)}
+        >
+          {retrievalImagesExpanded ? "Hide" : "Show"} retrieval images
+          <ChevronDown
+            className={`${styles.exampleRetrievalChevron} ${
+              retrievalImagesExpanded
+                ? styles.exampleRetrievalChevronExpanded
+                : ""
+            }`}
+            aria-hidden
+          />
+        </button>
       </div>
-      <div className={styles.exampleRetrievalGrid}>
-        {questions.map((question, index) => (
-          <div key={index} className={styles.exampleRetrievalSlot}>
-            <span className={styles.fieldLabel}>Seen {index + 1}</span>
-            <BuilderImageInput
-              asset={question.asset}
-              label={`Question image ${index + 1}`}
-              size="retrieval"
-              onChange={(asset, file) =>
-                updateRetrievalImage("questions", index, asset, file)
-              }
-              onError={(message) => setStatus({ tone: "error", message })}
-            />
-            <BuilderImageInput
-              asset={answers[index].asset}
-              label={`Answer image ${index + 1}`}
-              size="retrieval"
-              onChange={(asset, file) =>
-                updateRetrievalImage("answers", index, asset, file)
-              }
-              onError={(message) => setStatus({ tone: "error", message })}
-            />
-          </div>
-        ))}
-      </div>
+      {retrievalImagesExpanded ? (
+        <div
+          id="v2-example-retrieval-images"
+          className={styles.exampleRetrievalGrid}
+        >
+          {questions.map((question, index) => (
+            <div key={index} className={styles.exampleRetrievalSlot}>
+              <span className={styles.fieldLabel}>Seen {index + 1}</span>
+              <BuilderImageInput
+                asset={question.asset}
+                label={`Question image ${index + 1}`}
+                size="retrieval"
+                onChange={(asset, file) =>
+                  updateRetrievalImage("questions", index, asset, file)
+                }
+                onError={(message) => setStatus({ tone: "error", message })}
+              />
+              <BuilderImageInput
+                asset={answers[index].asset}
+                label={`Answer image ${index + 1}`}
+                size="retrieval"
+                onChange={(asset, file) =>
+                  updateRetrievalImage("answers", index, asset, file)
+                }
+                onError={(message) => setStatus({ tone: "error", message })}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className={styles.actionRow}>
         <button

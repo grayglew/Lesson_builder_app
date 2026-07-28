@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -6,6 +6,7 @@ import {
   logRetrievalItems,
   resolveRetrievalImages,
 } from "@/features/builder/api-client";
+import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import { RetrievalComposer } from "@/features/builder/RetrievalComposer";
 import {
   createInitialBuilderDocument,
@@ -57,15 +58,29 @@ describe("RetrievalComposer", () => {
 
   it("selects due rows locally without mutating retrieval progress", async () => {
     const user = userEvent.setup();
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
-    await user.click(screen.getByRole("button", { name: "Select all due" }));
+    await user.click(screen.getByRole("button", { name: "Selection actions" }));
+    await user.click(
+      within(screen.getByRole("menu", { name: "Retrieval selection actions" }))
+        .getByRole("button", { name: "Select all due" }),
+    );
 
     const items = useBuilderStore.getState().document.retrievalItems;
     expect(items[0].selected).toBe(true);
     expect(items[0].seenCount).toBe(1);
     expect(items[1].selected).toBe(false);
     expect(logRetrievalItems).not.toHaveBeenCalled();
+  });
+
+  it("uses a compact icon-only delete action with an accessible name", () => {
+    render(<RetrievalComposer compact />);
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete 101a: Expand brackets",
+    });
+    expect(deleteButton).toHaveTextContent("");
+    expect(deleteButton).toHaveAttribute("title", "Delete");
   });
 
   it("creates four-quadrant retrieval slides and advances only image pointers", async () => {
@@ -92,9 +107,9 @@ describe("RetrievalComposer", () => {
           selected: index === 0,
         })),
     });
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
-    await user.click(screen.getByRole("button", { name: "Add selected slide" }));
+    await user.click(screen.getByRole("button", { name: "4-per-slide" }));
 
     await waitFor(() => {
       expect(useBuilderStore.getState().document.slides).toHaveLength(1);
@@ -140,7 +155,7 @@ describe("RetrievalComposer", () => {
           selected: index === 0,
         })),
     });
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
     await user.click(screen.getByRole("button", { name: "Log selected" }));
 
@@ -154,9 +169,62 @@ describe("RetrievalComposer", () => {
     });
   });
 
+  it("rolls selected progress and the taught date back after confirmation", async () => {
+    const user = userEvent.setup();
+    vi.mocked(logRetrievalItems).mockResolvedValue([
+      {
+        id: "319874a0-2e50-4aa2-86df-1dc1f7af815f",
+        seenCount: 7,
+        lastTaught: "2026-06-11",
+      },
+    ]);
+    useBuilderStore.getState().updateGlobalData({
+      retrievalItems: useBuilderStore
+        .getState()
+        .document.retrievalItems.map((item, index) => ({
+          ...item,
+          selected: index === 1,
+        })),
+    });
+    render(
+      <AppNotificationsProvider>
+        <RetrievalComposer compact />
+      </AppNotificationsProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(
+      within(screen.getByRole("menu", { name: "Retrieval data actions" }))
+        .getByRole("button", { name: "Roll back selected" }),
+    );
+    expect(logRetrievalItems).not.toHaveBeenCalled();
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Roll back 1 retrieval item?" }))
+        .getByRole("button", { name: "Roll back selected" }),
+    );
+
+    await waitFor(() => {
+      expect(logRetrievalItems).toHaveBeenCalledWith([
+        {
+          className: "Year 9",
+          itemId: "319874a0-2e50-4aa2-86df-1dc1f7af815f",
+          lo: "102a: Factorise",
+          teachingDate: "2026-07-18",
+          deltaSeen: -1,
+        },
+      ]);
+      expect(useBuilderStore.getState().document.retrievalItems[1]).toEqual(
+        expect.objectContaining({
+          seenCount: 7,
+          lastTaught: "2026-06-11",
+        }),
+      );
+    });
+  });
+
   it("exposes eight paired question and answer image slots", async () => {
     const user = userEvent.setup();
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
     await user.click(
       screen.getAllByRole("button", { name: /^Edit$/ })[0],

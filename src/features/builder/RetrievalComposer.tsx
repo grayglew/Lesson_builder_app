@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   advanceRetrievalItems,
@@ -11,7 +11,9 @@ import {
   saveRetrievalItem,
   uploadRetrievalImage,
 } from "./api-client";
+import { useAppNotifications } from "./AppNotifications";
 import { BuilderImageInput } from "./BuilderImageInput";
+import { BuilderActionMenu } from "./BuilderActionMenu";
 import styles from "./BuilderShell.module.css";
 import { useDialogFocus } from "./useDialogFocus";
 import {
@@ -49,11 +51,18 @@ type RetrievalEditorState = {
   answers: ImageDraft[];
 };
 
-export function RetrievalComposer() {
+export function RetrievalComposer({
+  compact = false,
+  refreshing = false,
+}: {
+  compact?: boolean;
+  refreshing?: boolean;
+}) {
   const document = useBuilderStore(selectDocument);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const addSlides = useBuilderStore((state) => state.addSlides);
   const setStatus = useBuilderStore((state) => state.setStatus);
+  const { confirmDialog } = useAppNotifications();
   const [editor, setEditor] = useState<RetrievalEditorState | null>(null);
   const [busyAction, setBusyAction] = useState("");
 
@@ -258,7 +267,14 @@ export function RetrievalComposer() {
   }
 
   async function archiveItem(item: RetrievalItem) {
-    if (!window.confirm(`Archive "${item.lo}" from the retrieval bank?`)) return;
+    const approved = await confirmDialog({
+      title: "Archive this learning objective?",
+      description: `"${item.lo}" will be removed from the active retrieval bank.`,
+      confirmLabel: "Archive LO",
+      cancelLabel: "Keep LO",
+      tone: "danger",
+    });
+    if (!approved) return;
     setBusyAction(`archive-${item.id}`);
     try {
       await archiveRetrievalItem(item.id);
@@ -470,6 +486,68 @@ export function RetrievalComposer() {
     }
   }
 
+  async function rollbackSelected() {
+    const rollbackItems = selectedItems.filter((item) => item.seenCount > 0);
+    if (!rollbackItems.length) {
+      setStatus({
+        tone: "error",
+        message: "Select at least one retrieval item with a seen count above zero.",
+      });
+      return;
+    }
+    const approved = await confirmDialog({
+      title: `Roll back ${rollbackItems.length} retrieval item${rollbackItems.length === 1 ? "" : "s"}?`,
+      description:
+        "Each selected LO will have its seen count reduced by one and its last-taught date moved back by the matching spacing interval.",
+      confirmLabel: "Roll back selected",
+      cancelLabel: "Keep progress",
+      tone: "warning",
+    });
+    if (!approved) return;
+
+    setBusyAction("rollback");
+    setStatus({ tone: "working", message: "Rolling back selected retrieval..." });
+    try {
+      const results = await logRetrievalItems(
+        rollbackItems.map((item) => ({
+          itemId: item.id,
+          lo: item.lo,
+          className: item.className || document.className,
+          teachingDate: document.teachingDate,
+          deltaSeen: -1,
+        })),
+      );
+      const progressById = new Map(results.map((result) => [result.id, result]));
+      replaceItems(
+        document.retrievalItems.map((item) => {
+          const progress = progressById.get(item.id);
+          if (!progress) return item;
+          return {
+            ...item,
+            seenCount:
+              progress.seenCount ?? progress.seen_count ?? item.seenCount,
+            lastTaught:
+              progress.lastTaught ?? progress.last_taught ?? item.lastTaught,
+          };
+        }),
+      );
+      setStatus({
+        tone: "success",
+        message: `Rolled back ${rollbackItems.length} selected retrieval item${rollbackItems.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: errorMessage(
+          error,
+          "Could not roll back the selected retrieval items.",
+        ),
+      });
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   async function updateDatabase() {
     if (!visibleItems.length) {
       setStatus({ tone: "warning", message: "No retrieval items are visible." });
@@ -509,49 +587,55 @@ export function RetrievalComposer() {
       <div className={styles.panelHead}>
         <h3>Retrieval bank</h3>
         <div className={styles.inlineActions}>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => void openEditor()}
-          >
-            Add LO
-          </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => setSelection("all")}
-          >
-            Select all
-          </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => setSelection("due")}
-          >
-            Select all due
-          </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => setSelection("none")}
-          >
-            Deselect all
-          </button>
+          {!compact ? (
+            <>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => void openEditor()}
+              >
+                Add LO
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => setSelection("all")}
+              >
+                Select all
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => setSelection("due")}
+              >
+                Select all due
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => setSelection("none")}
+              >
+                Deselect all
+              </button>
+            </>
+          ) : null}
           <button
             className={`${styles.primaryButton} ${styles.compactButton}`}
             type="button"
             disabled={Boolean(busyAction)}
             onClick={() => void addSelectedSlides()}
+            title="Create retrieval slides with up to four selected learning objectives on each slide."
           >
-            Add selected slide
+            {compact ? "4-per-slide" : "Add selected slide"}
           </button>
           <button
             className={`${styles.primaryButton} ${styles.compactButton}`}
             type="button"
             disabled={Boolean(busyAction)}
             onClick={() => void generateRevisionLesson()}
+            title="Create paired revision slides from the selected learning objectives and their seen-image history."
           >
-            Generate revision lesson
+            {compact ? "2-per-slide" : "Generate revision lesson"}
           </button>
           <button
             className={`${styles.secondaryButton} ${styles.compactButton}`}
@@ -561,14 +645,35 @@ export function RetrievalComposer() {
           >
             Log selected
           </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            disabled={Boolean(busyAction)}
-            onClick={() => void updateDatabase()}
-          >
-            Update database
-          </button>
+          {compact ? (
+            <BuilderActionMenu
+              label="Retrieval data actions"
+              triggerContent={<><MoreHorizontal aria-hidden /> More</>}
+            >
+              <button type="button" onClick={() => void openEditor()}>Add learning objective</button>
+              <button type="button" disabled={Boolean(busyAction)} onClick={() => void rollbackSelected()}>Roll back selected</button>
+              <button type="button" disabled={Boolean(busyAction)} onClick={() => void updateDatabase()}>Update database</button>
+            </BuilderActionMenu>
+          ) : (
+            <>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                disabled={Boolean(busyAction)}
+                onClick={() => void rollbackSelected()}
+              >
+                Roll back selected
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                disabled={Boolean(busyAction)}
+                onClick={() => void updateDatabase()}
+              >
+                Update database
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -584,7 +689,26 @@ export function RetrievalComposer() {
         <table className={styles.dataTable}>
           <thead>
             <tr>
-              <th scope="col">Select</th>
+              <th scope="col">
+                {compact ? (
+                  <div className={styles.tableHeaderMenu}>
+                    <span>Select</span>
+                    <BuilderActionMenu
+                      label="Retrieval selection actions"
+                      triggerContent={
+                        <>
+                          <MoreHorizontal aria-hidden />
+                          <span className={styles.srOnly}>Selection actions</span>
+                        </>
+                      }
+                    >
+                      <button type="button" onClick={() => setSelection("all")}>Select all</button>
+                      <button type="button" onClick={() => setSelection("due")}>Select all due</button>
+                      <button type="button" onClick={() => setSelection("none")}>Deselect all</button>
+                    </BuilderActionMenu>
+                  </div>
+                ) : "Select"}
+              </th>
               <th scope="col">Learning objective</th>
               <th scope="col">Spacing</th>
               <th scope="col">Seen</th>
@@ -686,10 +810,12 @@ export function RetrievalComposer() {
                       <button
                         className={`${styles.miniButton} ${styles.dangerMini}`}
                         type="button"
+                        aria-label={compact ? `Delete ${item.lo}` : undefined}
+                        title={compact ? "Delete" : undefined}
                         disabled={busyAction === `archive-${item.id}`}
                         onClick={() => void archiveItem(item)}
                       >
-                        Delete
+                        {compact ? <Trash2 size={14} aria-hidden /> : "Delete"}
                       </button>
                     </div>
                   </td>
@@ -699,7 +825,9 @@ export function RetrievalComposer() {
             {!visibleItems.length ? (
               <tr>
                 <td colSpan={8}>
-                  <div className={styles.emptyTableState}>No retrieval items yet.</div>
+                  <div className={styles.emptyTableState} aria-live="polite">
+                    {refreshing ? "Refreshing retrieval items..." : "No retrieval items yet."}
+                  </div>
                 </td>
               </tr>
             ) : null}
