@@ -27,9 +27,7 @@
 }
 
 .menu {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  right: 0;
+  position: fixed;
   z-index: var(--builder-layer-menu, 60);
   display: grid;
   width: max-content;

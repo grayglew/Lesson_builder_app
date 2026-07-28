@@ -138,4 +138,25 @@ describe("DrawComposer", () => {
     );
     expect(useBuilderStore.getState().document.slides).toHaveLength(1);
   });
+
+  it("opens the same drawing surface fullscreen and restores focus on Escape", async () => {
+    const user = userEvent.setup();
+    render(<DrawComposer compact />);
+
+    const fullscreenButton = screen.getByRole("button", {
+      name: "Open full screen drawing",
+    });
+    await user.click(fullscreenButton);
+
+    expect(
+      screen.getByRole("dialog", { name: "High-resolution drawing" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Drawing canvas")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(
+      screen.queryByRole("dialog", { name: "High-resolution drawing" }),
+    ).not.toBeInTheDocument();
+    expect(fullscreenButton).toHaveFocus();
+  });
 });

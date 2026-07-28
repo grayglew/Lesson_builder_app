@@ -274,7 +274,7 @@ describe("standalone lesson export", () => {
         id: "template",
         type: "template",
         title: "Worked example",
-        bullets: ["First step", "Second step"],
+        bullets: ["**First** step", "Use `x` carefully"],
       },
       {
         id: "placeholder",
@@ -312,6 +312,8 @@ describe("standalone lesson export", () => {
     expect(html).toContain(
       'class="template-slide-inner"><h4>Worked example</h4>',
     );
+    expect(html).toContain("<li><strong>First</strong> step</li>");
+    expect(html).toContain("<li>Use <code>x</code> carefully</li>");
     expect(html).toContain(
       '<p>Discuss with your partner</p><span class="slide-label">Placeholder</span>',
     );

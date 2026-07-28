@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
+import { GripVertical, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { type CSSProperties, useEffect, useState } from "react";
 import {
   archiveClassName,
@@ -16,13 +16,13 @@ import {
   CompactAppBar,
   CompactDeckHeader,
   CompactToolNavigation,
-  CompactWorkspaceHeader,
   type BuilderShellVariant,
   type BuilderThemePreference,
   type BuilderToolName,
 } from "./BuilderCompactChrome";
 import styles from "./BuilderShell.module.css";
 import { BuilderStatusToast } from "./BuilderStatusToast";
+import { BuilderActionMenu } from "./BuilderActionMenu";
 import { CfuComposer } from "./CfuComposer";
 import { DrawComposer } from "./DrawComposer";
 import { ExampleComposer } from "./ExampleComposer";
@@ -50,6 +50,7 @@ import {
 import { useLessonExportActions } from "./useLessonExportActions";
 import { useWorkspaceAutosave } from "./useWorkspaceAutosave";
 import { renderLatexDocument } from "./latex";
+import { parseInlineMarkdown } from "./markdown";
 
 type BuilderShellProps = {
   userEmail: string;
@@ -118,12 +119,31 @@ export function BuilderShell({
   const [activeTool, setActiveTool] = useState<ToolName>("starter");
   const [lessonRailCollapsed, setLessonRailCollapsed] = useState(false);
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  const [draggedSlideId, setDraggedSlideId] = useState("");
+  const [dragOverSlideId, setDragOverSlideId] = useState("");
   const [busyAction, setBusyAction] = useState("");
   const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
+
+  function dropSlideAt(targetSlideId: string) {
+    if (!draggedSlideId || draggedSlideId === targetSlideId) return;
+    const fromIndex = document.slides.findIndex(
+      (slide) => slide.id === draggedSlideId,
+    );
+    const targetIndex = document.slides.findIndex(
+      (slide) => slide.id === targetSlideId,
+    );
+    if (fromIndex < 0 || targetIndex < 0) return;
+    const direction = fromIndex < targetIndex ? 1 : -1;
+    for (let move = 0; move < Math.abs(targetIndex - fromIndex); move += 1) {
+      moveSlide(draggedSlideId, direction);
+    }
+    setDraggedSlideId("");
+    setDragOverSlideId("");
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -443,6 +463,7 @@ export function BuilderShell({
             userEmail={userEmail}
             cloudMessage={workspaceAutosave.message}
             busy={Boolean(busyAction)}
+            lessonRailCollapsed={lessonRailCollapsed}
             identityControl={
               isImpersonating ? (
                 <ImpersonationControl
@@ -452,6 +473,9 @@ export function BuilderShell({
               ) : null
             }
             onLessons={() => setActiveTool("saved-lessons")}
+            onLessonRailToggle={() =>
+              setLessonRailCollapsed((current) => !current)
+            }
             onPresent={() => void lessonActions.previewLesson(false)}
             onSave={() => void saveLesson(false)}
           />
@@ -556,6 +580,7 @@ export function BuilderShell({
           />
 
           <div className={styles.lessonQuickActions} aria-label="Lesson save actions">
+            {variant === "classic" ? (
             <button
               className={`${styles.primaryButton} ${styles.compactButton}`}
               type="button"
@@ -564,6 +589,7 @@ export function BuilderShell({
             >
               {busyAction === "save" ? "Saving..." : "Save"}
             </button>
+            ) : null}
             <button
               className={`${styles.primaryButton} ${styles.compactButton}`}
               type="button"
@@ -587,8 +613,6 @@ export function BuilderShell({
           {variant === "compact-console" ? (
             <CompactToolNavigation
               activeTool={activeTool}
-              collapsed={lessonRailCollapsed}
-              onCollapse={() => setLessonRailCollapsed((current) => !current)}
               onSelect={setActiveTool}
             />
           ) : (
@@ -642,14 +666,6 @@ export function BuilderShell({
         </aside>
 
         <section className={styles.workspace} aria-label={toolLabels[activeTool]}>
-          {variant === "compact-console" ? (
-            <CompactWorkspaceHeader
-              label={toolLabels[activeTool]}
-              busy={Boolean(busyAction)}
-              onPresent={() => void lessonActions.previewLesson(false)}
-              onSave={() => void saveLesson(false)}
-            />
-          ) : null}
           <div
             className={
               variant === "compact-console"
@@ -663,22 +679,31 @@ export function BuilderShell({
             <div className={styles.toolPanel}>
               <SavedLessonLibrary
                 embedded
+                compact={variant === "compact-console"}
                 onBack={() => setActiveTool("starter")}
               />
             </div>
           ) : null}
           {activeTool === "retrieval" ? (
-            <RetrievalComposer refreshing={retrievalRefreshing} />
+            <RetrievalComposer
+              compact={variant === "compact-console"}
+              refreshing={retrievalRefreshing}
+            />
           ) : null}
-          {activeTool === "example" ? <ExampleComposer /> : null}
+          {activeTool === "example" ? (
+            <ExampleComposer compact={variant === "compact-console"} />
+          ) : null}
           {activeTool === "worksheet" ? <WorksheetComposer /> : null}
           {activeTool === "pdf" ? <PdfComposer /> : null}
           {activeTool === "cfu" ? <CfuComposer /> : null}
-          {activeTool === "draw" ? <DrawComposer /> : null}
+          {activeTool === "draw" ? (
+            <DrawComposer compact={variant === "compact-console"} />
+          ) : null}
           {activeTool === "templates" ? (
             <div className={styles.toolPanel}>
               <GlobalDataEditor
                 embedded
+                compact={variant === "compact-console"}
                 initialView="templates"
                 onBack={() => setActiveTool("starter")}
               />
@@ -724,7 +749,9 @@ export function BuilderShell({
               </div>
             </section>
           ) : null}
-          {activeTool === "math" ? <LatexComposer /> : null}
+          {activeTool === "math" ? (
+            <LatexComposer compact={variant === "compact-console"} />
+          ) : null}
           </div>
         </section>
 
@@ -737,7 +764,6 @@ export function BuilderShell({
               transferActions={<LessonTransferActions actions={lessonActions} />}
               onCollapse={() => setPreviewCollapsed((current) => !current)}
               onHandout={() => void lessonActions.previewLesson(true)}
-              onPresent={() => void lessonActions.previewLesson(false)}
               onReset={() => void resetCurrentLesson()}
             />
           ) : (
@@ -815,7 +841,21 @@ export function BuilderShell({
                     : ""
                 } ${
                   slide.id === selectedSlideId ? styles.slideItemActive : ""
+                } ${
+                  draggedSlideId === slide.id ? styles.slideItemDragging : ""
                 }`}
+                data-drag-over={dragOverSlideId === slide.id || undefined}
+                onDragOver={(event) => {
+                  if (variant !== "compact-console" || !draggedSlideId) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOverSlideId(slide.id);
+                }}
+                onDrop={(event) => {
+                  if (variant !== "compact-console") return;
+                  event.preventDefault();
+                  dropSlideAt(slide.id);
+                }}
               >
                 <div className={styles.slideToolbar}>
                   <button
@@ -835,6 +875,44 @@ export function BuilderShell({
                     role="group"
                     aria-label={`Slide ${index + 1} actions`}
                   >
+                    {variant === "compact-console" ? (
+                      <>
+                        <button
+                          className={`${styles.miniButton} ${styles.slideDragHandle}`}
+                          type="button"
+                          draggable
+                          aria-label={`Drag slide ${index + 1} to reorder`}
+                          title="Drag to reorder"
+                          onDragStart={(event) => {
+                            setDraggedSlideId(slide.id);
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", slide.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedSlideId("");
+                            setDragOverSlideId("");
+                          }}
+                        >
+                          <GripVertical size={15} aria-hidden />
+                        </button>
+                        <BuilderActionMenu
+                          label={`More actions for slide ${index + 1}`}
+                          triggerContent={
+                            <>
+                              <MoreHorizontal size={15} aria-hidden />
+                              <span className={styles.srOnly}>
+                                More actions for slide {index + 1}
+                              </span>
+                            </>
+                          }
+                        >
+                          <button type="button" disabled={index === 0} onClick={() => moveSlide(slide.id, -1)}>Move up</button>
+                          <button type="button" disabled={index === document.slides.length - 1} onClick={() => moveSlide(slide.id, 1)}>Move down</button>
+                          <button type="button" style={{ color: "#b42318" }} onClick={() => removeSlide(slide.id)}><Trash2 size={15} aria-hidden /> Delete slide</button>
+                        </BuilderActionMenu>
+                      </>
+                    ) : (
+                      <>
                     <button
                       className={styles.miniButton}
                       type="button"
@@ -861,6 +939,8 @@ export function BuilderShell({
                     >
                       ×
                     </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <button
@@ -924,7 +1004,7 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
         <h4>{label}</h4>
         <ul className={styles.templateBullets}>
           {stringArray(data.bullets).map((bullet, index) => (
-            <li key={index}>{bullet}</li>
+            <li key={index}><InlineMarkdown value={bullet} /></li>
           ))}
         </ul>
       </SlideFrame>
@@ -1042,6 +1122,19 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
       </div>
     </SlideFrame>
   );
+}
+
+function InlineMarkdown({ value }: { value: string }) {
+  return parseInlineMarkdown(value).map((part, index) => {
+    const key = `${part.type}-${index}`;
+    if (part.type === "strong") return <strong key={key}>{part.text}</strong>;
+    if (part.type === "emphasis") return <em key={key}>{part.text}</em>;
+    if (part.type === "code") return <code key={key}>{part.text}</code>;
+    if (part.type === "link") {
+      return <span key={key} className={styles.markdownLink}>{part.text}</span>;
+    }
+    return part.text;
+  });
 }
 
 function SlideFrame({

@@ -1,5 +1,6 @@
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -459,24 +460,24 @@ describe("BuilderShell Compact Console action parity", () => {
       />,
     );
 
-    expect(await screen.findByText("Build / Starter")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Starter" })).toBeInTheDocument();
     const navigation = screen.getByRole("navigation", { name: "Slide tools" });
     expect(navigation.querySelectorAll("button[data-active]")).toHaveLength(11);
     expect(screen.getByRole("button", { name: "Lessons" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Present" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "Present" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "New lesson" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save as" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Preview full lesson" })).toBeInTheDocument();
-
     await userEvent.setup().click(
       screen.getByRole("button", { name: "Account and utilities" }),
     );
     const accountMenu = screen.getByRole("menu", { name: "Account and utilities" });
     expect(within(accountMenu).getByRole("menuitem", { name: "Admin dashboard" })).toBeInTheDocument();
-    expect(within(accountMenu).getByRole("menuitem", { name: "Gemini-Expand" })).toBeInTheDocument();
-    expect(within(accountMenu).getByRole("menuitem", { name: "Gemini-Atom" })).toBeInTheDocument();
     expect(within(accountMenu).getByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByText("AI tools", { exact: true }));
+    expect(screen.getByRole("link", { name: "Gemini-Expand" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Gemini-Atom" })).toBeInTheDocument();
   });
 
   it("uses the same active tool and insert-after-selection state paths", async () => {
@@ -492,13 +493,59 @@ describe("BuilderShell Compact Console action parity", () => {
     render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
     await user.click(screen.getAllByRole("button", { name: "Select slide 1 for handout" })[0]);
     await user.click(screen.getByRole("button", { name: "Placeholder" }));
-    expect(screen.getByText("Build / Placeholder")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Placeholder" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add placeholder slide" }));
 
     expect(useBuilderStore.getState().document.slides.map((slide) => slide.title)).toEqual([
       "First",
       "Placeholder",
       "Second",
+    ]);
+  });
+
+  it("reorders compact deck slides by drag while retaining keyboard actions", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.slides = [
+      { id: "first", type: "blank", title: "First" },
+      { id: "second", type: "blank", title: "Second" },
+      { id: "third", type: "blank", title: "Third" },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+    const firstHandle = await screen.findByRole("button", {
+      name: "Drag slide 1 to reorder",
+    });
+    const thirdHandle = screen.getByRole("button", {
+      name: "Drag slide 3 to reorder",
+    });
+    const dataTransfer = {
+      dropEffect: "none",
+      effectAllowed: "none",
+      setData: vi.fn(),
+    };
+
+    fireEvent.dragStart(firstHandle, { dataTransfer });
+    fireEvent.dragOver(thirdHandle.closest("li")!, { dataTransfer });
+    fireEvent.drop(thirdHandle.closest("li")!, { dataTransfer });
+
+    expect(useBuilderStore.getState().document.slides.map((slide) => slide.id)).toEqual([
+      "second",
+      "third",
+      "first",
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "More actions for slide 2" }));
+    await user.click(
+      within(screen.getByRole("menu", { name: "More actions for slide 2" }))
+        .getByRole("button", { name: "Move up" }),
+    );
+    expect(useBuilderStore.getState().document.slides.map((slide) => slide.id)).toEqual([
+      "third",
+      "second",
+      "first",
     ]);
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
   useEffect,
@@ -8,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import styles from "./BuilderActionMenu.module.css";
 
 type BuilderActionMenuProps = {
@@ -20,12 +22,9 @@ const itemSelector =
   'a[href]:not([aria-disabled="true"]), button:not(:disabled), [role="menuitem"]:not([aria-disabled="true"])';
 
 function getMenuItems(
-  root: HTMLDivElement | null,
-  trigger: HTMLButtonElement | null,
+  menu: HTMLDivElement | null,
 ) {
-  return Array.from(root?.querySelectorAll<HTMLElement>(itemSelector) ?? []).filter(
-    (item) => item !== trigger,
-  );
+  return Array.from(menu?.querySelectorAll<HTMLElement>(itemSelector) ?? []);
 }
 
 export function BuilderActionMenu({
@@ -34,14 +33,27 @@ export function BuilderActionMenu({
   triggerContent,
 }: BuilderActionMenuProps) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<CSSProperties>({
+    left: 0,
+    top: 0,
+    visibility: "hidden",
+  });
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
 
     function closeFromOutside(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
     }
 
     window.document.addEventListener("pointerdown", closeFromOutside);
@@ -51,14 +63,51 @@ export function BuilderActionMenu({
   }, [open]);
 
   useLayoutEffect(() => {
-    if (open) getMenuItems(rootRef.current, triggerRef.current)[0]?.focus();
+    if (!open) return;
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger || !menu) return;
+
+    function positionMenu(
+      triggerElement: HTMLButtonElement,
+      menuElement: HTMLDivElement,
+    ) {
+      const triggerRect = triggerElement.getBoundingClientRect();
+      const menuRect = menuElement.getBoundingClientRect();
+      const viewportGap = 8;
+      const left = Math.min(
+        Math.max(viewportGap, triggerRect.right - menuRect.width),
+        window.innerWidth - menuRect.width - viewportGap,
+      );
+      const below = triggerRect.bottom + 6;
+      const top =
+        below + menuRect.height <= window.innerHeight - viewportGap
+          ? below
+          : Math.max(viewportGap, triggerRect.top - menuRect.height - 6);
+      setMenuPosition({ left, top, visibility: "visible" });
+    }
+
+    const updatePosition = () => positionMenu(trigger, menu);
+    updatePosition();
+    getMenuItems(menu)[0]?.focus();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [open]);
 
   function menuItems() {
-    return getMenuItems(rootRef.current, triggerRef.current);
+    return getMenuItems(menuRef.current);
   }
 
   function openMenu() {
+    setMenuPosition({ left: 0, top: 0, visibility: "hidden" });
+    setPortalRoot(
+      rootRef.current?.closest<HTMLElement>("[data-builder-variant]") ??
+        document.body,
+    );
     setOpen(true);
   }
 
@@ -108,17 +157,22 @@ export function BuilderActionMenu({
       >
         {triggerContent}
       </button>
-      {open ? (
-        <div
-          className={styles.menu}
-          role="menu"
-          aria-label={label}
-          onClick={() => setOpen(false)}
-          onKeyDown={onMenuKeyDown}
-        >
-          {children}
-        </div>
-      ) : null}
+      {open && portalRoot
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className={styles.menu}
+              style={menuPosition}
+              role="menu"
+              aria-label={label}
+              onClick={() => setOpen(false)}
+              onKeyDown={onMenuKeyDown}
+            >
+              {children}
+            </div>,
+            portalRoot,
+          )
+        : null}
     </div>
   );
 }

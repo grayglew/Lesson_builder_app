@@ -39,7 +39,7 @@ type LiveLookupState =
 const emptyImageDrafts = () =>
   Array.from({ length: 8 }, (): ImageDraft => ({ asset: null }));
 
-export function ExampleComposer() {
+export function ExampleComposer({ compact = false }: { compact?: boolean }) {
   const document = useBuilderStore(selectDocument);
   const addSlides = useBuilderStore((state) => state.addSlides);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
@@ -360,7 +360,10 @@ export function ExampleComposer() {
       <div className={styles.subsectionHead}>
         <div>
           <h4>Retrieval images</h4>
-          <p id="v2-example-retrieval-images-description">
+          <p
+            id="v2-example-retrieval-images-description"
+            className={compact ? styles.srOnly : undefined}
+          >
             Optional question and answer images are paired by the number of
             times this LO has been seen.
           </p>
@@ -371,6 +374,7 @@ export function ExampleComposer() {
           aria-expanded={retrievalImagesExpanded}
           aria-controls="v2-example-retrieval-images"
           aria-describedby="v2-example-retrieval-images-description"
+          title={compact ? "Optional question and answer images are paired by the number of times this LO has been seen." : undefined}
           onClick={() => setRetrievalImagesExpanded((expanded) => !expanded)}
         >
           {retrievalImagesExpanded ? "Hide" : "Show"} retrieval images

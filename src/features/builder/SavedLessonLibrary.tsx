@@ -8,6 +8,7 @@ import {
   Download,
   FolderOpen,
   LoaderCircle,
+  MoreHorizontal,
   Package,
   Pencil,
   Presentation,
@@ -36,6 +37,7 @@ import {
   updateSavedLessonMetadata,
 } from "./api-client";
 import { useAppNotifications } from "./AppNotifications";
+import { BuilderActionMenu } from "./BuilderActionMenu";
 import { ConfidenceModal } from "./ConfidenceModal";
 import {
   buildPowerPointBundleZip,
@@ -56,9 +58,11 @@ import { selectDocument, useBuilderStore } from "./store";
 export function SavedLessonLibrary({
   onBack,
   embedded = false,
+  compact = false,
 }: {
   onBack: () => void;
   embedded?: boolean;
+  compact?: boolean;
 }) {
   const document = useBuilderStore(selectDocument);
   const openLesson = useBuilderStore((state) => state.openSavedLesson);
@@ -432,9 +436,11 @@ export function SavedLessonLibrary({
               </button>
             ) : null}
             <h2 className="text-xl font-semibold">Saved lesson library</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Library changes happen only when you press a named action.
-            </p>
+            {!compact ? (
+              <p className="mt-1 text-sm text-slate-500">
+                Library changes happen only when you press a named action.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -568,20 +574,34 @@ export function SavedLessonLibrary({
                       <div className="flex justify-end gap-1">
                         <IconAction label="Open lesson" disabled={Boolean(busyId)} onClick={() => void openLessonById(lesson)} icon={busyId === lesson.id ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />} />
                         <IconAction label="Present lesson" disabled={Boolean(busyId)} onClick={() => void presentLesson(lesson)} icon={<Presentation className="size-4" />} />
-                        <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
-                        <IconAction label="Download PowerPoint bundle" disabled={Boolean(busyId)} onClick={() => void downloadPowerPointBundle(lesson)} icon={<Package className="size-4" />} />
-                        <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
-                        {confidence ? (
-                          <IconAction
-                            label="View confidence"
-                            disabled={Boolean(busyId)}
-                            onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })}
-                            icon={<BarChart3 className="size-4" />}
-                          />
-                        ) : null}
-                        <IconAction label="Change class" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)} icon={<School className="size-4" />} />
-                        <IconAction label="Rename lesson" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)} icon={<Pencil className="size-4" />} />
-                        <IconAction label="Delete lesson" danger disabled={Boolean(busyId)} onClick={() => void removeLesson(lesson)} icon={<Trash2 className="size-4" />} />
+                        {compact ? (
+                          <BuilderActionMenu
+                            label={`More actions for ${lesson.title}`}
+                            triggerContent={<><MoreHorizontal className="size-4" aria-hidden /><span className="sr-only">More actions for {lesson.title}</span></>}
+                          >
+                            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)}><Download className="size-4" aria-hidden /> Download HTML</button>
+                            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadPowerPointBundle(lesson)}><Package className="size-4" aria-hidden /> Download PowerPoint</button>
+                            <button type="button" disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)}>{lesson.isTaught ? <Archive className="size-4" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />} {lesson.isTaught ? "Mark planned" : "Mark taught"}</button>
+                            {confidence ? (
+                              <button type="button" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })}><BarChart3 className="size-4" aria-hidden /> View confidence</button>
+                            ) : null}
+                            <button type="button" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)}><School className="size-4" aria-hidden /> Change class</button>
+                            <button type="button" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)}><Pencil className="size-4" aria-hidden /> Rename lesson</button>
+                            <button type="button" disabled={Boolean(busyId)} style={{ color: "#b42318" }} onClick={() => void removeLesson(lesson)}><Trash2 className="size-4" aria-hidden /> Delete lesson</button>
+                          </BuilderActionMenu>
+                        ) : (
+                          <>
+                            <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
+                            <IconAction label="Download PowerPoint bundle" disabled={Boolean(busyId)} onClick={() => void downloadPowerPointBundle(lesson)} icon={<Package className="size-4" />} />
+                            <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
+                            {confidence ? (
+                              <IconAction label="View confidence" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })} icon={<BarChart3 className="size-4" />} />
+                            ) : null}
+                            <IconAction label="Change class" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)} icon={<School className="size-4" />} />
+                            <IconAction label="Rename lesson" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)} icon={<Pencil className="size-4" />} />
+                            <IconAction label="Delete lesson" danger disabled={Boolean(busyId)} onClick={() => void removeLesson(lesson)} icon={<Trash2 className="size-4" />} />
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

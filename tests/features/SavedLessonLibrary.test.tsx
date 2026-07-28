@@ -67,9 +67,9 @@ describe("SavedLessonLibrary production actions", () => {
     });
   });
 
-  it("shows all direct actions, newest-first order, dirty state, and confidence", async () => {
+  it("keeps primary actions visible and groups secondary actions without losing parity", async () => {
     const user = userEvent.setup();
-    render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
+    render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
 
     const rows = await screen.findAllByRole("row");
     expect(within(rows[1]).getByText("Active lesson *")).toBeInTheDocument();
@@ -89,20 +89,20 @@ describe("SavedLessonLibrary production actions", () => {
     expect(
       within(activeRow).getByRole("button", { name: "Present lesson" }),
     ).toBeInTheDocument();
-    expect(
-      within(activeRow).getByRole("button", { name: "Download lesson" }),
-    ).toBeInTheDocument();
-    expect(
-      within(activeRow).getByRole("button", {
-        name: "Download PowerPoint bundle",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(activeRow).getByRole("button", { name: "Change class" }),
-    ).toBeInTheDocument();
+    await user.click(
+      within(activeRow).getByRole("button", { name: "More actions for Active lesson" }),
+    );
+    const activeMenu = screen.getByRole("menu", { name: "More actions for Active lesson" });
+    expect(within(activeMenu).getByRole("button", { name: "Download HTML" })).toBeInTheDocument();
+    expect(within(activeMenu).getByRole("button", { name: "Download PowerPoint" })).toBeInTheDocument();
+    expect(within(activeMenu).getByRole("button", { name: "Change class" })).toBeInTheDocument();
 
     await user.click(
-      within(rows[2]).getByRole("button", { name: "View confidence" }),
+      within(rows[2]).getByRole("button", { name: "More actions for Confidence lesson" }),
+    );
+    await user.click(
+      within(screen.getByRole("menu", { name: "More actions for Confidence lesson" }))
+        .getByRole("button", { name: "View confidence" }),
     );
     expect(
       screen.getByRole("dialog", { name: "Confidence: Confidence lesson" }),
@@ -117,13 +117,17 @@ describe("SavedLessonLibrary production actions", () => {
     );
     render(
       <AppNotificationsProvider>
-        <SavedLessonLibrary embedded onBack={vi.fn()} />
+        <SavedLessonLibrary compact embedded onBack={vi.fn()} />
       </AppNotificationsProvider>,
     );
 
     const row = (await screen.findAllByRole("row"))[1];
     await user.click(
-      within(row).getByRole("button", { name: "Change class" }),
+      within(row).getByRole("button", { name: "More actions for Active lesson" }),
+    );
+    await user.click(
+      within(screen.getByRole("menu", { name: "More actions for Active lesson" }))
+        .getByRole("button", { name: "Change class" }),
     );
     const dialog = screen.getByRole("dialog", { name: "Change lesson class" });
     const classInput = within(dialog).getByRole("textbox", { name: "Class" });
@@ -160,13 +164,15 @@ describe("SavedLessonLibrary production actions", () => {
       new Blob(["bundle"], { type: "application/zip" }),
     );
     vi.mocked(downloadPresenterSlideImages).mockResolvedValue([]);
-    render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
+    render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
 
     const row = (await screen.findAllByRole("row"))[1];
     await user.click(
-      within(row).getByRole("button", {
-        name: "Download PowerPoint bundle",
-      }),
+      within(row).getByRole("button", { name: "More actions for Active lesson" }),
+    );
+    await user.click(
+      within(screen.getByRole("menu", { name: "More actions for Active lesson" }))
+        .getByRole("button", { name: "Download PowerPoint" }),
     );
 
     const dependencies = vi.mocked(buildPowerPointBundleZip).mock.calls[0]?.[1];
@@ -184,7 +190,7 @@ describe("SavedLessonLibrary production actions", () => {
 
   it("clears every saved-lesson filter in one action and restores newest-first order", async () => {
     const user = userEvent.setup();
-    render(<SavedLessonLibrary embedded onBack={vi.fn()} />);
+    render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
 
     await screen.findByText("Confidence lesson");
     const clearFilters = screen.getByRole("button", { name: "Clear filters" });

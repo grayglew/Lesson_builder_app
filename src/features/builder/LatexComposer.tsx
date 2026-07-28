@@ -1,13 +1,13 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { useState } from "react";
 import styles from "./LatexComposer.module.css";
 import { LatexPreview } from "./LatexPreview";
 import { type BuilderSlide, createBuilderId } from "./schema";
 import { useBuilderStore } from "./store";
 
-export function LatexComposer() {
+export function LatexComposer({ compact = false }: { compact?: boolean }) {
   const addSlides = useBuilderStore((state) => state.addSlides);
   const setStatus = useBuilderStore((state) => state.setStatus);
   const [questions, setQuestions] = useState("");
@@ -60,35 +60,80 @@ export function LatexComposer() {
         <h3>Rendered LaTeX slides</h3>
       </div>
 
-      <div className={styles.editorGrid}>
-        <label>
-          <span className={styles.fieldLabel}>Questions</span>
-          <textarea
-            className={styles.textArea}
-            rows={9}
-            value={questions}
-            placeholder={
-              "Solve $x^2 - 5x + 6 = 0$\n\n$$\\frac{3}{4} + \\sqrt{16}$$"
-            }
-            onChange={(event) => setQuestions(event.target.value)}
-          />
-        </label>
-        <label>
-          <span className={styles.fieldLabel}>Answers</span>
-          <textarea
-            className={styles.textArea}
-            rows={9}
-            value={answers}
-            placeholder="$x = 2$ or $x = 3$"
-            onChange={(event) => setAnswers(event.target.value)}
-          />
-        </label>
-      </div>
-
-      <div className={styles.previewGrid} aria-live="polite">
-        <LatexPreview label="Questions preview" source={questions} />
-        <LatexPreview label="Answers preview" source={answers} />
-      </div>
+      {compact ? (
+        <div className={styles.slideSequence} aria-label="Two-slide LaTeX sequence">
+          <article className={styles.slideEditor}>
+            <header className={styles.slideLabel}>
+              <span>Slide 1</span>
+              <strong>Questions</strong>
+            </header>
+            <label>
+              <span className={styles.fieldLabel}>Question LaTeX</span>
+              <textarea
+                aria-label="Questions"
+                className={styles.textArea}
+                rows={9}
+                value={questions}
+                placeholder={
+                  "Solve $x^2 - 5x + 6 = 0$\n\n$$\\frac{3}{4} + \\sqrt{16}$$"
+                }
+                onChange={(event) => setQuestions(event.target.value)}
+              />
+            </label>
+            <LatexPreview label="Questions preview" source={questions} />
+          </article>
+          <ArrowRight className={styles.sequenceArrow} aria-hidden />
+          <article className={styles.slideEditor}>
+            <header className={styles.slideLabel}>
+              <span>Slide 2</span>
+              <strong>Answers</strong>
+            </header>
+            <label>
+              <span className={styles.fieldLabel}>Answer LaTeX</span>
+              <textarea
+                aria-label="Answers"
+                className={styles.textArea}
+                rows={9}
+                value={answers}
+                placeholder="$x = 2$ or $x = 3$"
+                onChange={(event) => setAnswers(event.target.value)}
+              />
+            </label>
+            <LatexPreview label="Answers preview" source={answers} />
+          </article>
+        </div>
+      ) : (
+        <>
+          <div className={styles.editorGrid}>
+            <label>
+              <span className={styles.fieldLabel}>Questions</span>
+              <textarea
+                className={styles.textArea}
+                rows={9}
+                value={questions}
+                placeholder={
+                  "Solve $x^2 - 5x + 6 = 0$\n\n$$\\frac{3}{4} + \\sqrt{16}$$"
+                }
+                onChange={(event) => setQuestions(event.target.value)}
+              />
+            </label>
+            <label>
+              <span className={styles.fieldLabel}>Answers</span>
+              <textarea
+                className={styles.textArea}
+                rows={9}
+                value={answers}
+                placeholder="$x = 2$ or $x = 3$"
+                onChange={(event) => setAnswers(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className={styles.previewGrid} aria-live="polite">
+            <LatexPreview label="Questions preview" source={questions} />
+            <LatexPreview label="Answers preview" source={answers} />
+          </div>
+        </>
+      )}
 
       <div className={styles.actionRow}>
         <button

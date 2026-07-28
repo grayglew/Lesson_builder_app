@@ -6,6 +6,27 @@
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
 }
 
+.panelFullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  height: 100dvh;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: 14px;
+  background: #eef2f0;
+  box-shadow: none;
+}
+
+.panelFullscreen .canvasFrame {
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
 .panelHead,
 .inlineActions,
 .actionRow {
@@ -154,6 +175,18 @@ select.input {
 
 .actionRow {
   margin-top: 16px;
+}
+
+:global([data-builder-variant="compact-console"]) .secondaryButton,
+:global([data-builder-variant="compact-console"]) .dangerButton,
+:global([data-builder-variant="compact-console"]) .primaryButton {
+  white-space: nowrap;
+}
+
+:global([data-builder-variant="compact-console"]) .actionRow .primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 @media (max-width: 800px) {

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -58,9 +58,13 @@ describe("RetrievalComposer", () => {
 
   it("selects due rows locally without mutating retrieval progress", async () => {
     const user = userEvent.setup();
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
-    await user.click(screen.getByRole("button", { name: "Select all due" }));
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(
+      within(screen.getByRole("menu", { name: "Retrieval selection and data actions" }))
+        .getByRole("button", { name: "Select all due" }),
+    );
 
     const items = useBuilderStore.getState().document.retrievalItems;
     expect(items[0].selected).toBe(true);
@@ -93,9 +97,9 @@ describe("RetrievalComposer", () => {
           selected: index === 0,
         })),
     });
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
-    await user.click(screen.getByRole("button", { name: "Add selected slide" }));
+    await user.click(screen.getByRole("button", { name: "Add retrieval slides" }));
 
     await waitFor(() => {
       expect(useBuilderStore.getState().document.slides).toHaveLength(1);
@@ -141,7 +145,7 @@ describe("RetrievalComposer", () => {
           selected: index === 0,
         })),
     });
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
     await user.click(screen.getByRole("button", { name: "Log selected" }));
 
@@ -174,14 +178,19 @@ describe("RetrievalComposer", () => {
     });
     render(
       <AppNotificationsProvider>
-        <RetrievalComposer />
+        <RetrievalComposer compact />
       </AppNotificationsProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Roll back selected" }));
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(
+      within(screen.getByRole("menu", { name: "Retrieval selection and data actions" }))
+        .getByRole("button", { name: "Roll back selected" }),
+    );
     expect(logRetrievalItems).not.toHaveBeenCalled();
     await user.click(
-      screen.getAllByRole("button", { name: "Roll back selected" })[1],
+      within(screen.getByRole("dialog", { name: "Roll back 1 retrieval item?" }))
+        .getByRole("button", { name: "Roll back selected" }),
     );
 
     await waitFor(() => {
@@ -205,7 +214,7 @@ describe("RetrievalComposer", () => {
 
   it("exposes eight paired question and answer image slots", async () => {
     const user = userEvent.setup();
-    render(<RetrievalComposer />);
+    render(<RetrievalComposer compact />);
 
     await user.click(
       screen.getAllByRole("button", { name: /^Edit$/ })[0],

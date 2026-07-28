@@ -3,6 +3,7 @@ import type {
   BuilderSlide,
 } from "./schema";
 import { renderLatexDocument } from "./latex";
+import { inlineMarkdownToHtml } from "./markdown";
 import { normalizeBuilderDocument } from "./schema";
 
 type StandaloneLessonOptions = {
@@ -316,7 +317,7 @@ function renderStandaloneSlide(
 
   if (slide.type === "template") {
     return `<section ${attrs}><div class="template-slide-inner"><h4>${title}</h4><ul>${stringArray(data.bullets)
-      .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
+      .map((bullet) => `<li>${inlineMarkdownToHtml(bullet)}</li>`)
       .join("")}</ul></div><span class="slide-label">Template</span></section>`;
   }
 

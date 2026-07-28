@@ -51,7 +51,7 @@ test.describe("Compact Console functional review", () => {
     });
 
     await page.goto("/builder/compact-review?visual=1");
-    await expect(page.getByText("Build / Starter")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Starter" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Slide tools" })).toBeVisible();
     await expect(page.getByRole("complementary", { name: "Lesson preview" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Lessons", exact: true })).toBeVisible();
@@ -82,7 +82,7 @@ test.describe("Compact Console functional review", () => {
     await page.goto("/builder/compact-review?visual=1");
 
     await page.getByRole("button", { name: "Placeholder" }).click();
-    await expect(page.getByText("Build / Placeholder")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Placeholder" })).toBeVisible();
 
     await page.getByText("Core slides", { exact: true }).click();
     await expect(page.getByRole("button", { name: "Starter" })).toBeHidden();

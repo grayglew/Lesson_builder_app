@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  BrainCircuit,
   BookOpen,
   BookOpenCheck,
   ChevronDown,
@@ -27,6 +28,7 @@ import {
   Save,
   Settings,
   Sigma,
+  Sparkles,
   SquareDashed,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -57,7 +59,9 @@ type CompactAppBarProps = {
   cloudMessage: string;
   busy: boolean;
   identityControl?: ReactNode;
+  lessonRailCollapsed: boolean;
   onLessons: () => void;
+  onLessonRailToggle: () => void;
   onPresent: () => void;
   onSave: () => void;
 };
@@ -67,7 +71,9 @@ export function CompactAppBar({
   className,
   cloudMessage,
   identityControl,
+  lessonRailCollapsed,
   onLessons,
+  onLessonRailToggle,
   onPresent,
   onSave,
   teachingDate,
@@ -77,7 +83,13 @@ export function CompactAppBar({
   return (
     <header className={styles.compactAppBar}>
       <div className={styles.compactBrand}>
-        <span>LB</span>
+        <span className={styles.compactBrandMark} aria-hidden>
+          <svg viewBox="0 0 32 32">
+            <path d="M6 6h15v4H10v12h11v4H6z" />
+            <path d="M17 12h9v14h-9v-4h5v-6h-5z" />
+            <path className={styles.compactBrandAccent} d="m19 6 7 7h-7z" />
+          </svg>
+        </span>
         <div>
           <strong>Lesson Builder</strong>
           <small>{className || "No class selected"}</small>
@@ -87,6 +99,15 @@ export function CompactAppBar({
         <strong>{title.trim() || "Untitled lesson"}</strong>
         <span>{teachingDate || "No teaching date"}</span>
       </div>
+      <button
+        className={styles.compactLessonRailToggle}
+        type="button"
+        aria-label={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
+        title={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
+        onClick={onLessonRailToggle}
+      >
+        {lessonRailCollapsed ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
+      </button>
       <span className={styles.compactCloudStatus} title={cloudMessage}>
         <Cloud aria-hidden /> {cloudMessage}
       </span>
@@ -109,8 +130,6 @@ export function CompactAppBar({
         triggerContent={<><MoreHorizontal aria-hidden /><span className={styles.srOnly}>Account and utilities</span></>}
       >
         <a role="menuitem" href="/admin/users"><Settings aria-hidden /> Admin dashboard</a>
-        <a role="menuitem" href="https://gemini.google.com/gem/1cnUR7VWLpXMmPLX4B7pSBuArHuYzrjwO?usp=sharing" target="_blank" rel="noopener noreferrer">Gemini-Expand</a>
-        <a role="menuitem" href="https://gemini.google.com/gem/1J_SwoYOWHaLhibISlDthTgX74F9bGzQy?usp=sharing" target="_blank" rel="noopener noreferrer">Gemini-Atom</a>
         <a role="menuitem" href="/auth/logout"><LogOut aria-hidden /> Log out</a>
         {identityControl ? <div className={styles.compactIdentityControl}>{identityControl}</div> : null}
         <span className={styles.compactAccountEmail}>{userEmail}</span>
@@ -119,37 +138,8 @@ export function CompactAppBar({
   );
 }
 
-type WorkspaceHeaderProps = {
-  label: string;
-  busy: boolean;
-  onPresent: () => void;
-  onSave: () => void;
-};
-
-export function CompactWorkspaceHeader({
-  busy,
-  label,
-  onPresent,
-  onSave,
-}: WorkspaceHeaderProps) {
-  return (
-    <header className={styles.compactWorkspaceHeader}>
-      <div>
-        <span>Build / {label}</span>
-        <h2>{label}</h2>
-      </div>
-      <div>
-        <button type="button" onClick={onPresent}><Play aria-hidden /> Present</button>
-        <button type="button" className={styles.compactSaveButton} disabled={busy} onClick={onSave}><Save aria-hidden /> Save</button>
-      </div>
-    </header>
-  );
-}
-
 type CompactToolNavigationProps = {
   activeTool: BuilderToolName;
-  collapsed: boolean;
-  onCollapse: () => void;
   onSelect: (tool: BuilderToolName) => void;
 };
 
@@ -157,7 +147,7 @@ const groups: Array<{
   label: string;
   tools: Array<{ name: BuilderToolName; label: string; icon: typeof BookOpen }>;
 }> = [
-  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "templates", label: "Templates", icon: LayoutTemplate }] },
+  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "templates", label: "Shared data", icon: LayoutTemplate }] },
   { label: "Core slides", tools: [{ name: "starter", label: "Starter", icon: LayoutGrid }, { name: "retrieval", label: "Retrieval", icon: RefreshCw }, { name: "example", label: "Example", icon: BookOpenCheck }, { name: "cfu", label: "CFU", icon: ListChecks }] },
   { label: "Resources", tools: [{ name: "worksheet", label: "Worksheet", icon: Files }, { name: "pdf", label: "PDF", icon: FileText }] },
   { label: "Create", tools: [{ name: "draw", label: "Draw", icon: PencilRuler }, { name: "placeholder", label: "Placeholder", icon: SquareDashed }, { name: "math", label: "LaTeX", icon: Sigma }] },
@@ -165,25 +155,16 @@ const groups: Array<{
 
 export function CompactToolNavigation({
   activeTool,
-  collapsed,
-  onCollapse,
   onSelect,
 }: CompactToolNavigationProps) {
   const [openGroups, setOpenGroups] = useState(
-    () => new Set(groups.map((group) => group.label)),
+    () => new Set([...groups.map((group) => group.label), "AI tools"]),
   );
 
   return (
     <nav className={styles.compactToolNavigation} aria-label="Slide tools">
       <div className={styles.compactRailHeading}>
         <span><BookOpen aria-hidden /> Lesson tools</span>
-        <button
-          type="button"
-          aria-label={collapsed ? "Expand lesson tools" : "Collapse lesson tools"}
-          onClick={onCollapse}
-        >
-          {collapsed ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
-        </button>
       </div>
       {groups.map((group) => (
         <details
@@ -217,6 +198,39 @@ export function CompactToolNavigation({
           </div>
         </details>
       ))}
+      <details
+        open={openGroups.has("AI tools")}
+        onToggle={(event) => {
+          const nextOpen = event.currentTarget.open;
+          setOpenGroups((current) => {
+            if (current.has("AI tools") === nextOpen) return current;
+            const next = new Set(current);
+            if (nextOpen) next.add("AI tools");
+            else next.delete("AI tools");
+            return next;
+          });
+        }}
+      >
+        <summary>AI tools<ChevronDown aria-hidden /></summary>
+        <div>
+          <a
+            href="https://gemini.google.com/gem/1cnUR7VWLpXMmPLX4B7pSBuArHuYzrjwO?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Sparkles aria-hidden />
+            <span>Gemini Expand</span>
+          </a>
+          <a
+            href="https://gemini.google.com/gem/1J_SwoYOWHaLhibISlDthTgX74F9bGzQy?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <BrainCircuit aria-hidden />
+            <span>Gemini Atom</span>
+          </a>
+        </div>
+      </details>
     </nav>
   );
 }
@@ -228,7 +242,6 @@ type CompactDeckHeaderProps = {
   transferActions: ReactNode;
   onCollapse: () => void;
   onHandout: () => void;
-  onPresent: () => void;
   onReset: () => void;
 };
 
@@ -236,7 +249,6 @@ export function CompactDeckHeader({
   collapsed,
   onCollapse,
   onHandout,
-  onPresent,
   onReset,
   selectedCount,
   slideCount,
@@ -263,14 +275,6 @@ export function CompactDeckHeader({
         </button>
       </div>
       <div className={styles.compactDeckActions} role="toolbar" aria-label="Deck preview actions">
-        <button
-          type="button"
-          aria-label="Preview full lesson"
-          title="Preview full lesson"
-          onClick={onPresent}
-        >
-          <Play aria-hidden /> <span>Present</span>
-        </button>
         <button
           type="button"
           aria-label={`Open handout from ${selectedCount} selected slide${selectedCount === 1 ? "" : "s"}`}

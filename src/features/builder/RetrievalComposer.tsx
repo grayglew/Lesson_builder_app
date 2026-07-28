@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, MoreHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   advanceRetrievalItems,
@@ -13,6 +13,7 @@ import {
 } from "./api-client";
 import { useAppNotifications } from "./AppNotifications";
 import { BuilderImageInput } from "./BuilderImageInput";
+import { BuilderActionMenu } from "./BuilderActionMenu";
 import styles from "./BuilderShell.module.css";
 import { useDialogFocus } from "./useDialogFocus";
 import {
@@ -50,7 +51,13 @@ type RetrievalEditorState = {
   answers: ImageDraft[];
 };
 
-export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean }) {
+export function RetrievalComposer({
+  compact = false,
+  refreshing = false,
+}: {
+  compact?: boolean;
+  refreshing?: boolean;
+}) {
   const document = useBuilderStore(selectDocument);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const addSlides = useBuilderStore((state) => state.addSlides);
@@ -580,49 +587,55 @@ export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean
       <div className={styles.panelHead}>
         <h3>Retrieval bank</h3>
         <div className={styles.inlineActions}>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => void openEditor()}
-          >
-            Add LO
-          </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => setSelection("all")}
-          >
-            Select all
-          </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => setSelection("due")}
-          >
-            Select all due
-          </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            onClick={() => setSelection("none")}
-          >
-            Deselect all
-          </button>
+          {!compact ? (
+            <>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => void openEditor()}
+              >
+                Add LO
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => setSelection("all")}
+              >
+                Select all
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => setSelection("due")}
+              >
+                Select all due
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                onClick={() => setSelection("none")}
+              >
+                Deselect all
+              </button>
+            </>
+          ) : null}
           <button
             className={`${styles.primaryButton} ${styles.compactButton}`}
             type="button"
             disabled={Boolean(busyAction)}
             onClick={() => void addSelectedSlides()}
+            title="Create retrieval slides with up to four selected learning objectives on each slide."
           >
-            Add selected slide
+            {compact ? "Add retrieval slides" : "Add selected slide"}
           </button>
           <button
             className={`${styles.primaryButton} ${styles.compactButton}`}
             type="button"
             disabled={Boolean(busyAction)}
             onClick={() => void generateRevisionLesson()}
+            title="Create paired revision slides from the selected learning objectives and their seen-image history."
           >
-            Generate revision lesson
+            {compact ? "Build revision deck" : "Generate revision lesson"}
           </button>
           <button
             className={`${styles.secondaryButton} ${styles.compactButton}`}
@@ -632,22 +645,38 @@ export function RetrievalComposer({ refreshing = false }: { refreshing?: boolean
           >
             Log selected
           </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            disabled={Boolean(busyAction)}
-            onClick={() => void rollbackSelected()}
-          >
-            Roll back selected
-          </button>
-          <button
-            className={`${styles.secondaryButton} ${styles.compactButton}`}
-            type="button"
-            disabled={Boolean(busyAction)}
-            onClick={() => void updateDatabase()}
-          >
-            Update database
-          </button>
+          {compact ? (
+            <BuilderActionMenu
+              label="Retrieval selection and data actions"
+              triggerContent={<><MoreHorizontal aria-hidden /> More</>}
+            >
+              <button type="button" onClick={() => void openEditor()}>Add learning objective</button>
+              <button type="button" onClick={() => setSelection("all")}>Select all</button>
+              <button type="button" onClick={() => setSelection("due")}>Select all due</button>
+              <button type="button" onClick={() => setSelection("none")}>Deselect all</button>
+              <button type="button" disabled={Boolean(busyAction)} onClick={() => void rollbackSelected()}>Roll back selected</button>
+              <button type="button" disabled={Boolean(busyAction)} onClick={() => void updateDatabase()}>Update database</button>
+            </BuilderActionMenu>
+          ) : (
+            <>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                disabled={Boolean(busyAction)}
+                onClick={() => void rollbackSelected()}
+              >
+                Roll back selected
+              </button>
+              <button
+                className={`${styles.secondaryButton} ${styles.compactButton}`}
+                type="button"
+                disabled={Boolean(busyAction)}
+                onClick={() => void updateDatabase()}
+              >
+                Update database
+              </button>
+            </>
+          )}
         </div>
       </div>
 

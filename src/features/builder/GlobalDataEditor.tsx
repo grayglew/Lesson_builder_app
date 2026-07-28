@@ -43,10 +43,12 @@ export function GlobalDataEditor({
   onBack,
   initialView = "retrieval",
   embedded = false,
+  compact = false,
 }: {
   onBack: () => void;
   initialView?: DataView;
   embedded?: boolean;
+  compact?: boolean;
 }) {
   const document = useBuilderStore(selectDocument);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
@@ -269,9 +271,11 @@ export function GlobalDataEditor({
             </button>
           ) : null}
           <h2 className="text-xl font-semibold">Shared builder data</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Edit drafts locally, then use the explicit save or archive action for each section.
-          </p>
+          {!compact ? (
+            <p className="mt-1 text-sm text-slate-500">
+              Edit drafts locally, then use the explicit save or archive action for each section.
+            </p>
+          ) : null}
         </div>
 
         <nav className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-3" aria-label="Shared data sections">
@@ -401,6 +405,11 @@ export function GlobalDataEditor({
                     </label>
                     <label>
                       <span className="field-title mb-1.5">Bullets (one per line)</span>
+                      {compact ? (
+                        <span className="mb-2 block text-xs text-slate-500">
+                          Inline Markdown supported: <code>**bold**</code>, <code>_italic_</code>, <code>`code`</code>, and links.
+                        </span>
+                      ) : null}
                       <textarea className={`${inputClass} min-h-72 resize-y`} value={activeTemplate.bullets.join("\n")} onChange={(event) => updateTemplate({ bullets: event.target.value.split("\n") })} />
                     </label>
                   </div>
