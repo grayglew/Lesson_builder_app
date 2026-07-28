@@ -16,8 +16,6 @@ import {
   ListChecks,
   LogOut,
   MoreHorizontal,
-  PanelLeftClose,
-  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   PencilRuler,
@@ -48,6 +46,7 @@ export type BuilderToolName =
   | "cfu"
   | "draw"
   | "templates"
+  | "shared-data"
   | "placeholder"
   | "math";
 
@@ -59,9 +58,7 @@ type CompactAppBarProps = {
   cloudMessage: string;
   busy: boolean;
   identityControl?: ReactNode;
-  lessonRailCollapsed: boolean;
   onLessons: () => void;
-  onLessonRailToggle: () => void;
   onPresent: () => void;
   onSave: () => void;
 };
@@ -71,9 +68,7 @@ export function CompactAppBar({
   className,
   cloudMessage,
   identityControl,
-  lessonRailCollapsed,
   onLessons,
-  onLessonRailToggle,
   onPresent,
   onSave,
   teachingDate,
@@ -99,15 +94,6 @@ export function CompactAppBar({
         <strong>{title.trim() || "Untitled lesson"}</strong>
         <span>{teachingDate || "No teaching date"}</span>
       </div>
-      <button
-        className={styles.compactLessonRailToggle}
-        type="button"
-        aria-label={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
-        title={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
-        onClick={onLessonRailToggle}
-      >
-        {lessonRailCollapsed ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
-      </button>
       <span className={styles.compactCloudStatus} title={cloudMessage}>
         <Cloud aria-hidden /> {cloudMessage}
       </span>
@@ -147,7 +133,7 @@ const groups: Array<{
   label: string;
   tools: Array<{ name: BuilderToolName; label: string; icon: typeof BookOpen }>;
 }> = [
-  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "templates", label: "Shared data", icon: LayoutTemplate }] },
+  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "templates", label: "Templates", icon: LayoutTemplate }, { name: "shared-data", label: "Shared data", icon: Layers3 }] },
   { label: "Core slides", tools: [{ name: "starter", label: "Starter", icon: LayoutGrid }, { name: "retrieval", label: "Retrieval", icon: RefreshCw }, { name: "example", label: "Example", icon: BookOpenCheck }, { name: "cfu", label: "CFU", icon: ListChecks }] },
   { label: "Resources", tools: [{ name: "worksheet", label: "Worksheet", icon: Files }, { name: "pdf", label: "PDF", icon: FileText }] },
   { label: "Create", tools: [{ name: "draw", label: "Draw", icon: PencilRuler }, { name: "placeholder", label: "Placeholder", icon: SquareDashed }, { name: "math", label: "LaTeX", icon: Sigma }] },

@@ -462,7 +462,9 @@ describe("BuilderShell Compact Console action parity", () => {
 
     expect(await screen.findByRole("region", { name: "Starter" })).toBeInTheDocument();
     const navigation = screen.getByRole("navigation", { name: "Slide tools" });
-    expect(navigation.querySelectorAll("button[data-active]")).toHaveLength(11);
+    expect(navigation.querySelectorAll("button[data-active]")).toHaveLength(12);
+    expect(screen.getByRole("button", { name: "Templates" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Shared data" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lessons" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Present" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(1);
@@ -521,6 +523,13 @@ describe("BuilderShell Compact Console action parity", () => {
     const thirdHandle = screen.getByRole("button", {
       name: "Drag slide 3 to reorder",
     });
+    const firstSelector = screen.getAllByRole("button", {
+      name: "Select slide 1 for handout",
+    })[0];
+    expect(
+      firstHandle.compareDocumentPosition(firstSelector) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const dataTransfer = {
       dropEffect: "none",
       effectAllowed: "none",

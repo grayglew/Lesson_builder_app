@@ -60,9 +60,9 @@ describe("RetrievalComposer", () => {
     const user = userEvent.setup();
     render(<RetrievalComposer compact />);
 
-    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(screen.getByRole("button", { name: "Selection actions" }));
     await user.click(
-      within(screen.getByRole("menu", { name: "Retrieval selection and data actions" }))
+      within(screen.getByRole("menu", { name: "Retrieval selection actions" }))
         .getByRole("button", { name: "Select all due" }),
     );
 
@@ -71,6 +71,16 @@ describe("RetrievalComposer", () => {
     expect(items[0].seenCount).toBe(1);
     expect(items[1].selected).toBe(false);
     expect(logRetrievalItems).not.toHaveBeenCalled();
+  });
+
+  it("uses a compact icon-only delete action with an accessible name", () => {
+    render(<RetrievalComposer compact />);
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete 101a: Expand brackets",
+    });
+    expect(deleteButton).toHaveTextContent("");
+    expect(deleteButton).toHaveAttribute("title", "Delete");
   });
 
   it("creates four-quadrant retrieval slides and advances only image pointers", async () => {
@@ -99,7 +109,7 @@ describe("RetrievalComposer", () => {
     });
     render(<RetrievalComposer compact />);
 
-    await user.click(screen.getByRole("button", { name: "Add retrieval slides" }));
+    await user.click(screen.getByRole("button", { name: "4-per-slide" }));
 
     await waitFor(() => {
       expect(useBuilderStore.getState().document.slides).toHaveLength(1);
@@ -184,7 +194,7 @@ describe("RetrievalComposer", () => {
 
     await user.click(screen.getByRole("button", { name: "More" }));
     await user.click(
-      within(screen.getByRole("menu", { name: "Retrieval selection and data actions" }))
+      within(screen.getByRole("menu", { name: "Retrieval data actions" }))
         .getByRole("button", { name: "Roll back selected" }),
     );
     expect(logRetrievalItems).not.toHaveBeenCalled();

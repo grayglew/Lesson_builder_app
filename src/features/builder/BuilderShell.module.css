@@ -1590,7 +1590,7 @@
   display: grid;
   min-width: 0;
   min-height: 3.5rem;
-  grid-template-columns: auto minmax(8rem, 1fr) auto auto auto auto auto auto;
+  grid-template-columns: auto minmax(8rem, 1fr) auto auto auto auto auto;
   align-items: center;
   gap: 0.45rem;
   border-bottom: 1px solid var(--builder-line);
@@ -1656,11 +1656,6 @@
 
 .compactBrandMark .compactBrandAccent {
   fill: #dc6d57;
-}
-
-.compactAppBar .compactLessonRailToggle {
-  width: 2.75rem;
-  padding: 0;
 }
 
 .compactBrand div,
@@ -1982,22 +1977,17 @@
     padding: 0;
   }
 
-  .compactConsole .lessonRailCollapsed .sidebar > :not(.compactToolNavigation) {
+  .compactConsole .lessonRailCollapsed .sidebar > :not(.compactLessonDetailsHead) {
     display: none;
   }
 
-  .compactConsole .lessonRailCollapsed .compactToolNavigation {
-    margin: 0;
-    border-top: 0;
-  }
-
-  .compactConsole .lessonRailCollapsed .compactRailHeading {
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead {
     justify-content: center;
-    padding: 0.35rem 0;
+    padding: 0.2rem 0;
+    border-bottom: 0;
   }
 
-  .compactConsole .lessonRailCollapsed .compactRailHeading span,
-  .compactConsole .lessonRailCollapsed .compactToolNavigation details {
+  .compactConsole .lessonRailCollapsed .compactLessonDetailsHead span {
     display: none;
   }
 }
@@ -2073,11 +2063,12 @@
 
 .compactLessonDetailsHead {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  min-height: 3.15rem;
+  align-items: center;
   gap: 0.5rem;
-  padding-bottom: 0.45rem;
+  padding: 0.2rem 0.45rem;
   border-bottom: 1px solid var(--builder-line);
+  background: var(--builder-surface);
 }
 
 .compactLessonDetailsHead span {
@@ -2086,11 +2077,22 @@
   font-weight: 800;
 }
 
-.compactLessonDetailsHead small {
+.compactLessonDetailsHead button {
+  display: grid;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
   color: var(--builder-muted);
-  font: 600 0.58rem/1 var(--font-builder-mono);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.compactLessonDetailsHead button:hover {
+  background: var(--builder-surface-alt);
+  color: var(--builder-ink);
 }
 
 .compactConsole .fieldLabel,
@@ -2253,6 +2255,28 @@
 .compactConsole [data-testid="retrieval-panel"] .panelHead .inlineActions > button {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.tableHeaderMenu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+.compactConsole .tableHeaderMenu :global(button[aria-haspopup="menu"]) {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border-color: transparent;
+  padding: 0;
+  background: transparent;
+}
+
+.compactConsole .tableHeaderMenu :global(button[aria-haspopup="menu"]):hover,
+.compactConsole .tableHeaderMenu :global(button[aria-haspopup="menu"]:focus-visible) {
+  border-color: var(--builder-line-strong);
+  background: var(--builder-surface);
 }
 
 .compactConsole .retrievalMeta,
@@ -2485,6 +2509,7 @@
 }
 
 .compactConsole .slideDragHandle {
+  flex: 0 0 auto;
   cursor: grab;
 }
 
@@ -2499,6 +2524,7 @@
 }
 
 .compactConsole .slideSelectButton {
+  flex: 1 1 auto;
   min-height: 2.25rem;
 }
 

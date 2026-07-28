@@ -32,8 +32,27 @@ async function stubBuilder(page: Page) {
             { id: "starter-slide", type: "starter", title: "Starter", slots: [] },
             { id: "example-slide", type: "example", title: "Example", lo: "101a: Expand a single bracket" },
           ],
-          retrievalItems: [],
-          slideTemplates: [],
+          retrievalItems: [
+            {
+              id: "4eb5cf7e-5de4-4d34-9ab4-e58f67410ca1",
+              lo: "101a: Expand a single bracket",
+              className: "Year 9",
+              spacingFactor: 1,
+              seenCount: 2,
+              currentImageSlot: 1,
+              lastTaught: "2026-07-01",
+              selected: false,
+              images: [],
+              answerImages: [],
+            },
+          ],
+          slideTemplates: [
+            {
+              id: "template-markdown",
+              title: "Start of lesson expectations",
+              bullets: ["**Today's date**", "Do Now in books"],
+            },
+          ],
           updatedAt: "2026-07-18T06:00:00.000Z",
         },
       }),
@@ -125,5 +144,42 @@ test.describe("Compact Console functional review", () => {
     await expect(page.getByRole("button", { name: "Collapse lesson preview" })).toBeVisible();
     await page.getByRole("button", { name: "Collapse lesson tools" }).click();
     await expect(page.getByRole("button", { name: "Expand lesson tools" })).toBeVisible();
+  });
+
+  test("places the refined rail, deck, retrieval, and library controls correctly", async ({ page }) => {
+    await stubBuilder(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/builder/compact-review?visual=1");
+
+    const railToggle = page.getByRole("button", { name: "Collapse lesson tools" });
+    const lessonSetup = page.getByText("Lesson setup", { exact: true });
+    const railToggleBox = await railToggle.boundingBox();
+    const lessonSetupBox = await lessonSetup.boundingBox();
+    expect(railToggleBox).not.toBeNull();
+    expect(lessonSetupBox).not.toBeNull();
+    expect(railToggleBox!.x).toBeLessThan(lessonSetupBox!.x);
+
+    await page.getByRole("button", { name: "Retrieval", exact: true }).click();
+    await expect(page.getByRole("button", { name: "4-per-slide" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "2-per-slide" })).toBeVisible();
+    await page.getByRole("button", { name: "Selection actions" }).click();
+    const selectionMenu = page.getByRole("menu", { name: "Retrieval selection actions" });
+    await expect(
+      selectionMenu.getByRole("button", { name: "Select all", exact: true }),
+    ).toBeVisible();
+    await expect(selectionMenu.getByRole("button", { name: "Select all due" })).toBeVisible();
+    await expect(selectionMenu.getByRole("button", { name: "Deselect all" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Templates" }).click();
+    await expect(page.getByRole("heading", { name: "Templates" }).last()).toBeVisible();
+    const guide = page.getByText("Markdown formatting guide", { exact: true });
+    await guide.click();
+    await expect(page.getByText(/Headings, images, tables/)).toBeVisible();
+
+    await page.getByRole("button", { name: "Shared data" }).click();
+    const sharedTabs = page.getByRole("navigation", { name: "Shared data sections" });
+    await expect(sharedTabs.getByRole("button", { name: /^Retrieval/ })).toBeVisible();
+    await expect(sharedTabs.getByRole("button", { name: /^Classes/ })).toBeVisible();
+    await expect(sharedTabs.getByRole("button", { name: /^Templates/ })).toHaveCount(0);
   });
 });

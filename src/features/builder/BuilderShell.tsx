@@ -1,6 +1,13 @@
 "use client";
 
-import { GripVertical, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+  GripVertical,
+  LoaderCircle,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Trash2,
+} from "lucide-react";
 import { type CSSProperties, useEffect, useState } from "react";
 import {
   archiveClassName,
@@ -86,6 +93,7 @@ const toolLabels: Record<ToolName, string> = {
   cfu: "CFU",
   draw: "Draw",
   templates: "Templates",
+  "shared-data": "Shared data",
   placeholder: "Placeholder",
   math: "LaTeX",
 };
@@ -463,7 +471,6 @@ export function BuilderShell({
             userEmail={userEmail}
             cloudMessage={workspaceAutosave.message}
             busy={Boolean(busyAction)}
-            lessonRailCollapsed={lessonRailCollapsed}
             identityControl={
               isImpersonating ? (
                 <ImpersonationControl
@@ -473,9 +480,6 @@ export function BuilderShell({
               ) : null
             }
             onLessons={() => setActiveTool("saved-lessons")}
-            onLessonRailToggle={() =>
-              setLessonRailCollapsed((current) => !current)
-            }
             onPresent={() => void lessonActions.previewLesson(false)}
             onSave={() => void saveLesson(false)}
           />
@@ -496,6 +500,20 @@ export function BuilderShell({
             </div>
           </div>
 
+          {variant === "compact-console" ? (
+            <div className={styles.compactLessonDetailsHead}>
+              <button
+                type="button"
+                aria-label={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
+                title={lessonRailCollapsed ? "Expand lesson tools" : "Collapse lesson tools"}
+                onClick={() => setLessonRailCollapsed((current) => !current)}
+              >
+                {lessonRailCollapsed ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
+              </button>
+              <span>Lesson setup</span>
+            </div>
+          ) : null}
+
           <div
             className={
               variant === "compact-console"
@@ -503,12 +521,6 @@ export function BuilderShell({
                 : styles.classicLessonDetails
             }
           >
-          {variant === "compact-console" ? (
-            <div className={styles.compactLessonDetailsHead}>
-              <span>Lesson setup</span>
-              <small>Metadata and saving</small>
-            </div>
-          ) : null}
           <label className={styles.fieldLabel} htmlFor="v2-lesson-title">
             Lesson title
           </label>
@@ -705,6 +717,18 @@ export function BuilderShell({
                 embedded
                 compact={variant === "compact-console"}
                 initialView="templates"
+                visibleViews={variant === "compact-console" ? ["templates"] : undefined}
+                onBack={() => setActiveTool("starter")}
+              />
+            </div>
+          ) : null}
+          {activeTool === "shared-data" ? (
+            <div className={styles.toolPanel}>
+              <GlobalDataEditor
+                embedded
+                compact
+                initialView="retrieval"
+                visibleViews={["retrieval", "classes"]}
                 onBack={() => setActiveTool("starter")}
               />
             </div>
@@ -858,6 +882,26 @@ export function BuilderShell({
                 }}
               >
                 <div className={styles.slideToolbar}>
+                  {variant === "compact-console" ? (
+                    <button
+                      className={`${styles.miniButton} ${styles.slideDragHandle}`}
+                      type="button"
+                      draggable
+                      aria-label={`Drag slide ${index + 1} to reorder`}
+                      title="Drag to reorder"
+                      onDragStart={(event) => {
+                        setDraggedSlideId(slide.id);
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", slide.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedSlideId("");
+                        setDragOverSlideId("");
+                      }}
+                    >
+                      <GripVertical size={15} aria-hidden />
+                    </button>
+                  ) : null}
                   <button
                     className={styles.slideSelectButton}
                     type="button"
@@ -876,26 +920,7 @@ export function BuilderShell({
                     aria-label={`Slide ${index + 1} actions`}
                   >
                     {variant === "compact-console" ? (
-                      <>
-                        <button
-                          className={`${styles.miniButton} ${styles.slideDragHandle}`}
-                          type="button"
-                          draggable
-                          aria-label={`Drag slide ${index + 1} to reorder`}
-                          title="Drag to reorder"
-                          onDragStart={(event) => {
-                            setDraggedSlideId(slide.id);
-                            event.dataTransfer.effectAllowed = "move";
-                            event.dataTransfer.setData("text/plain", slide.id);
-                          }}
-                          onDragEnd={() => {
-                            setDraggedSlideId("");
-                            setDragOverSlideId("");
-                          }}
-                        >
-                          <GripVertical size={15} aria-hidden />
-                        </button>
-                        <BuilderActionMenu
+                      <BuilderActionMenu
                           label={`More actions for slide ${index + 1}`}
                           triggerContent={
                             <>
@@ -909,8 +934,7 @@ export function BuilderShell({
                           <button type="button" disabled={index === 0} onClick={() => moveSlide(slide.id, -1)}>Move up</button>
                           <button type="button" disabled={index === document.slides.length - 1} onClick={() => moveSlide(slide.id, 1)}>Move down</button>
                           <button type="button" style={{ color: "#b42318" }} onClick={() => removeSlide(slide.id)}><Trash2 size={15} aria-hidden /> Delete slide</button>
-                        </BuilderActionMenu>
-                      </>
+                      </BuilderActionMenu>
                     ) : (
                       <>
                     <button

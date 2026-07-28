@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, MoreHorizontal } from "lucide-react";
+import { LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   advanceRetrievalItems,
@@ -626,7 +626,7 @@ export function RetrievalComposer({
             onClick={() => void addSelectedSlides()}
             title="Create retrieval slides with up to four selected learning objectives on each slide."
           >
-            {compact ? "Add retrieval slides" : "Add selected slide"}
+            {compact ? "4-per-slide" : "Add selected slide"}
           </button>
           <button
             className={`${styles.primaryButton} ${styles.compactButton}`}
@@ -635,7 +635,7 @@ export function RetrievalComposer({
             onClick={() => void generateRevisionLesson()}
             title="Create paired revision slides from the selected learning objectives and their seen-image history."
           >
-            {compact ? "Build revision deck" : "Generate revision lesson"}
+            {compact ? "2-per-slide" : "Generate revision lesson"}
           </button>
           <button
             className={`${styles.secondaryButton} ${styles.compactButton}`}
@@ -647,13 +647,10 @@ export function RetrievalComposer({
           </button>
           {compact ? (
             <BuilderActionMenu
-              label="Retrieval selection and data actions"
+              label="Retrieval data actions"
               triggerContent={<><MoreHorizontal aria-hidden /> More</>}
             >
               <button type="button" onClick={() => void openEditor()}>Add learning objective</button>
-              <button type="button" onClick={() => setSelection("all")}>Select all</button>
-              <button type="button" onClick={() => setSelection("due")}>Select all due</button>
-              <button type="button" onClick={() => setSelection("none")}>Deselect all</button>
               <button type="button" disabled={Boolean(busyAction)} onClick={() => void rollbackSelected()}>Roll back selected</button>
               <button type="button" disabled={Boolean(busyAction)} onClick={() => void updateDatabase()}>Update database</button>
             </BuilderActionMenu>
@@ -692,7 +689,26 @@ export function RetrievalComposer({
         <table className={styles.dataTable}>
           <thead>
             <tr>
-              <th scope="col">Select</th>
+              <th scope="col">
+                {compact ? (
+                  <div className={styles.tableHeaderMenu}>
+                    <span>Select</span>
+                    <BuilderActionMenu
+                      label="Retrieval selection actions"
+                      triggerContent={
+                        <>
+                          <MoreHorizontal aria-hidden />
+                          <span className={styles.srOnly}>Selection actions</span>
+                        </>
+                      }
+                    >
+                      <button type="button" onClick={() => setSelection("all")}>Select all</button>
+                      <button type="button" onClick={() => setSelection("due")}>Select all due</button>
+                      <button type="button" onClick={() => setSelection("none")}>Deselect all</button>
+                    </BuilderActionMenu>
+                  </div>
+                ) : "Select"}
+              </th>
               <th scope="col">Learning objective</th>
               <th scope="col">Spacing</th>
               <th scope="col">Seen</th>
@@ -794,10 +810,12 @@ export function RetrievalComposer({
                       <button
                         className={`${styles.miniButton} ${styles.dangerMini}`}
                         type="button"
+                        aria-label={compact ? `Delete ${item.lo}` : undefined}
+                        title={compact ? "Delete" : undefined}
                         disabled={busyAction === `archive-${item.id}`}
                         onClick={() => void archiveItem(item)}
                       >
-                        Delete
+                        {compact ? <Trash2 size={14} aria-hidden /> : "Delete"}
                       </button>
                     </div>
                   </td>
