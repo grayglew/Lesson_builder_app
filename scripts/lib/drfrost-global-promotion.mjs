@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { assertDistinctQuestionAnswerPairs } from "./drfrost-import.mjs";
 
 export const APPROVED_DRFROST_MANIFEST_HASH =
   "ed76a3c2d9e6a42dd41097fc79c4b84725494a04305fba69b5ca98e765c6288b";
@@ -123,6 +124,7 @@ function validateApprovedSource(manifest, manifestHash) {
   if (imageCount !== APPROVED_DRFROST_IMAGE_COUNT) {
     throw new Error(`Expected ${APPROVED_DRFROST_IMAGE_COUNT} image references in the approved manifest.`);
   }
+  assertDistinctQuestionAnswerPairs(manifest.entries);
 }
 
 function findPromotionConflicts({ canonicalIds, targetBySourceId, progressRows, personalImageRows }) {
