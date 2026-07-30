@@ -15,6 +15,7 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run --configLoader runner",
     "drfrost:inventory": "node scripts/import-drfrost-captures.mjs",
+    "drfrost:promote-global": "node scripts/promote-drfrost-global-catalog.mjs",
     "test:e2e": "playwright test",
     "test:presenter-runtime": "node src/features/presenter/runtime-browser-check.mjs"
   },

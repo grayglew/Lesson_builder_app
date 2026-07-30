@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearRetrievalImage,
+  loadGlobalRetrievalImages,
   lookupRetrievalLo,
   saveRetrievalItem,
   uploadRetrievalImage,
@@ -21,6 +22,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
   return {
     ...original,
     clearRetrievalImage: vi.fn().mockResolvedValue(undefined),
+    loadGlobalRetrievalImages: vi.fn(),
     lookupRetrievalLo: vi.fn(),
     saveRetrievalItem: vi.fn(async (item: RetrievalItem) => ({
       ...item,
@@ -197,7 +199,7 @@ describe("ExampleComposer", () => {
       0,
       expect.objectContaining({ name: "retrieval.png" }),
     );
-    expect(clearRetrievalImage).toHaveBeenCalledTimes(7);
+    expect(clearRetrievalImage).not.toHaveBeenCalled();
   });
 
   it("keeps the actions visible while retrieval image inputs are collapsed", async () => {
@@ -248,6 +250,9 @@ describe("ExampleComposer", () => {
         contentId: "11111111-1111-4111-8111-111111111111",
         loCode: "101a",
         lo: "101a: Canonical expand brackets",
+        source: "global",
+        hasRetrievalImages: true,
+        imagePairCount: 8,
       },
     });
     const user = userEvent.setup();
@@ -280,6 +285,9 @@ describe("ExampleComposer", () => {
         contentId: "11111111-1111-4111-8111-111111111111",
         loCode: "101a",
         lo: "101a: Canonical expand brackets",
+        source: "global",
+        hasRetrievalImages: true,
+        imagePairCount: 8,
       },
     });
     const user = userEvent.setup();
@@ -301,6 +309,50 @@ describe("ExampleComposer", () => {
         className: "Year 9",
       }),
     );
+  });
+
+  it("loads all global retrieval image pairs without creating class tracking", async () => {
+    vi.mocked(lookupRetrievalLo).mockResolvedValue({
+      exists: true,
+      trackedForClass: false,
+      match: {
+        contentId: "11111111-1111-4111-8111-111111111111",
+        loCode: "101a",
+        lo: "101a: Canonical expand brackets",
+        source: "global",
+        hasRetrievalImages: true,
+        imagePairCount: 8,
+      },
+    });
+    vi.mocked(loadGlobalRetrievalImages).mockResolvedValue({
+      contentId: "11111111-1111-4111-8111-111111111111",
+      loCode: "101a",
+      lo: "101a: Canonical expand brackets",
+      images: Array.from({ length: 8 }, (_, index) => ({
+        name: `question-${index + 1}.png`,
+        type: "image/png",
+        size: 10,
+        dataUrl: `https://example.test/question-${index + 1}.png`,
+      })),
+      answerImages: Array.from({ length: 8 }, (_, index) => ({
+        name: `answer-${index + 1}.png`,
+        type: "image/png",
+        size: 10,
+        dataUrl: `https://example.test/answer-${index + 1}.png`,
+      })),
+    });
+    const user = userEvent.setup();
+    render(<ExampleComposer />);
+
+    await user.type(screen.getByLabelText("Learning objective"), "101A");
+    const loadButton = screen.getByRole("button", { name: "Load retrieval images" });
+    await waitFor(() => expect(loadButton).toBeEnabled());
+    await user.click(loadButton);
+
+    await waitFor(() => expect(loadGlobalRetrievalImages).toHaveBeenCalledOnce());
+    expect(screen.getAllByAltText(/^Question image \d preview$/)).toHaveLength(8);
+    expect(screen.getAllByAltText(/^Answer image \d preview$/)).toHaveLength(8);
+    expect(saveRetrievalItem).not.toHaveBeenCalled();
   });
 });
 

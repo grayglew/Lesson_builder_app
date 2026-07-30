@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedBuilderSyncClient } from "@/lib/builder-sync/auth";
 import { resolveRetrievalImageRequests } from "@/lib/builder-global/data";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   const auth = await getAuthorizedBuilderSyncClient();
@@ -12,6 +13,7 @@ export async function POST(request: Request) {
       auth.supabase,
       auth.user.id,
       Array.isArray(body.requests) ? body.requests : [],
+      createAdminClient(),
     );
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {

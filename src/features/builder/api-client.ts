@@ -109,8 +109,20 @@ const retrievalLookupSchema = z.object({
       contentId: z.string(),
       loCode: z.string(),
       lo: z.string(),
+      source: z.enum(["global", "personal"]),
+      hasRetrievalImages: z.boolean(),
+      imagePairCount: z.number().int().min(0).max(8),
     })
     .nullable(),
+});
+
+const globalRetrievalImagesSchema = z.object({
+  ok: z.literal(true),
+  contentId: z.string(),
+  loCode: z.string(),
+  lo: z.string(),
+  images: z.array(builderAssetSchema.nullable()).length(8),
+  answerImages: z.array(builderAssetSchema.nullable()).length(8),
 });
 
 export type RetrievalLookupResult = Omit<
@@ -576,6 +588,29 @@ export async function lookupRetrievalLo(
   };
 }
 
+export async function loadGlobalRetrievalImages(
+  contentId: string,
+  signal?: AbortSignal,
+) {
+  const searchParams = new URLSearchParams({ contentId });
+  const response = await fetch(
+    `/api/builder-global/retrieval-catalog/images?${searchParams.toString()}`,
+    {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+    },
+  );
+  const result = await readJson(response, globalRetrievalImagesSchema);
+  return {
+    contentId: result.contentId,
+    loCode: result.loCode,
+    lo: result.lo,
+    images: result.images,
+    answerImages: result.answerImages,
+  };
+}
+
 export async function archiveRetrievalItem(id: string) {
   await requestJson(
     "/api/builder-global/retrieval-items",
@@ -730,6 +765,18 @@ export async function clearRetrievalImage(
   await postJson(
     "/api/builder-global/image-complete",
     { itemId, role, seenIndex, clear: true },
+    z.object({ ok: z.literal(true), image: z.null() }),
+  );
+}
+
+export async function resetRetrievalImageOverride(
+  itemId: string,
+  role: "question" | "answer",
+  seenIndex: number,
+) {
+  await postJson(
+    "/api/builder-global/image-complete",
+    { itemId, role, seenIndex, reset: true },
     z.object({ ok: z.literal(true), image: z.null() }),
   );
 }

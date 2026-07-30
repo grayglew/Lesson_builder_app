@@ -523,6 +523,33 @@
   font-size: 12px;
 }
 
+.exampleCanonicalMatch {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0.35rem 0 0;
+  color: var(--builder-muted);
+  font-size: 0.78rem;
+}
+
+.exampleCanonicalMatch strong {
+  color: var(--builder-accent-strong);
+  font-family: var(--font-builder-mono);
+}
+
+.exampleRetrievalActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.exampleRetrievalActions .secondaryButton {
+  min-height: 2.75rem;
+  white-space: nowrap;
+}
+
 .newLessonDialog {
   width: min(520px, 100%);
 }
@@ -1617,6 +1644,22 @@
     --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);
     color-scheme: dark;
   }
+
+  .subsectionHead {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .exampleRetrievalActions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .exampleRetrievalActions > button {
+    width: 100%;
+    min-height: 44px;
+  }
 }
 
 .compactConsole .appShell {
@@ -2066,6 +2109,12 @@
     height: auto;
     min-height: 100dvh;
     overflow: auto;
+  }
+
+  .compactConsole .notificationToast {
+    bottom: calc(
+      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom) + 0.75rem
+    );
   }
 
   .compactConsole .compactAppBar {

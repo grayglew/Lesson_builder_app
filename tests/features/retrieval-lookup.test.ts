@@ -4,12 +4,17 @@ import { lookupRetrievalLoData } from "@/lib/builder-global/data";
 describe("retrieval LO lookup", () => {
   it("matches a normalized LO code and reports class tracking", async () => {
     const database = fakeSupabase({
-      retrieval_los: {
+      retrieval_los: [{
         id: "11111111-1111-4111-8111-111111111111",
         lo_code: "101a",
         lo_text: "101a: Expand brackets",
-      },
-      retrieval_class_progress: { id: "progress-1" },
+        scope: "global",
+      }],
+      retrieval_class_progress: [{ id: "progress-1" }],
+      retrieval_lo_images: [[
+        { seen_count: 1, role: "question", is_hidden: false },
+        { seen_count: 1, role: "answer", is_hidden: false },
+      ]],
     });
 
     await expect(
@@ -26,14 +31,17 @@ describe("retrieval LO lookup", () => {
         contentId: "11111111-1111-4111-8111-111111111111",
         loCode: "101a",
         lo: "101a: Expand brackets",
+        source: "global",
+        hasRetrievalImages: true,
+        imagePairCount: 1,
       },
     });
 
     expect(database.calls).toContainEqual([
       "retrieval_los",
       "eq",
-      "owner_id",
-      "owner-1",
+      "scope",
+      "global",
     ]);
     expect(database.calls).toContainEqual([
       "retrieval_los",
@@ -50,7 +58,7 @@ describe("retrieval LO lookup", () => {
   });
 
   it("uses exact normalized text when there is no code", async () => {
-    const database = fakeSupabase({ retrieval_los: null });
+    const database = fakeSupabase({ retrieval_los: [[], []] });
 
     await expect(
       lookupRetrievalLoData(
@@ -68,7 +76,7 @@ describe("retrieval LO lookup", () => {
     expect(database.calls).toContainEqual([
       "retrieval_los",
       "eq",
-      "lo_code",
+      "lo_key",
       "expand a single bracket",
     ]);
     expect(
@@ -77,8 +85,14 @@ describe("retrieval LO lookup", () => {
   });
 });
 
-function fakeSupabase(responses: Record<string, unknown>) {
+function fakeSupabase(responses: Record<string, unknown[]>) {
   const calls: string[][] = [];
+  const responseIndex = new Map<string, number>();
+  const nextResponse = (table: string) => {
+    const index = responseIndex.get(table) || 0;
+    responseIndex.set(table, index + 1);
+    return responses[table]?.[index] ?? null;
+  };
   const client = {
     from(table: string) {
       const query = {
@@ -94,9 +108,16 @@ function fakeSupabase(responses: Record<string, unknown>) {
           calls.push([table, "is", column, String(value)]);
           return query;
         },
+        limit(value: number) {
+          calls.push([table, "limit", String(value)]);
+          return query;
+        },
         maybeSingle() {
           calls.push([table, "maybeSingle"]);
-          return Promise.resolve({ data: responses[table] ?? null, error: null });
+          return Promise.resolve({ data: nextResponse(table), error: null });
+        },
+        then(resolve: (value: { data: unknown; error: null }) => unknown) {
+          return Promise.resolve({ data: nextResponse(table), error: null }).then(resolve);
         },
       };
       return query;

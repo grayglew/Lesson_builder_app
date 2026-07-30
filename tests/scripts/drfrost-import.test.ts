@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyApprovedImport,
+  assertDistinctQuestionAnswerPairs,
   buildDrFrostImportManifest,
   hashImportManifest,
   loadImportCheckpoint,
@@ -46,6 +47,55 @@ describe("Doctor Frost import inventory", () => {
         (image: { sha256: string }) => image.sha256.length === 64,
       ),
     ).toBe(true);
+  });
+
+  it("excludes a capture whose question and answer are identical for the same example", async () => {
+    const root = await makeRoot();
+    await writeFile(path.join(root, "lane-1.md"), "- [x] 101a\n");
+    await makeCapture(
+      root,
+      "20260720T000000Z-101a",
+      "101a",
+      "2.0.9",
+      "2026-07-20T00:00:00Z",
+      { identicalPairSeenCount: 3 },
+    );
+
+    const manifest = await buildDrFrostImportManifest({
+      captureRoot: path.join(root, "captures"),
+      registerFiles: [path.join(root, "lane-1.md")],
+      expectedTotal: 1,
+      requireAllChecked: false,
+      targetProjectRef: "project-ref",
+      ownerEmail: "grayglew@gmail.com",
+    });
+
+    expect(manifest.entries).toEqual([]);
+    expect(manifest.omissions).toEqual([
+      { code: "101a", reason: "no-valid-helper-2.0.9+-capture" },
+    ]);
+  });
+
+  it("rejects identical question and answer hashes without rejecting reuse across examples", () => {
+    const manifest = sampleManifest();
+    const firstQuestion = manifest.entries[0].images.find(
+      (image) => image.role === "question" && image.seenCount === 1,
+    );
+    const firstAnswer = manifest.entries[0].images.find(
+      (image) => image.role === "answer" && image.seenCount === 1,
+    );
+    const secondQuestion = manifest.entries[0].images.find(
+      (image) => image.role === "question" && image.seenCount === 2,
+    );
+
+    if (!firstQuestion || !firstAnswer || !secondQuestion) throw new Error("Invalid test fixture.");
+    secondQuestion.sha256 = firstQuestion.sha256;
+    expect(() => assertDistinctQuestionAnswerPairs(manifest.entries)).not.toThrow();
+
+    firstAnswer.sha256 = firstQuestion.sha256;
+    expect(() => assertDistinctQuestionAnswerPairs(manifest.entries)).toThrow(
+      /101a question and answer images are identical for seen count 1/i,
+    );
   });
 
   it("builds an inspection-only inventory when checked captures are not all eligible", async () => {
@@ -423,6 +473,7 @@ async function makeCapture(
   code: string,
   helperVersion: string,
   completedAt: string,
+  options: { identicalPairSeenCount?: number } = {},
 ) {
   const directory = path.join(root, "captures", directoryName);
   await mkdir(directory);
@@ -450,12 +501,19 @@ async function makeCapture(
     Array.from({ length: 8 }, (_, index) => JSON.stringify({ index: index + 1 })).join("\n") + "\n",
   );
   await writeFile(path.join(directory, "batch.complete"), `${code}\n`);
-  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
   await Promise.all(
-    items.flatMap((item) => [
-      writeFile(path.join(directory, item.question_file), png),
-      writeFile(path.join(directory, item.feedback_file), png),
-    ]),
+    items.flatMap((item) => {
+      const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+      const questionPng = Buffer.from([...signature, item.index, 1]);
+      const answerPng =
+        options.identicalPairSeenCount === item.index
+          ? questionPng
+          : Buffer.from([...signature, item.index, 2]);
+      return [
+        writeFile(path.join(directory, item.question_file), questionPng),
+        writeFile(path.join(directory, item.feedback_file), answerPng),
+      ];
+    }),
   );
 }
 

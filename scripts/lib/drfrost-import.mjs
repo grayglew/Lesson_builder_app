@@ -96,6 +96,29 @@ export function hashImportManifest(manifest) {
   return createHash("sha256").update(stableStringify(manifest)).digest("hex");
 }
 
+export function assertDistinctQuestionAnswerPairs(entries) {
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const images = Array.isArray(entry?.images) ? entry.images : [];
+    for (let seenCount = 1; seenCount <= 8; seenCount += 1) {
+      const question = images.find(
+        (image) => image?.role === "question" && Number(image.seenCount) === seenCount,
+      );
+      const answer = images.find(
+        (image) => image?.role === "answer" && Number(image.seenCount) === seenCount,
+      );
+      if (
+        question?.sha256 &&
+        answer?.sha256 &&
+        String(question.sha256).toLowerCase() === String(answer.sha256).toLowerCase()
+      ) {
+        throw new Error(
+          `Doctor Frost ${entry?.code || "capture"} question and answer images are identical for seen count ${seenCount}.`,
+        );
+      }
+    }
+  }
+}
+
 export function assertApplyApproval({ manifest, manifestHash, approval }) {
   if (!approval?.approved) {
     throw new Error("Explicit import approval is required before any upload client is created.");
@@ -306,6 +329,7 @@ function assertImportManifestStructure(manifest) {
       "Inspection-only or incomplete Doctor Frost inventories cannot be applied.",
     );
   }
+  assertDistinctQuestionAnswerPairs(entries);
 }
 
 function assertPartialImportApproval({ manifest, approval }) {
@@ -421,6 +445,7 @@ async function inspectCapture(directory) {
   ) {
     throw new Error("Capture does not contain eight question and eight feedback PNGs.");
   }
+  assertDistinctQuestionAnswerPairs([{ code, images }]);
   return {
     code,
     lo,
