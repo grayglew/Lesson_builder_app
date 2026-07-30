@@ -46,6 +46,7 @@ type BuilderImagePayload = {
   assetId?: string;
   storagePath?: string;
   checksum?: string;
+  catalogueScope?: "personal" | "global";
 };
 
 type BuilderRetrievalItem = {
@@ -96,6 +97,7 @@ type RetrievalLoRow = {
   lo_text: string;
   lo_key?: string | null;
   archived_at?: string | null;
+  scope?: "personal" | "global";
 };
 
 type RetrievalProgressRow = {
@@ -135,9 +137,12 @@ type AssetRow = {
 };
 
 type RetrievalImageRow = {
+  owner_id?: string;
   retrieval_lo_id: string;
   seen_count: number;
   role?: RetrievalImageRole | null;
+  scope?: "personal" | "global";
+  is_hidden?: boolean;
   asset?: AssetRow | AssetRow[] | null;
 };
 
@@ -160,9 +165,9 @@ type RetrievalLoIdentity = {
 
 const IMAGE_BUCKET = "lesson-assets";
 const SIGNED_URL_SECONDS = PRESENTER_SIGNED_URL_SECONDS;
-const RETRIEVAL_LO_SELECT = "id,lo_code,code_source,legacy_lo_id,lo_text,lo_key,archived_at";
+const RETRIEVAL_LO_SELECT = "id,owner_id,lo_code,code_source,legacy_lo_id,lo_text,lo_key,archived_at,scope";
 const RETRIEVAL_PROGRESS_SELECT =
-  "id,retrieval_lo_id,class_id,class_name,spacing_factor,seen_count,current_image_slot,last_taught,archived_at,retrieval_lo:retrieval_los(id,lo_code,code_source,legacy_lo_id,lo_text,lo_key,archived_at)";
+  "id,retrieval_lo_id,class_id,class_name,spacing_factor,seen_count,current_image_slot,last_taught,archived_at,retrieval_lo:retrieval_los(id,owner_id,lo_code,code_source,legacy_lo_id,lo_text,lo_key,archived_at,scope)";
 
 export function isUuid(value: unknown) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -185,19 +190,15 @@ export async function lookupRetrievalLoData(
   lo: string,
   className: string,
 ) {
-  const loCode = extractRetrievalLoCode(lo) || normalizeBuilderKey(lo);
-  if (!loCode) {
+  const typedCode = extractRetrievalLoCode(lo);
+  const loKey = normalizeBuilderKey(lo);
+  if (!loKey) {
     return { exists: false, trackedForClass: false, match: null };
   }
 
-  const { data: retrievalLo, error: retrievalLoError } = await supabase
-    .from("retrieval_los")
-    .select("id,lo_code,lo_text")
-    .eq("owner_id", userId)
-    .eq("lo_code", loCode)
-    .is("archived_at", null)
-    .maybeSingle();
-  if (retrievalLoError) throw retrievalLoError;
+  const retrievalLo = typedCode
+    ? await findCatalogueLoByCode(supabase, userId, typedCode)
+    : await findCatalogueLoByExactWording(supabase, userId, loKey);
   if (!retrievalLo) {
     return { exists: false, trackedForClass: false, match: null };
   }
@@ -216,6 +217,23 @@ export async function lookupRetrievalLoData(
     trackedForClass = Boolean(progress);
   }
 
+  const { data: imageRows, error: imageError } = await supabase
+    .from("retrieval_lo_images")
+    .select("seen_count,role,is_hidden")
+    .eq("retrieval_lo_id", retrievalLo.id)
+    .eq("scope", retrievalLo.scope === "global" ? "global" : "personal")
+    .eq("is_hidden", false);
+  if (imageError) throw imageError;
+  const questionSlots = new Set<number>();
+  const answerSlots = new Set<number>();
+  (imageRows || []).forEach((row) => {
+    const slot = Number(row.seen_count);
+    if (row.role === "answer") answerSlots.add(slot);
+    else questionSlots.add(slot);
+  });
+  const imagePairCount = Array.from({ length: 8 }, (_, index) => index + 1)
+    .filter((slot) => questionSlots.has(slot) && answerSlots.has(slot)).length;
+
   return {
     exists: true,
     trackedForClass,
@@ -223,7 +241,106 @@ export async function lookupRetrievalLoData(
       contentId: String(retrievalLo.id),
       loCode: String(retrievalLo.lo_code),
       lo: String(retrievalLo.lo_text),
+      source: retrievalLo.scope === "global" ? "global" : "personal",
+      hasRetrievalImages: questionSlots.size > 0 || answerSlots.size > 0,
+      imagePairCount,
     },
+  };
+}
+
+async function findCatalogueLoByCode(
+  supabase: SupabaseClient,
+  userId: string,
+  loCode: string,
+) {
+  const code = normalizeBuilderKey(loCode);
+  const { data: global, error: globalError } = await supabase
+    .from("retrieval_los")
+    .select(RETRIEVAL_LO_SELECT)
+    .eq("scope", "global")
+    .eq("lo_code", code)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (globalError) throw globalError;
+  if (global) return global as RetrievalLoRow;
+
+  const { data: personal, error: personalError } = await supabase
+    .from("retrieval_los")
+    .select(RETRIEVAL_LO_SELECT)
+    .eq("scope", "personal")
+    .eq("owner_id", userId)
+    .eq("lo_code", code)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (personalError) throw personalError;
+  return personal as RetrievalLoRow | null;
+}
+
+async function findCatalogueLoByExactWording(
+  supabase: SupabaseClient,
+  userId: string,
+  loKey: string,
+) {
+  const { data: globalRows, error: globalError } = await supabase
+    .from("retrieval_los")
+    .select(RETRIEVAL_LO_SELECT)
+    .eq("scope", "global")
+    .eq("lo_key", loKey)
+    .is("archived_at", null)
+    .limit(2);
+  if (globalError) throw globalError;
+  if ((globalRows || []).length === 1) return globalRows![0] as RetrievalLoRow;
+  if ((globalRows || []).length > 1) return null;
+
+  const { data: personalRows, error: personalError } = await supabase
+    .from("retrieval_los")
+    .select(RETRIEVAL_LO_SELECT)
+    .eq("scope", "personal")
+    .eq("owner_id", userId)
+    .eq("lo_key", loKey)
+    .is("archived_at", null)
+    .limit(2);
+  if (personalError) throw personalError;
+  return (personalRows || []).length === 1
+    ? (personalRows![0] as RetrievalLoRow)
+    : null;
+}
+
+export async function loadGlobalRetrievalLoImages(
+  admin: SupabaseClient,
+  contentId: string,
+) {
+  if (!isUuid(contentId)) throw new Error("Invalid global retrieval content ID.");
+
+  const { data: retrievalLo, error: loError } = await admin
+    .from("retrieval_los")
+    .select(RETRIEVAL_LO_SELECT)
+    .eq("id", contentId)
+    .eq("scope", "global")
+    .is("archived_at", null)
+    .maybeSingle();
+  if (loError) throw loError;
+  if (!retrievalLo) throw new Error("Global retrieval skill was not found.");
+
+  const { data: rows, error: rowsError } = await admin
+    .from("retrieval_lo_images")
+    .select("owner_id,retrieval_lo_id,seen_count,role,scope,is_hidden,asset:assets(id,bucket,storage_path,file_name,mime_type,byte_size,checksum)")
+    .eq("retrieval_lo_id", contentId)
+    .eq("scope", "global")
+    .eq("is_hidden", false)
+    .order("seen_count", { ascending: true });
+  if (rowsError) throw rowsError;
+
+  const imageRows = (rows || []) as unknown as RetrievalImageRow[];
+  const signedUrlByPath = await createSignedUrlMap(admin, imageRows);
+  const grouped = groupImagesByItem(imageRows, signedUrlByPath).get(contentId) || emptyGroupedImages();
+
+  return {
+    contentId,
+    loCode: String(retrievalLo.lo_code),
+    lo: String(retrievalLo.lo_text),
+    images: grouped.question,
+    answerImages: grouped.answer,
   };
 }
 
@@ -237,18 +354,26 @@ export function normalizeSeenCountFromIndex(value: unknown) {
   return Math.min(8, Math.max(1, Math.round(index) + 1));
 }
 
-export async function loadBuilderGlobalBootstrapData(supabase: SupabaseClient, userId: string) {
-  return loadBuilderGlobalDataInternal(supabase, userId, { includeSignedUrls: false });
+export async function loadBuilderGlobalBootstrapData(
+  supabase: SupabaseClient,
+  userId: string,
+  assetSupabase: SupabaseClient = supabase,
+) {
+  return loadBuilderGlobalDataInternal(supabase, userId, { includeSignedUrls: false, assetSupabase });
 }
 
-export async function loadBuilderGlobalData(supabase: SupabaseClient, userId: string) {
-  return loadBuilderGlobalDataInternal(supabase, userId, { includeSignedUrls: true });
+export async function loadBuilderGlobalData(
+  supabase: SupabaseClient,
+  userId: string,
+  assetSupabase: SupabaseClient = supabase,
+) {
+  return loadBuilderGlobalDataInternal(supabase, userId, { includeSignedUrls: true, assetSupabase });
 }
 
 async function loadBuilderGlobalDataInternal(
   supabase: SupabaseClient,
   userId: string,
-  options: { includeSignedUrls?: boolean } = {},
+  options: { includeSignedUrls?: boolean; assetSupabase?: SupabaseClient } = {},
 ) {
   const includeSignedUrls = options.includeSignedUrls !== false;
   const [{ data: classes, error: classesError }, { data: items, error: itemsError }, { data: templates, error: templatesError }] =
@@ -283,7 +408,13 @@ async function loadBuilderGlobalDataInternal(
     const rightLo = firstRetrievalLo(right.retrieval_lo);
     return normalizeBuilderKey(leftLo?.lo_text || "").localeCompare(normalizeBuilderKey(rightLo?.lo_text || ""));
   });
-  const retrievalItems = await buildRetrievalItemsFromRows(supabase, userId, itemRows, includeSignedUrls);
+  const retrievalItems = await buildRetrievalItemsFromRows(
+    supabase,
+    userId,
+    itemRows,
+    includeSignedUrls,
+    options.assetSupabase || supabase,
+  );
 
   const classNames = uniqueStrings([
     ...((classes || []) as ClassRow[]).map((entry) => entry.name),
@@ -307,10 +438,11 @@ async function buildRetrievalItemsFromRows(
   userId: string,
   itemRows: RetrievalItemRow[],
   includeSignedUrls: boolean,
+  assetSupabase: SupabaseClient = supabase,
 ) {
   const retrievalLoIds = uniqueStrings(itemRows.map((item) => item.retrieval_lo_id).filter(Boolean));
-  const imageRows = await loadRetrievalLoImages(supabase, userId, retrievalLoIds);
-  const signedUrlByPath = includeSignedUrls ? await createSignedUrlMap(supabase, imageRows) : new Map<string, string>();
+  const imageRows = await loadRetrievalLoImages(supabase, userId, retrievalLoIds, assetSupabase);
+  const signedUrlByPath = includeSignedUrls ? await createSignedUrlMap(assetSupabase, imageRows) : new Map<string, string>();
   const imagesByItem = groupImagesByItem(imageRows, signedUrlByPath, includeSignedUrls);
 
   return itemRows.map((item) => {
@@ -562,13 +694,18 @@ export async function logRetrievalBatchData(
   return { results };
 }
 
-export async function advanceRetrievalSlotsData(supabase: SupabaseClient, userId: string, itemIds: unknown[]) {
+export async function advanceRetrievalSlotsData(
+  supabase: SupabaseClient,
+  userId: string,
+  itemIds: unknown[],
+  assetSupabase: SupabaseClient = supabase,
+) {
   const results = [];
   for (const rawId of itemIds) {
     const itemId = String(rawId || "");
     if (!isUuid(itemId)) continue;
     const item = await assertOwnsRetrievalItem(supabase, userId, itemId);
-    const images = await loadRetrievalLoImages(supabase, userId, [item.retrieval_lo_id]);
+    const images = await loadRetrievalLoImages(supabase, userId, [item.retrieval_lo_id], assetSupabase);
     const nextSlot = nextRetrievalSlot(item.current_image_slot, images);
     const { data, error } = await supabase
       .from("retrieval_class_progress")
@@ -587,6 +724,7 @@ export async function resolveRetrievalImageRequests(
   supabase: SupabaseClient,
   userId: string,
   requests: ResolvedRetrievalImageRequest[],
+  assetSupabase: SupabaseClient = supabase,
 ) {
   const foundItems = [];
   for (const request of Array.isArray(requests) ? requests : []) {
@@ -595,8 +733,13 @@ export async function resolveRetrievalImageRequests(
   }
 
   const itemRows = foundItems.map((entry) => entry.item);
-  const imageRows = await loadRetrievalLoImages(supabase, userId, uniqueStrings(itemRows.map((item) => item.retrieval_lo_id)));
-  const signedUrlByPath = await createSignedUrlMap(supabase, imageRows);
+  const imageRows = await loadRetrievalLoImages(
+    supabase,
+    userId,
+    uniqueStrings(itemRows.map((item) => item.retrieval_lo_id)),
+    assetSupabase,
+  );
+  const signedUrlByPath = await createSignedUrlMap(assetSupabase, imageRows);
   const imagesByItem = groupImagesByItem(imageRows, signedUrlByPath, true);
 
   return {
@@ -653,17 +796,7 @@ export async function createRetrievalImageUploadUrl(
   const reusable = input.checksum ? await findReusableImageAsset(supabase, userId, input.checksum) : null;
   if (reusable) {
     const seenCount = input.seenIndex + 1;
-    const { error: imageError } = await supabase.from("retrieval_lo_images").upsert(
-      {
-        owner_id: userId,
-        retrieval_lo_id: retrievalLoId,
-        seen_count: seenCount,
-        role: input.role,
-        asset_id: reusable.id,
-      },
-      { onConflict: "owner_id,retrieval_lo_id,seen_count,role" },
-    );
-    if (imageError) throw imageError;
+    await upsertPersonalImageReference(supabase, userId, retrievalLoId, seenCount, input.role, reusable.id);
     const { data: signed, error: signError } = await supabase.storage.from(IMAGE_BUCKET).createSignedUrl(reusable.storage_path, SIGNED_URL_SECONDS);
     if (signError || !signed?.signedUrl) throw signError || new Error("Could not sign reusable retrieval image.");
     return {
@@ -737,18 +870,7 @@ export async function completeRetrievalImageUpload(
   if (assetError) throw assetError;
 
   const seenCount = input.seenIndex + 1;
-  const { error: imageError } = await supabase.from("retrieval_lo_images").upsert(
-    {
-      owner_id: userId,
-      retrieval_lo_id: retrievalLoId,
-      seen_count: seenCount,
-      role: input.role,
-      asset_id: asset.id,
-    },
-    { onConflict: "owner_id,retrieval_lo_id,seen_count,role" },
-  );
-
-  if (imageError) throw imageError;
+  await upsertPersonalImageReference(supabase, userId, retrievalLoId, seenCount, input.role, asset.id);
 
   const { data: signed, error: signError } = await supabase.storage.from(IMAGE_BUCKET).createSignedUrl(input.path, SIGNED_URL_SECONDS);
   if (signError || !signed?.signedUrl) throw signError || new Error("Could not sign retrieval image.");
@@ -766,29 +888,102 @@ export async function deleteRetrievalImageReference(
   },
 ) {
   const retrievalLoId = await resolveRetrievalLoForProgress(supabase, userId, input.itemId);
-  const { error } = await supabase
-    .from("retrieval_lo_images")
-    .delete()
-    .eq("owner_id", userId)
-    .eq("retrieval_lo_id", retrievalLoId)
-    .eq("seen_count", input.seenIndex + 1)
-    .eq("role", input.role);
-
-  if (error) throw error;
+  await upsertPersonalImageReference(
+    supabase,
+    userId,
+    retrievalLoId,
+    input.seenIndex + 1,
+    input.role,
+    null,
+    true,
+  );
 }
 
-async function loadRetrievalLoImages(supabase: SupabaseClient, userId: string, retrievalLoIds: string[]) {
+export async function resetRetrievalImageOverride(
+  supabase: SupabaseClient,
+  userId: string,
+  input: {
+    itemId: string;
+    role: RetrievalImageRole;
+    seenIndex: number;
+  },
+) {
+  const retrievalLoId = await resolveRetrievalLoForProgress(supabase, userId, input.itemId);
+  await deletePersonalImageReference(
+    supabase,
+    userId,
+    retrievalLoId,
+    input.seenIndex + 1,
+    input.role,
+  );
+}
+
+async function upsertPersonalImageReference(
+  supabase: SupabaseClient,
+  userId: string,
+  retrievalLoId: string,
+  seenCount: number,
+  role: RetrievalImageRole,
+  assetId: string | null,
+  isHidden = false,
+) {
+  const row = {
+    owner_id: userId,
+    retrieval_lo_id: retrievalLoId,
+    seen_count: seenCount,
+    role,
+    asset_id: isHidden ? null : assetId,
+    scope: "personal",
+    is_hidden: isHidden,
+  };
+  const { data: updated, error: updateError } = await supabase
+    .from("retrieval_lo_images")
+    .update(row)
+    .eq("owner_id", userId)
+    .eq("retrieval_lo_id", retrievalLoId)
+    .eq("seen_count", seenCount)
+    .eq("role", role)
+    .eq("scope", "personal")
+    .select("id")
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (updated) return;
+
+  const { error: insertError } = await supabase.from("retrieval_lo_images").insert(row);
+  if (insertError) throw insertError;
+}
+
+async function loadRetrievalLoImages(
+  supabase: SupabaseClient,
+  userId: string,
+  retrievalLoIds: string[],
+  assetSupabase: SupabaseClient = supabase,
+) {
   const validIds = uniqueStrings(retrievalLoIds).filter(isUuid);
   if (!validIds.length) return [] as RetrievalImageRow[];
-  const { data, error } = await supabase
-    .from("retrieval_lo_images")
-    .select("retrieval_lo_id,seen_count,role,asset:assets(id,bucket,storage_path,file_name,mime_type,byte_size,checksum)")
-    .eq("owner_id", userId)
-    .in("retrieval_lo_id", validIds)
-    .order("seen_count", { ascending: true });
+  const [personalResult, globalResult] = await Promise.all([
+    supabase
+      .from("retrieval_lo_images")
+      .select("owner_id,retrieval_lo_id,seen_count,role,scope,is_hidden,asset:assets(id,bucket,storage_path,file_name,mime_type,byte_size,checksum)")
+      .eq("owner_id", userId)
+      .eq("scope", "personal")
+      .in("retrieval_lo_id", validIds)
+      .order("seen_count", { ascending: true }),
+    assetSupabase
+      .from("retrieval_lo_images")
+      .select("owner_id,retrieval_lo_id,seen_count,role,scope,is_hidden,asset:assets(id,bucket,storage_path,file_name,mime_type,byte_size,checksum)")
+      .eq("scope", "global")
+      .eq("is_hidden", false)
+      .in("retrieval_lo_id", validIds)
+      .order("seen_count", { ascending: true }),
+  ]);
 
-  if (error) throw error;
-  return (data || []) as unknown as RetrievalImageRow[];
+  if (personalResult.error) throw personalResult.error;
+  if (globalResult.error) throw globalResult.error;
+  return [
+    ...((globalResult.data || []) as unknown as RetrievalImageRow[]),
+    ...((personalResult.data || []) as unknown as RetrievalImageRow[]),
+  ];
 }
 
 async function createSignedUrlMap(supabase: SupabaseClient, imageRows: RetrievalImageRow[]) {
@@ -815,14 +1010,23 @@ function groupImagesByItem(imageRows: RetrievalImageRow[], signedUrlByPath: Map<
   const grouped = new Map<string, { question: Array<BuilderImagePayload | null>; answer: Array<BuilderImagePayload | null> }>();
 
   imageRows.forEach((row) => {
+    const item = grouped.get(row.retrieval_lo_id) || emptyGroupedImages();
+    const role = normalizeImageRole(row.role);
+    const index = Math.min(7, Math.max(0, Math.round(Number(row.seen_count) || 1) - 1));
+    if (row.scope === "personal" && row.is_hidden) {
+      item[role][index] = null;
+      grouped.set(row.retrieval_lo_id, item);
+      return;
+    }
     const asset = firstAsset(row.asset);
     if (!asset?.storage_path) return;
     const signedUrl = signedUrlByPath.get(asset.storage_path) || "";
     if (includeSignedUrls && !signedUrl) return;
-    const item = grouped.get(row.retrieval_lo_id) || emptyGroupedImages();
-    const role = normalizeImageRole(row.role);
-    const index = Math.min(7, Math.max(0, Math.round(Number(row.seen_count) || 1) - 1));
-    item[role][index] = imagePayloadFromAsset(asset, includeSignedUrls ? signedUrl : "");
+    item[role][index] = imagePayloadFromAsset(
+      asset,
+      includeSignedUrls ? signedUrl : "",
+      row.scope,
+    );
     grouped.set(row.retrieval_lo_id, item);
   });
 
@@ -844,7 +1048,11 @@ function emptyGroupedImages() {
   };
 }
 
-function imagePayloadFromAsset(asset: AssetRow, signedUrl: string): BuilderImagePayload {
+function imagePayloadFromAsset(
+  asset: AssetRow,
+  signedUrl: string,
+  catalogueScope?: "personal" | "global",
+): BuilderImagePayload {
   return {
     name: asset.file_name || "retrieval-image",
     type: asset.mime_type || "image/png",
@@ -853,6 +1061,7 @@ function imagePayloadFromAsset(asset: AssetRow, signedUrl: string): BuilderImage
     assetId: asset.id,
     storagePath: asset.storage_path,
     checksum: asset.checksum || "",
+    ...(catalogueScope ? { catalogueScope } : {}),
   };
 }
 
@@ -1124,13 +1333,24 @@ async function upsertSharedRetrievalLo(supabase: SupabaseClient, userId: string,
     legacy_lo_id: String(input.legacyLoId || extractLegacyLoId(lo) || "").trim() || null,
     lo_text: lo,
     archived_at: null,
+    scope: "personal" as const,
   };
 
   if (isUuid(contentId)) {
+    const { data: referenced, error: referencedError } = await supabase
+      .from("retrieval_los")
+      .select(RETRIEVAL_LO_SELECT)
+      .eq("id", contentId)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (referencedError) throw referencedError;
+    if (referenced?.scope === "global") return referenced as RetrievalLoRow;
+
     const { data, error } = await supabase
       .from("retrieval_los")
       .update(row)
       .eq("owner_id", userId)
+      .eq("scope", "personal")
       .eq("id", contentId)
       .select(RETRIEVAL_LO_SELECT)
       .maybeSingle();
@@ -1140,10 +1360,12 @@ async function upsertSharedRetrievalLo(supabase: SupabaseClient, userId: string,
 
   const existing = await findSharedRetrievalLoByCode(supabase, userId, identity.loCode);
   if (existing) {
+    if (existing.scope === "global") return existing;
     const { data, error } = await supabase
       .from("retrieval_los")
       .update(row)
       .eq("owner_id", userId)
+      .eq("scope", "personal")
       .eq("id", existing.id)
       .select(RETRIEVAL_LO_SELECT)
       .single();
@@ -1233,17 +1455,7 @@ async function findSharedRetrievalLoByLo(supabase: SupabaseClient, userId: strin
 }
 
 async function findSharedRetrievalLoByCode(supabase: SupabaseClient, userId: string, loCode: string) {
-  const code = normalizeBuilderKey(loCode);
-  if (!code) return null;
-  const { data, error } = await supabase
-    .from("retrieval_los")
-    .select(RETRIEVAL_LO_SELECT)
-    .eq("owner_id", userId)
-    .eq("lo_code", code)
-    .is("archived_at", null)
-    .maybeSingle();
-  if (error) throw error;
-  return data as RetrievalLoRow | null;
+  return findCatalogueLoByCode(supabase, userId, loCode);
 }
 
 async function findRetrievalProgressByLoAndClass(supabase: SupabaseClient, userId: string, lo: string, className: string) {
@@ -1287,27 +1499,12 @@ async function syncImageRoleReferences(
     const image = images[index];
     if (image?.dataUrl && String(image.dataUrl).startsWith("data:")) {
       await uploadDataUrlRetrievalImage(supabase, userId, retrievalLoId, role, index, image);
+    } else if (image?.catalogueScope === "global") {
+      await deletePersonalImageReference(supabase, userId, retrievalLoId, index + 1, role);
     } else if (image?.assetId && isUuid(image.assetId)) {
-      const { error } = await supabase.from("retrieval_lo_images").upsert(
-        {
-          owner_id: userId,
-          retrieval_lo_id: retrievalLoId,
-          seen_count: index + 1,
-          role,
-          asset_id: image.assetId,
-        },
-        { onConflict: "owner_id,retrieval_lo_id,seen_count,role" },
-      );
-      if (error) throw error;
+      await upsertPersonalImageReference(supabase, userId, retrievalLoId, index + 1, role, image.assetId);
     } else if (!image || !String(image.dataUrl || "").startsWith("data:")) {
-      const { error } = await supabase
-        .from("retrieval_lo_images")
-        .delete()
-        .eq("owner_id", userId)
-        .eq("retrieval_lo_id", retrievalLoId)
-        .eq("seen_count", index + 1)
-        .eq("role", role);
-      if (error) throw error;
+      await deletePersonalImageReference(supabase, userId, retrievalLoId, index + 1, role);
     }
   }
 }
@@ -1339,17 +1536,7 @@ async function uploadDataUrlRetrievalImage(
   const parsed = parseDataUrl(image.dataUrl || "");
   const reusable = image.checksum ? await findReusableImageAsset(supabase, userId, image.checksum) : null;
   if (reusable) {
-    const { error } = await supabase.from("retrieval_lo_images").upsert(
-      {
-        owner_id: userId,
-        retrieval_lo_id: retrievalLoId,
-        seen_count: index + 1,
-        role,
-        asset_id: reusable.id,
-      },
-      { onConflict: "owner_id,retrieval_lo_id,seen_count,role" },
-    );
-    if (error) throw error;
+    await upsertPersonalImageReference(supabase, userId, retrievalLoId, index + 1, role, reusable.id);
     return;
   }
 
@@ -1387,18 +1574,25 @@ async function uploadDataUrlRetrievalImage(
     throw assetError;
   }
 
-  const { error: imageError } = await supabase.from("retrieval_lo_images").upsert(
-    {
-      owner_id: userId,
-      retrieval_lo_id: retrievalLoId,
-      seen_count: index + 1,
-      role,
-      asset_id: asset.id,
-    },
-    { onConflict: "owner_id,retrieval_lo_id,seen_count,role" },
-  );
+  await upsertPersonalImageReference(supabase, userId, retrievalLoId, index + 1, role, asset.id);
+}
 
-  if (imageError) throw imageError;
+async function deletePersonalImageReference(
+  supabase: SupabaseClient,
+  userId: string,
+  retrievalLoId: string,
+  seenCount: number,
+  role: RetrievalImageRole,
+) {
+  const { error } = await supabase
+    .from("retrieval_lo_images")
+    .delete()
+    .eq("owner_id", userId)
+    .eq("retrieval_lo_id", retrievalLoId)
+    .eq("seen_count", seenCount)
+    .eq("role", role)
+    .eq("scope", "personal");
+  if (error) throw error;
 }
 
 export async function resolveRetrievalLoForProgress(supabase: SupabaseClient, userId: string, itemId: string) {

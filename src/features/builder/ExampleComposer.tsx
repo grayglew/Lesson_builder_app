@@ -1,10 +1,12 @@
 "use client";
 
-import { ChevronDown, Database, LoaderCircle, Plus } from "lucide-react";
+import { ChevronDown, Database, Images, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   clearRetrievalImage,
+  loadGlobalRetrievalImages,
   lookupRetrievalLo,
+  resetRetrievalImageOverride,
   saveRetrievalItem,
   type RetrievalLookupResult,
   uploadRetrievalImage,
@@ -29,10 +31,14 @@ import { selectDocument, useBuilderStore } from "./store";
 type ImageDraft = {
   asset: BuilderAsset | null;
   file?: File;
+  origin?: "global" | "manual";
+  dirty?: boolean;
+  resetToGlobal?: boolean;
 };
 
 type LiveLookupState =
   | { state: "idle" }
+  | { state: "checking"; queryKey: string }
   | { state: "ready"; queryKey: string; result: RetrievalLookupResult }
   | { state: "error"; queryKey: string };
 
@@ -56,6 +62,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
   const [retrievalImagesExpanded, setRetrievalImagesExpanded] =
     useState(false);
   const [isSavingBank, setIsSavingBank] = useState(false);
+  const [isLoadingGlobalImages, setIsLoadingGlobalImages] = useState(false);
   const [liveLookup, setLiveLookup] = useState<LiveLookupState>({
     state: "idle",
   });
@@ -77,14 +84,13 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     const trimmedLo = lo.trim();
-    if (!trimmedLo || bankStatus.state === "tracked" || bankStatus.state === "shared") {
-      return;
-    }
+    if (!trimmedLo) return;
 
     let cancelled = false;
     const controller = new AbortController();
     const queryKey = `${document.className}\n${trimmedLo}`;
     const timer = window.setTimeout(() => {
+      setLiveLookup({ state: "checking", queryKey });
       void lookupRetrievalLo(trimmedLo, document.className, controller.signal)
         .then((result) => {
           if (!cancelled) setLiveLookup({ state: "ready", queryKey, result });
@@ -104,7 +110,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [bankStatus.state, document.className, lo]);
+  }, [document.className, lo]);
 
   function updateRetrievalImage(
     role: "questions" | "answers",
@@ -114,10 +120,80 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
   ) {
     const update = (drafts: ImageDraft[]) =>
       drafts.map((draft, slotIndex) =>
-        slotIndex === index ? { asset, file } : draft,
+        slotIndex === index
+          ? { asset, file, origin: "manual" as const, dirty: true }
+          : draft,
       );
     if (role === "questions") setQuestions(update);
     else setAnswers(update);
+  }
+
+  async function loadMatchedRetrievalImages() {
+    const match =
+      activeLiveLookup.state === "ready"
+        ? activeLiveLookup.result.match
+        : null;
+    if (
+      !match ||
+      match.source !== "global" ||
+      !match.hasRetrievalImages
+    ) {
+      return;
+    }
+
+    const hasManualDraft = [...questions, ...answers].some(
+      (draft) => draft.asset && draft.origin !== "global",
+    );
+    if (hasManualDraft) {
+      const approved = await confirmDialog({
+        title: "Replace the retrieval image draft?",
+        description:
+          "Loading the global Doctor Frost images will replace the retrieval images currently in this draft. Your saved retrieval bank is not changed until you add the LO.",
+        confirmLabel: "Load global images",
+        cancelLabel: "Keep current draft",
+        tone: "warning",
+      });
+      if (!approved) return;
+    }
+
+    setIsLoadingGlobalImages(true);
+    setStatus({ tone: "working", message: "Loading retrieval images..." });
+    try {
+      const loaded = await loadGlobalRetrievalImages(match.contentId);
+      const shouldResetSavedOverrides =
+        bankStatus.state === "shared" || bankStatus.state === "tracked";
+      setQuestions(
+        loaded.images.map((asset) => ({
+          asset,
+          origin: "global",
+          dirty: shouldResetSavedOverrides,
+          resetToGlobal: shouldResetSavedOverrides,
+        })),
+      );
+      setAnswers(
+        loaded.answerImages.map((asset) => ({
+          asset,
+          origin: "global",
+          dirty: shouldResetSavedOverrides,
+          resetToGlobal: shouldResetSavedOverrides,
+        })),
+      );
+      setRetrievalImagesExpanded(true);
+      setStatus({
+        tone: "success",
+        message: `Loaded retrieval images for ${loaded.loCode}.`,
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message:
+          error instanceof Error && error.message
+            ? error.message
+            : "Could not load the global retrieval images.",
+      });
+    } finally {
+      setIsLoadingGlobalImages(false);
+    }
   }
 
   function addExampleSlide() {
@@ -252,14 +328,18 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
     drafts: ImageDraft[],
     preserved: Array<BuilderAsset | null> | undefined,
   ) {
-    if (!drafts.some((draft) => draft.asset)) {
-      return normalizeImageSlots(preserved);
-    }
+    const preservedSlots = normalizeImageSlots(preserved);
     return Promise.all(
       drafts.map(async (draft, index) => {
+        if (!draft.dirty) return draft.asset ?? preservedSlots[index] ?? null;
+        if (draft.resetToGlobal) {
+          await resetRetrievalImageOverride(itemId, role, index);
+          return draft.asset;
+        }
         if (draft.file) {
           return uploadRetrievalImage(itemId, role, index, draft.file);
         }
+        if (draft.asset) return draft.asset;
         await clearRetrievalImage(itemId, role, index);
         return null;
       }),
@@ -308,6 +388,12 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
       <p className={`${styles.fieldNote} ${bankStatusClass}`}>
         {databaseStatus.message}
       </p>
+      {activeLiveLookup.state === "ready" && activeLiveLookup.result.match ? (
+        <p className={styles.exampleCanonicalMatch}>
+          <strong>{activeLiveLookup.result.match.loCode}</strong>
+          <span>{activeLiveLookup.result.match.lo}</span>
+        </p>
+      ) : null}
 
       <label className={styles.exampleSpacingField}>
         <span className={styles.fieldLabel}>Retrieval spacing factor</span>
@@ -368,25 +454,45 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
             times this LO has been seen.
           </p>
         </div>
-        <button
-          className={styles.exampleRetrievalToggle}
-          type="button"
-          aria-expanded={retrievalImagesExpanded}
-          aria-controls="v2-example-retrieval-images"
-          aria-describedby="v2-example-retrieval-images-description"
-          title={compact ? "Optional question and answer images are paired by the number of times this LO has been seen." : undefined}
-          onClick={() => setRetrievalImagesExpanded((expanded) => !expanded)}
-        >
-          {retrievalImagesExpanded ? "Hide" : "Show"} retrieval images
-          <ChevronDown
-            className={`${styles.exampleRetrievalChevron} ${
-              retrievalImagesExpanded
-                ? styles.exampleRetrievalChevronExpanded
-                : ""
-            }`}
-            aria-hidden
-          />
-        </button>
+        <div className={styles.exampleRetrievalActions}>
+          <button
+            className={styles.secondaryButton}
+            type="button"
+            disabled={
+              isLoadingGlobalImages ||
+              activeLiveLookup.state !== "ready" ||
+              activeLiveLookup.result.match?.source !== "global" ||
+              !activeLiveLookup.result.match?.hasRetrievalImages
+            }
+            onClick={() => void loadMatchedRetrievalImages()}
+          >
+            {isLoadingGlobalImages ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Images className="size-4" aria-hidden />
+            )}
+            Load retrieval images
+          </button>
+          <button
+            className={styles.exampleRetrievalToggle}
+            type="button"
+            aria-expanded={retrievalImagesExpanded}
+            aria-controls="v2-example-retrieval-images"
+            aria-describedby="v2-example-retrieval-images-description"
+            title={compact ? "Optional question and answer images are paired by the number of times this LO has been seen." : undefined}
+            onClick={() => setRetrievalImagesExpanded((expanded) => !expanded)}
+          >
+            {retrievalImagesExpanded ? "Hide" : "Show"} retrieval images
+            <ChevronDown
+              className={`${styles.exampleRetrievalChevron} ${
+                retrievalImagesExpanded
+                  ? styles.exampleRetrievalChevronExpanded
+                  : ""
+              }`}
+              aria-hidden
+            />
+          </button>
+        </div>
       </div>
       {retrievalImagesExpanded ? (
         <div
@@ -450,6 +556,9 @@ function getDatabaseStatus(
   bankStatus: ReturnType<typeof getExampleRetrievalBankStatus>,
   liveLookup: LiveLookupState,
 ) {
+  if (liveLookup.state === "checking") {
+    return { tone: "neutral" as const, message: "Checking retrieval database..." };
+  }
   if (bankStatus.state === "tracked") {
     return {
       tone: "good" as const,

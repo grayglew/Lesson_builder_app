@@ -22,8 +22,8 @@ export function createSupabaseDrFrostAdapter(supabase) {
     async findActiveLo(ownerId, code) {
       const { data, error } = await supabase
         .from("retrieval_los")
-        .select("id,lo_code,code_source,legacy_lo_id,lo_text")
-        .eq("owner_id", ownerId)
+        .select("id,lo_code,code_source,legacy_lo_id,lo_text,scope")
+        .eq("scope", "global")
         .eq("lo_code", code)
         .is("archived_at", null)
         .maybeSingle();
@@ -36,12 +36,13 @@ export function createSupabaseDrFrostAdapter(supabase) {
         .from("retrieval_los")
         .insert({
           owner_id: ownerId,
+          scope: "global",
           lo_code: code,
           code_source: "prefix",
           lo_text: lo,
           archived_at: null,
         })
-        .select("id,lo_code,code_source,legacy_lo_id,lo_text")
+        .select("id,lo_code,code_source,legacy_lo_id,lo_text,scope")
         .single();
       if (error) throw error;
       return data;
@@ -52,15 +53,15 @@ export function createSupabaseDrFrostAdapter(supabase) {
         await Promise.all([
           supabase
             .from("retrieval_los")
-            .select("id,lo_code,code_source,legacy_lo_id,lo_text,archived_at")
-            .eq("owner_id", ownerId)
+            .select("id,owner_id,lo_code,code_source,legacy_lo_id,lo_text,archived_at,scope")
             .eq("id", retrievalLoId)
+            .eq("scope", "global")
             .single(),
           supabase
             .from("retrieval_lo_images")
-            .select("seen_count,role,asset_id")
-            .eq("owner_id", ownerId)
+            .select("owner_id,seen_count,role,asset_id,scope,is_hidden")
             .eq("retrieval_lo_id", retrievalLoId)
+            .eq("scope", "global")
             .order("role")
             .order("seen_count"),
         ]);
@@ -118,8 +119,8 @@ export function createSupabaseDrFrostAdapter(supabase) {
       const { error: loError } = await supabase
         .from("retrieval_los")
         .update({ lo_code: code, code_source: "prefix", lo_text: lo })
-        .eq("owner_id", ownerId)
         .eq("id", retrievalLoId)
+        .eq("scope", "global")
         .is("archived_at", null);
       if (loError) throw loError;
 
@@ -129,10 +130,18 @@ export function createSupabaseDrFrostAdapter(supabase) {
         seen_count: image.seenCount,
         role: image.role,
         asset_id: image.assetId,
+        scope: "global",
+        is_hidden: false,
       }));
+      const { error: deleteError } = await supabase
+        .from("retrieval_lo_images")
+        .delete()
+        .eq("retrieval_lo_id", retrievalLoId)
+        .eq("scope", "global");
+      if (deleteError) throw deleteError;
       const { error: imageError } = await supabase
         .from("retrieval_lo_images")
-        .upsert(rows, { onConflict: "owner_id,retrieval_lo_id,seen_count,role" });
+        .insert(rows);
       if (imageError) throw imageError;
     },
 
@@ -146,24 +155,26 @@ export function createSupabaseDrFrostAdapter(supabase) {
           legacy_lo_id: snapshot.lo.legacy_lo_id,
           lo_text: snapshot.lo.lo_text,
           archived_at: snapshot.lo.archived_at,
+          scope: "global",
         })
-        .eq("owner_id", ownerId)
         .eq("id", retrievalLoId);
       if (loError) throw loError;
       const { error: deleteError } = await supabase
         .from("retrieval_lo_images")
         .delete()
-        .eq("owner_id", ownerId)
-        .eq("retrieval_lo_id", retrievalLoId);
+        .eq("retrieval_lo_id", retrievalLoId)
+        .eq("scope", "global");
       if (deleteError) throw deleteError;
       if (snapshot.images?.length) {
         const { error: imageError } = await supabase.from("retrieval_lo_images").insert(
           snapshot.images.map((image) => ({
-            owner_id: ownerId,
+            owner_id: image.owner_id || ownerId,
             retrieval_lo_id: retrievalLoId,
             seen_count: image.seen_count,
             role: image.role,
             asset_id: image.asset_id,
+            scope: "global",
+            is_hidden: false,
           })),
         );
         if (imageError) throw imageError;
@@ -174,8 +185,8 @@ export function createSupabaseDrFrostAdapter(supabase) {
       const { error } = await supabase
         .from("retrieval_los")
         .update({ archived_at: new Date().toISOString() })
-        .eq("owner_id", ownerId)
-        .eq("id", retrievalLoId);
+        .eq("id", retrievalLoId)
+        .eq("scope", "global");
       if (error) throw error;
     },
   };

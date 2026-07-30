@@ -31,6 +31,9 @@ describe("retrieval items lookup route", () => {
         contentId: "content-1",
         loCode: "101a",
         lo: "101a: Expand brackets",
+        source: "global",
+        hasRetrievalImages: true,
+        imagePairCount: 8,
       },
     });
   });
@@ -51,6 +54,9 @@ describe("retrieval items lookup route", () => {
         contentId: "content-1",
         loCode: "101a",
         lo: "101a: Expand brackets",
+        source: "global",
+        hasRetrievalImages: true,
+        imagePairCount: 8,
       },
     });
     expect(mocks.lookupRetrievalLoData).toHaveBeenCalledWith(

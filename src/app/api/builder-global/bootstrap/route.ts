@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedBuilderSyncClient } from "@/lib/builder-sync/auth";
 import { loadBuilderGlobalBootstrapData } from "@/lib/builder-global/data";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
   const auth = await getAuthorizedBuilderSyncClient();
   if ("response" in auth) return auth.response;
 
   try {
-    const state = await loadBuilderGlobalBootstrapData(auth.supabase, auth.user.id);
+    const state = await loadBuilderGlobalBootstrapData(
+      auth.supabase,
+      auth.user.id,
+      createAdminClient(),
+    );
     return NextResponse.json({ ok: true, state });
   } catch (error) {
     return NextResponse.json(

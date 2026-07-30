@@ -5,6 +5,7 @@ import {
   deleteRetrievalImageReference,
   isUuid,
   normalizeImageRole,
+  resetRetrievalImageOverride,
 } from "@/lib/builder-global/data";
 
 export async function POST(request: Request) {
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
   const role = normalizeImageRole(body.role);
   const seenIndex = Number(body.seenIndex);
   const clear = Boolean(body.clear);
+  const reset = Boolean(body.reset);
 
   if (!isUuid(itemId)) {
     return NextResponse.json({ ok: false, error: "Invalid retrieval item id." }, { status: 400 });
@@ -26,6 +28,10 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (reset) {
+      await resetRetrievalImageOverride(auth.supabase, auth.user.id, { itemId, role, seenIndex });
+      return NextResponse.json({ ok: true, image: null });
+    }
     if (clear) {
       await deleteRetrievalImageReference(auth.supabase, auth.user.id, { itemId, role, seenIndex });
       return NextResponse.json({ ok: true, image: null });
