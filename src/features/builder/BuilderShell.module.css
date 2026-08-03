@@ -1096,9 +1096,9 @@
 
 .handoutSlideToggle {
   display: grid;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
+  width: 45px;
+  min-width: 45px;
+  height: 45px;
   place-items: center;
   cursor: pointer;
 }

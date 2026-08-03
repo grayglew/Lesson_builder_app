@@ -14,19 +14,58 @@ type StarterSlotReference = {
   item: RetrievalItem;
 };
 
+export function hydrateStarterSlotsFromRetrievalItems(
+  document: BuilderDocument,
+  retrievalItems: readonly RetrievalItem[] = document.retrievalItems,
+): BuilderDocument {
+  const slides: BuilderSlide[] = document.slides.map((slide) => {
+    if (slide.type !== "starter") return slide;
+    return {
+      ...slide,
+      slots: starterSlots(slide).map((slot) => {
+        const item = findRetrievalItemForLiveSlot(
+          retrievalItems,
+          slot,
+          document.className,
+        );
+        if (!item) return { ...slot };
+
+        const currentImageSlot = normalizeImageSlot(
+          slot.lockImageSlot
+            ? slot.currentImageSlot ?? item.currentImageSlot
+            : item.currentImageSlot,
+        );
+        return {
+          ...slot,
+          lo: String(slot.lo || item.lo || "").trim(),
+          retrievalItemId: String(
+            slot.retrievalItemId || item.id || "",
+          ).trim(),
+          currentImageSlot,
+          image:
+            usableAsset(item.images[currentImageSlot - 1]) ||
+            slot.image ||
+            null,
+          answerImage:
+            usableAsset(item.answerImages[currentImageSlot - 1]) ||
+            slot.answerImage ||
+            null,
+        };
+      }),
+    } as BuilderSlide;
+  });
+  return { ...document, slides };
+}
+
 export async function hydrateLiveStarterSlots(
   document: BuilderDocument,
   retrievalItems: readonly RetrievalItem[] = document.retrievalItems,
   resolver: LiveStarterImageResolver = resolveRetrievalImages,
 ): Promise<BuilderDocument> {
-  const slides: BuilderSlide[] = document.slides.map((slide) => {
-    if (slide.type !== "starter") return slide;
-    return {
-      ...slide,
-      slots: starterSlots(slide).map((slot) => ({ ...slot })),
-    } as BuilderSlide;
-  });
-  const hydrated: BuilderDocument = { ...document, slides };
+  const hydrated = hydrateStarterSlotsFromRetrievalItems(
+    document,
+    retrievalItems,
+  );
   const references: StarterSlotReference[] = [];
   const requests: RetrievalItem[] = [];
 
@@ -41,19 +80,11 @@ export async function hydrateLiveStarterSlots(
       );
       if (!item) return;
 
-      const currentImageSlot = normalizeImageSlot(
-        slot.lockImageSlot
-          ? slot.currentImageSlot ?? item.currentImageSlot
-          : item.currentImageSlot,
-      );
-      slots[slotIndex] = {
-        ...slot,
-        lo: String(slot.lo || item.lo || "").trim(),
-        retrievalItemId: String(slot.retrievalItemId || item.id || "").trim(),
-        currentImageSlot,
-      };
       references.push({ slideIndex, slotIndex, item });
-      requests.push({ ...item, currentImageSlot });
+      requests.push({
+        ...item,
+        currentImageSlot: slot.currentImageSlot || item.currentImageSlot,
+      });
     });
   });
 
@@ -66,7 +97,12 @@ export async function hydrateLiveStarterSlots(
       const slots = starterSlots(slide);
       if (slide?.type !== "starter") return;
       const slot = slots[reference.slotIndex];
-      const resolved = resolvedItems[index];
+      const requestKey = `request-${index}`;
+      const resolved =
+        resolvedItems.find((item) => item.requestKey === requestKey) ||
+        (resolvedItems.length === references.length
+          ? resolvedItems[index]
+          : undefined);
       if (!slot || !resolved) return;
       slots[reference.slotIndex] = {
         ...slot,
@@ -180,4 +216,12 @@ function normalizeImageSlot(value: unknown) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 1;
   return Math.max(1, Math.min(8, Math.round(number)));
+}
+
+function usableAsset<T>(asset: T): T | null {
+  if (!asset || typeof asset !== "object" || Array.isArray(asset)) return null;
+  const dataUrl = String(
+    (asset as Record<string, unknown>).dataUrl || "",
+  ).trim();
+  return dataUrl ? asset : null;
 }

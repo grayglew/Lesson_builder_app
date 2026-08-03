@@ -281,7 +281,11 @@ export function useLessonExportActions() {
   }
 
   async function prepareA4Handout() {
-    const selectedDocument = selectHandoutDocument(document);
+    const hydratedDocument = await hydrateLiveStarterSlots(
+      document,
+      document.retrievalItems,
+    );
+    const selectedDocument = selectHandoutDocument(hydratedDocument);
     return buildA4Handout(await embedRemoteBuilderAssets(selectedDocument));
   }
 

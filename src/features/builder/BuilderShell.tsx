@@ -9,7 +9,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   archiveClassName,
   loadBuilderDocument,
@@ -41,6 +47,10 @@ import { ImpersonationControl } from "./ImpersonationControl";
 import latexStyles from "./LatexComposer.module.css";
 import { LatexComposer } from "./LatexComposer";
 import { LessonTransferActions } from "./LessonTransferActions";
+import {
+  hydrateLiveStarterSlots,
+  hydrateStarterSlotsFromRetrievalItems,
+} from "./live-starter";
 import { NewLessonDialog } from "./NewLessonDialog";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
@@ -112,6 +122,25 @@ export function BuilderShell({
   const [themePreference, setThemePreference] =
     useState<BuilderThemePreference>(initialTheme);
   const document = useBuilderStore(selectDocument);
+  const fallbackPreviewSlides = useMemo(
+    () => hydrateStarterSlotsFromRetrievalItems(document).slides,
+    [document],
+  );
+  const [resolvedPreview, setResolvedPreview] = useState<{
+    className: string;
+    retrievalItems: typeof document.retrievalItems;
+    sourceSlides: BuilderSlide[];
+    slides: BuilderSlide[];
+  } | null>(null);
+  const previewSlides =
+    resolvedPreview?.sourceSlides === document.slides &&
+    resolvedPreview.retrievalItems === document.retrievalItems &&
+    resolvedPreview.className === document.className
+      ? resolvedPreview.slides
+      : fallbackPreviewSlides;
+  const previewSourceSlides = document.slides;
+  const previewRetrievalItems = document.retrievalItems;
+  const previewClassName = document.className;
   const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
   const hydrated = useBuilderStore((state) => state.hydrated);
   const hydrate = useBuilderStore((state) => state.hydrate);
@@ -191,6 +220,33 @@ export function BuilderShell({
     setDraggedSlideId("");
     setDragOverSlideId("");
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const previewDocument = {
+      ...useBuilderStore.getState().document,
+      className: previewClassName,
+      retrievalItems: previewRetrievalItems,
+      slides: previewSourceSlides,
+    };
+    void hydrateLiveStarterSlots(
+      previewDocument,
+      previewRetrievalItems,
+    ).then((hydratedDocument) => {
+      if (cancelled) return;
+      setResolvedPreview({
+        className: previewClassName,
+        retrievalItems: previewRetrievalItems,
+        sourceSlides: previewSourceSlides,
+        slides: hydratedDocument.slides,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewClassName, previewRetrievalItems, previewSourceSlides]);
 
   useEffect(() => {
     if (variant !== "compact-console") return;
@@ -1023,7 +1079,7 @@ export function BuilderShell({
           )}
 
           <ol id="v2-slide-list" className={styles.slideList}>
-            {document.slides.map((slide, index) => (
+            {previewSlides.map((slide, index) => (
               <li
                 key={slide.id}
                 className={`${styles.slideItem} ${
