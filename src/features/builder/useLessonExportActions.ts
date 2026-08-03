@@ -10,15 +10,45 @@ import {
 } from "./api-client";
 import {
   buildStandaloneLessonHtml,
-  embedRemoteBuilderAssets,
   normalizeImportedBuilderDocument,
   parseStandaloneLessonHtml,
 } from "./lesson-export";
-import { hydrateLiveStarterSlots } from "./live-starter";
 import {
   buildA4Handout,
   selectHandoutDocument,
 } from "./handout-export";
+import { prepareBuilderDocumentForExport } from "./prepare-export-document";
+import type { BuilderDocument, RetrievalItem } from "./schema";
+
+type CurrentOutputDependencies = {
+  prepareDocument?: (
+    document: BuilderDocument,
+    retrievalItems?: readonly RetrievalItem[],
+  ) => Promise<BuilderDocument>;
+};
+
+export function prepareCurrentOutputDocument(
+  document: BuilderDocument,
+  dependencies: CurrentOutputDependencies = {},
+) {
+  const prepareDocument =
+    dependencies.prepareDocument ?? prepareBuilderDocumentForExport;
+  return prepareDocument(document, document.retrievalItems);
+}
+
+export async function prepareCurrentA4Handout(
+  document: BuilderDocument,
+  dependencies: CurrentOutputDependencies = {},
+) {
+  const selectedDocument = selectHandoutDocument(document);
+  const prepareDocument =
+    dependencies.prepareDocument ?? prepareBuilderDocumentForExport;
+  const preparedDocument = await prepareDocument(
+    selectedDocument,
+    document.retrievalItems,
+  );
+  return buildA4Handout(preparedDocument);
+}
 
 export function useLessonExportActions() {
   const document = useBuilderStore((state) => state.document);
@@ -231,14 +261,10 @@ export function useLessonExportActions() {
     studentSession: PresenterStudentSession | null = null,
     offlineCapabilities = false,
   ) {
-    const hydratedDocument = await hydrateLiveStarterSlots(
-      document,
-      document.retrievalItems,
-    );
     const [runtimeCss, runtimeJavaScript, embeddedDocument] = await Promise.all([
       fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
       fetchAssetText("/builder-v2-assets/presenter-runtime.js"),
-      embedRemoteBuilderAssets(hydratedDocument),
+      prepareCurrentOutputDocument(document),
     ]);
     return buildStandaloneLessonHtml(embeddedDocument, {
       handout,
@@ -281,12 +307,7 @@ export function useLessonExportActions() {
   }
 
   async function prepareA4Handout() {
-    const hydratedDocument = await hydrateLiveStarterSlots(
-      document,
-      document.retrievalItems,
-    );
-    const selectedDocument = selectHandoutDocument(hydratedDocument);
-    return buildA4Handout(await embedRemoteBuilderAssets(selectedDocument));
+    return prepareCurrentA4Handout(document);
   }
 
   return {

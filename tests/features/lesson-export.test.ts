@@ -465,6 +465,155 @@ describe("standalone lesson export", () => {
     );
     fetchMock.mockRestore();
   });
+
+  it("throws for inaccessible managed slide assets in strict mode", async () => {
+    const document = lessonDocument();
+    document.slides = [
+      {
+        id: "revision",
+        type: "revision",
+        title: "Revision",
+        items: [
+          {
+            lo: "101a: Expand",
+            image: {
+              ...testImage("question.png", ""),
+              dataUrl: "https://assets.example.test/expired.png",
+              assetId: "managed-question",
+              storagePath: "global/question.png",
+            },
+            answerImage: null,
+          },
+        ],
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 403 }),
+    );
+
+    await expect(
+      embedRemoteBuilderAssets(document, {
+        managedAssetFailure: "throw",
+        traversalScope: "slides",
+      }),
+    ).rejects.toThrow("Could not embed managed lesson asset (403)");
+  });
+
+  it("strict slide-only embedding ignores unrelated stale retrieval-bank assets", async () => {
+    const document = lessonDocument();
+    const slideUrl = "https://assets.example.test/slide.png";
+    const bankUrl = "https://assets.example.test/unrelated-bank.png";
+    const starter = document.slides[0];
+    if (starter.type !== "starter") throw new Error("Expected starter");
+    const starterSlots = starter.slots as StarterSlot[];
+    starterSlots[0].image = {
+      ...starterSlots[0].image!,
+      dataUrl: slideUrl,
+      assetId: "slide-asset",
+      storagePath: "global/slide.png",
+    };
+    document.retrievalItems = [
+      {
+        id: "unrelated",
+        lo: "999z: Unrelated",
+        className: "Year 9",
+        spacingFactor: 1,
+        seenCount: 1,
+        currentImageSlot: 1,
+        selected: false,
+        images: [
+          {
+            name: "bank.png",
+            type: "image/png",
+            size: 1,
+            dataUrl: bankUrl,
+            assetId: "bank-asset",
+            storagePath: "global/bank.png",
+          },
+        ],
+        answerImages: [],
+      },
+    ];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (input) => {
+        if (String(input) === bankUrl) return new Response(null, { status: 403 });
+        return new Response(new Blob(["slide"], { type: "image/png" }), {
+          status: 200,
+        });
+      },
+    );
+
+    const embedded = await embedRemoteBuilderAssets(document, {
+      managedAssetFailure: "throw",
+      traversalScope: "slides",
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(slideUrl, { cache: "no-store" });
+    expect(embedded.retrievalItems[0].images[0]?.dataUrl).toBe(bankUrl);
+  });
+
+  it("rejects an empty managed slide source in strict mode", async () => {
+    const document = lessonDocument();
+    const starter = document.slides[0];
+    if (starter.type !== "starter") throw new Error("Expected starter");
+    const starterSlots = starter.slots as StarterSlot[];
+    starterSlots[0].image = {
+      name: "missing.png",
+      type: "image/png",
+      size: 0,
+      dataUrl: "",
+      assetId: "missing-asset",
+      storagePath: "global/missing.png",
+    };
+
+    await expect(
+      embedRemoteBuilderAssets(document, {
+        managedAssetFailure: "throw",
+        traversalScope: "slides",
+      }),
+    ).rejects.toThrow("Could not embed managed lesson asset: no renderable source");
+  });
+
+  it("does not let a permissive record sharing a URL mask a managed failure", async () => {
+    const document = lessonDocument();
+    const sharedUrl = "https://assets.example.test/shared-expired.png";
+    document.slides = [
+      {
+        id: "example",
+        type: "example",
+        title: "Example",
+        lo: "101a: Expand",
+        image1: {
+          name: "external.png",
+          type: "image/png",
+          size: 1,
+          dataUrl: sharedUrl,
+        },
+        answerImage1: {
+          name: "managed.png",
+          type: "image/png",
+          size: 1,
+          dataUrl: sharedUrl,
+          assetId: "managed-answer",
+          storagePath: "global/managed.png",
+        },
+        image2: null,
+        answerImage2: null,
+      },
+    ];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 403 }),
+    );
+
+    await expect(
+      embedRemoteBuilderAssets(document, {
+        managedAssetFailure: "throw",
+        traversalScope: "slides",
+      }),
+    ).rejects.toThrow("Could not embed managed lesson asset (403)");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });
 
 function lessonDocument(): BuilderDocument {

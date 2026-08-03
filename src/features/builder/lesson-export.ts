@@ -160,38 +160,75 @@ export function normalizeImportedBuilderDocument(
   });
 }
 
+export type EmbedRemoteBuilderAssetsOptions = {
+  managedAssetFailure?: "preserve" | "throw";
+  traversalScope?: "document" | "slides";
+};
+
+type EmbeddedAssetResult =
+  | { ok: true; dataUrl: string }
+  | { ok: false; status?: number };
+
 export async function embedRemoteBuilderAssets(
   document: BuilderDocument,
+  options: EmbedRemoteBuilderAssetsOptions = {},
 ): Promise<BuilderDocument> {
   const embedded = structuredCloneSafe(document);
-  const records = collectRecords(embedded);
-  const dataUrlCache = new Map<string, Promise<string>>();
+  const records = collectRecords(
+    options.traversalScope === "slides" ? embedded.slides : embedded,
+  );
+  const dataUrlCache = new Map<string, Promise<EmbeddedAssetResult>>();
 
   await Promise.all(
     records.map(async (record) => {
       const source = String(record.dataUrl || record.url || record.path || "");
+      const managed = Boolean(
+        String(record.assetId || "").trim() ||
+          String(record.storagePath || "").trim(),
+      );
+      if (!isRenderableAssetSource(source)) {
+        if (managed && options.managedAssetFailure === "throw") {
+          throw new Error(
+            "Could not embed managed lesson asset: no renderable source.",
+          );
+        }
+        return;
+      }
       if (!/^https?:\/\//i.test(source)) return;
       let pending = dataUrlCache.get(source);
       if (!pending) {
-        pending = fetch(source, { cache: "no-store" }).then(async (response) => {
-          const status = Number(response.status || 0);
-          if (!response.ok && !(status >= 200 && status < 300)) {
-            throw new Error(
-              `Could not embed a lesson asset (${response.status}).`,
-            );
-          }
-          const downloaded = await response.blob();
-          const contentType =
-            downloaded.type ||
-            String(record.type || "application/octet-stream");
-          const blob = downloaded.type
-            ? downloaded
-            : new Blob([downloaded], { type: contentType });
-          return blobToDataUrl(blob);
-        }).catch(() => source);
+        pending = fetch(source, { cache: "no-store" })
+          .then(async (response): Promise<EmbeddedAssetResult> => {
+            const status = Number(response.status || 0);
+            if (!response.ok && !(status >= 200 && status < 300)) {
+              return { ok: false, status: response.status };
+            }
+            const downloaded = await response.blob();
+            if (!downloaded.size) return { ok: false, status };
+            const contentType =
+              downloaded.type ||
+              String(record.type || "application/octet-stream");
+            const blob = downloaded.type
+              ? downloaded
+              : new Blob([downloaded], { type: contentType });
+            const dataUrl = await blobToDataUrl(blob);
+            return dataUrl && !dataUrl.endsWith(",")
+              ? { ok: true, dataUrl }
+              : { ok: false, status };
+          })
+          .catch((): EmbeddedAssetResult => ({ ok: false }));
         dataUrlCache.set(source, pending);
       }
-      record.dataUrl = await pending;
+      const result = await pending;
+      if (result.ok) {
+        record.dataUrl = result.dataUrl;
+        return;
+      }
+      if (managed && options.managedAssetFailure === "throw") {
+        const suffix = result.status ? ` (${result.status})` : "";
+        throw new Error(`Could not embed managed lesson asset${suffix}.`);
+      }
+      record.dataUrl = source;
     }),
   );
   return embedded;
@@ -1810,6 +1847,13 @@ function collectRecords(value: unknown): Record<string, unknown>[] {
   if (!value || typeof value !== "object") return [];
   const record = value as Record<string, unknown>;
   return [record, ...Object.values(record).flatMap(collectRecords)];
+}
+
+function isRenderableAssetSource(source: string) {
+  if (/^https?:\/\//i.test(source) || /^blob:/i.test(source)) return true;
+  if (!/^data:/i.test(source)) return false;
+  const comma = source.indexOf(",");
+  return comma >= 0 && source.slice(comma + 1).trim().length > 0;
 }
 
 function blobToDataUrl(blob: Blob) {
