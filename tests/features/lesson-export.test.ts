@@ -354,13 +354,17 @@ describe("standalone lesson export", () => {
           title: "Imported lesson",
           className: "Year 10",
           teachingDate: "2026-07-19",
-          slides: [],
+          slides: [
+            { id: "imported-slide", type: "blank", title: "Imported" },
+          ],
+          handoutSlideIds: ["imported-slide"],
         },
       },
       current,
     );
 
     expect(imported.title).toBe("Imported lesson");
+    expect(imported.handoutSlideIds).toEqual(["imported-slide"]);
     expect(imported.retrievalItems).toEqual(current.retrievalItems);
     expect(imported.classNames).toEqual(
       expect.arrayContaining(["Year 9", "Year 10"]),

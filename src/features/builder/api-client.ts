@@ -301,6 +301,7 @@ export async function saveCurrentLesson(
     teachingDate: document.teachingDate,
     overallLessonLo: document.overallLessonLo.trim(),
     slides: document.slides,
+    handoutSlideIds: document.handoutSlideIds,
     savedAt: new Date().toISOString(),
   };
   const blob = new Blob([JSON.stringify(savedDocument)], {

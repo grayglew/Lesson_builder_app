@@ -22,9 +22,6 @@ import {
 
 export function useLessonExportActions() {
   const document = useBuilderStore((state) => state.document);
-  const selectedPreviewSlideIds = useBuilderStore(
-    (state) => state.selectedPreviewSlideIds,
-  );
   const hydrate = useBuilderStore((state) => state.hydrate);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const setStatus = useBuilderStore((state) => state.setStatus);
@@ -193,6 +190,7 @@ export function useLessonExportActions() {
             teachingDate: imported.teachingDate,
             overallLessonLo: imported.overallLessonLo,
             slides: imported.slides,
+            handoutSlideIds: imported.handoutSlideIds,
             updatedAt: imported.updatedAt,
           },
         },
@@ -283,10 +281,7 @@ export function useLessonExportActions() {
   }
 
   async function prepareA4Handout() {
-    const selectedDocument = selectHandoutDocument(
-      document,
-      selectedPreviewSlideIds,
-    );
+    const selectedDocument = selectHandoutDocument(document);
     return buildA4Handout(await embedRemoteBuilderAssets(selectedDocument));
   }
 

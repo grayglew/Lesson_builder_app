@@ -281,7 +281,9 @@ describe("BuilderShell legacy UI parity", () => {
     render(<BuilderShell userEmail="teacher@example.com" />);
 
     await user.click(
-      screen.getAllByRole("button", { name: "Select slide 1 for handout" })[0],
+      screen.getByRole("button", {
+        name: "Select slide 1 as active from preview",
+      }),
     );
     await user.click(screen.getByRole("button", { name: "Placeholder" }));
     await user.click(screen.getByRole("button", { name: "Add placeholder slide" }));
@@ -376,7 +378,7 @@ describe("BuilderShell legacy UI parity", () => {
     expect(screen.getByLabelText("Class")).toHaveValue("");
   });
 
-  it("allows several preview slides to be selected independently for a handout", async () => {
+  it("keeps persistent handout selection independent from the active slide", async () => {
     const user = userEvent.setup();
     const document = createInitialBuilderDocument(
       "2026-07-18T06:00:00.000Z",
@@ -396,21 +398,18 @@ describe("BuilderShell legacy UI parity", () => {
 
     render(<BuilderShell userEmail="teacher@example.com" />);
 
-    await user.click(
-      screen.getAllByRole("button", {
-        name: "Select slide 1 for handout",
-      })[0],
-    );
-    await user.click(
-      screen.getAllByRole("button", {
-        name: "Select slide 2 for handout",
-      })[0],
-    );
+    await user.click(screen.getByRole("checkbox", {
+      name: "Include slide 1 in handout",
+    }));
+    await user.click(screen.getByRole("checkbox", {
+      name: "Include slide 2 in handout",
+    }));
 
-    expect(useBuilderStore.getState().selectedPreviewSlideIds).toEqual([
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
       "starter",
       "example",
     ]);
+    expect(useBuilderStore.getState().selectedSlideId).toBeNull();
     expect(
       screen.getByRole("button", {
         name: "Open handout from 2 selected slides",
@@ -423,14 +422,22 @@ describe("BuilderShell legacy UI parity", () => {
       screen.getByRole("button", { name: "Move slide 2 up" }),
     ).toBeInTheDocument();
 
-    await user.click(
-      screen.getAllByRole("button", {
-        name: "Deselect slide 1 for handout",
-      })[0],
-    );
-    expect(useBuilderStore.getState().selectedPreviewSlideIds).toEqual([
+    await user.click(screen.getByRole("button", {
+      name: "Select slide 3 as active from preview",
+    }));
+    expect(useBuilderStore.getState().selectedSlideId).toBe("blank");
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "starter",
       "example",
     ]);
+
+    await user.click(screen.getByRole("checkbox", {
+      name: "Include slide 1 in handout",
+    }));
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "example",
+    ]);
+    expect(useBuilderStore.getState().selectedSlideId).toBe("blank");
   });
 });
 
@@ -599,7 +606,9 @@ describe("BuilderShell Compact Console action parity", () => {
     vi.mocked(loadBuilderDocument).mockResolvedValue(document);
 
     render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
-    await user.click(screen.getAllByRole("button", { name: "Select slide 1 for handout" })[0]);
+    await user.click(screen.getByRole("button", {
+      name: "Select slide 1 as active from preview",
+    }));
     await user.click(screen.getByRole("button", { name: "Placeholder" }));
     expect(screen.getByRole("region", { name: "Placeholder" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add placeholder slide" }));
@@ -629,9 +638,9 @@ describe("BuilderShell Compact Console action parity", () => {
     const thirdHandle = screen.getByRole("button", {
       name: "Drag slide 3 to reorder",
     });
-    const firstSelector = screen.getAllByRole("button", {
-      name: "Select slide 1 for handout",
-    })[0];
+    const firstSelector = screen.getByRole("checkbox", {
+      name: "Include slide 1 in handout",
+    });
     expect(
       firstHandle.compareDocumentPosition(firstSelector) &
         Node.DOCUMENT_POSITION_FOLLOWING,

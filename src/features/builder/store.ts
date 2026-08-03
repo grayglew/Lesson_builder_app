@@ -40,7 +40,6 @@ export type BuilderStatus = {
 export type BuilderStore = {
   document: BuilderDocument;
   selectedSlideId: string | null;
-  selectedPreviewSlideIds: string[];
   hydrated: boolean;
   status: BuilderStatus;
   hydrate: (document: unknown) => void;
@@ -52,7 +51,7 @@ export type BuilderStore = {
   reset: () => void;
   updateMetadata: (patch: MetadataPatch) => void;
   selectSlide: (slideId: string | null) => void;
-  togglePreviewSlideSelection: (slideId: string) => void;
+  toggleHandoutSlide: (slideId: string) => void;
   addBlankSlide: () => void;
   addPlaceholderSlide: (text?: string) => void;
   addStarterSlide: (slots: StarterSlot[]) => void;
@@ -74,7 +73,6 @@ export const useBuilderStore = create<BuilderStore>()(
   immer((set) => ({
     document: createInitialBuilderDocument(),
     selectedSlideId: null,
-    selectedPreviewSlideIds: [],
     hydrated: false,
     status: idleStatus,
 
@@ -82,7 +80,6 @@ export const useBuilderStore = create<BuilderStore>()(
       set((state) => {
         state.document = normalizeBuilderDocument(input);
         state.selectedSlideId = null;
-        state.selectedPreviewSlideIds = [];
         state.hydrated = true;
         state.status = idleStatus;
       }),
@@ -107,7 +104,6 @@ export const useBuilderStore = create<BuilderStore>()(
           updatedAt: new Date().toISOString(),
         };
         state.selectedSlideId = null;
-        state.selectedPreviewSlideIds = [];
         state.status = {
           tone: "success",
           message: `Opened "${state.document.title}" from the lesson library.`,
@@ -175,7 +171,6 @@ export const useBuilderStore = create<BuilderStore>()(
       set((state) => {
         state.document = createInitialBuilderDocument();
         state.selectedSlideId = null;
-        state.selectedPreviewSlideIds = [];
         state.hydrated = true;
         state.status = {
           tone: "success",
@@ -194,15 +189,16 @@ export const useBuilderStore = create<BuilderStore>()(
         state.selectedSlideId = slideId;
       }),
 
-    togglePreviewSlideSelection: (slideId) =>
+    toggleHandoutSlide: (slideId) =>
       set((state) => {
-        const index = state.selectedPreviewSlideIds.indexOf(slideId);
-        if (index >= 0) {
-          state.selectedPreviewSlideIds.splice(index, 1);
-        } else if (state.document.slides.some((slide) => slide.id === slideId)) {
-          state.selectedPreviewSlideIds.push(slideId);
-        }
-        state.selectedSlideId = slideId;
+        if (!state.document.slides.some((slide) => slide.id === slideId)) return;
+        const selectedIds = new Set(state.document.handoutSlideIds);
+        if (selectedIds.has(slideId)) selectedIds.delete(slideId);
+        else selectedIds.add(slideId);
+        state.document.handoutSlideIds = state.document.slides
+          .filter((slide) => selectedIds.has(slide.id))
+          .map((slide) => slide.id);
+        touchDocument(state.document);
       }),
 
     addBlankSlide: () =>
@@ -292,6 +288,10 @@ export const useBuilderStore = create<BuilderStore>()(
         }
         const [slide] = state.document.slides.splice(currentIndex, 1);
         state.document.slides.splice(nextIndex, 0, slide);
+        const selectedIds = new Set(state.document.handoutSlideIds);
+        state.document.handoutSlideIds = state.document.slides
+          .filter((entry) => selectedIds.has(entry.id))
+          .map((entry) => entry.id);
         touchDocument(state.document);
       }),
 
@@ -300,7 +300,7 @@ export const useBuilderStore = create<BuilderStore>()(
         const index = state.document.slides.findIndex((slide) => slide.id === slideId);
         if (index < 0) return;
         state.document.slides.splice(index, 1);
-        state.selectedPreviewSlideIds = state.selectedPreviewSlideIds.filter(
+        state.document.handoutSlideIds = state.document.handoutSlideIds.filter(
           (id) => id !== slideId,
         );
         state.selectedSlideId =
@@ -351,7 +351,13 @@ function touchDocument(document: BuilderDocument) {
 }
 
 function clonePlain<T>(value: T): T {
-  if (typeof structuredClone === "function") return structuredClone(value);
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch {
+      // Immer draft proxies are JSON-safe but cannot be passed to structuredClone.
+    }
+  }
   return JSON.parse(JSON.stringify(value)) as T;
 }
 

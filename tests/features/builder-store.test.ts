@@ -115,6 +115,54 @@ describe("builder store slide insertion", () => {
       "Placeholder",
     ]);
   });
+
+  it("persists handout inclusion without changing the active slide", () => {
+    useBuilderStore.getState().selectSlide("slide_after");
+
+    vi.setSystemTime(new Date(INSERT_TIME));
+    useBuilderStore.getState().toggleHandoutSlide("slide_before");
+
+    const state = useBuilderStore.getState();
+    expect(state.selectedSlideId).toBe("slide_after");
+    expect(state.document.handoutSlideIds).toEqual(["slide_before"]);
+    expect(state.document.updatedAt).toBe(INSERT_TIME);
+    expect(state.document.lessonUpdatedAt).toBe(INSERT_TIME);
+  });
+
+  it("keeps handout IDs in deck order and removes them when slides are deleted", () => {
+    useBuilderStore.getState().toggleHandoutSlide("slide_after");
+    useBuilderStore.getState().toggleHandoutSlide("slide_before");
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "slide_before",
+      "slide_after",
+    ]);
+
+    useBuilderStore.getState().moveSlide("slide_after", -1);
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "slide_after",
+      "slide_before",
+    ]);
+
+    useBuilderStore.getState().removeSlide("slide_before");
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "slide_after",
+    ]);
+  });
+
+  it("leaves newly inserted and duplicated slides out of the handout", () => {
+    useBuilderStore.getState().toggleHandoutSlide("slide_before");
+    useBuilderStore.getState().duplicateSlide("slide_before");
+    const duplicateId = useBuilderStore.getState().selectedSlideId;
+    useBuilderStore.getState().addPlaceholderSlide("New content");
+
+    expect(duplicateId).toBeTruthy();
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "slide_before",
+    ]);
+    expect(useBuilderStore.getState().document.handoutSlideIds).not.toContain(
+      duplicateId,
+    );
+  });
 });
 
 function baseDocument(): BuilderDocument {

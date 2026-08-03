@@ -237,6 +237,7 @@ export const builderDocumentSchema = z
     lessonUpdatedAt: timestampSchema,
     classNames: z.array(z.string()),
     slides: z.array(builderSlideSchema),
+    handoutSlideIds: z.array(z.string()).default([]),
     retrievalItems: z.array(retrievalItemSchema),
     slideTemplates: z.array(slideTemplateSchema),
     updatedAt: timestampSchema,
@@ -255,6 +256,7 @@ export const workspaceDocumentSchema = z
     activeLessonSavedAt: timestampSchema.default(""),
     lessonUpdatedAt: timestampSchema,
     slides: z.array(builderSlideSchema),
+    handoutSlideIds: z.array(z.string()).default([]),
     updatedAt: timestampSchema,
   })
   .passthrough();
@@ -294,6 +296,7 @@ export function createInitialBuilderDocument(now = new Date().toISOString()): Bu
     lessonUpdatedAt: now,
     classNames: [...DEFAULT_CLASS_NAMES],
     slides: [],
+    handoutSlideIds: [],
     retrievalItems: [],
     slideTemplates: [],
     updatedAt: now,
@@ -316,6 +319,11 @@ export function normalizeBuilderDocument(input: unknown): BuilderDocument {
     ...retrievalItems.map((item) => item.className),
     ...(hasExplicitClassNames ? [] : DEFAULT_CLASS_NAMES),
   ]);
+  const slides = parseSlides(source.slides);
+  const requestedHandoutIds = new Set(asStringArray(source.handoutSlideIds));
+  const handoutSlideIds = slides
+    .filter((slide) => requestedHandoutIds.has(slide.id))
+    .map((slide) => slide.id);
 
   return builderDocumentSchema.parse({
     ...source,
@@ -334,7 +342,8 @@ export function normalizeBuilderDocument(input: unknown): BuilderDocument {
       asString(source.updatedAt) ||
       now,
     classNames,
-    slides: parseSlides(source.slides),
+    slides,
+    handoutSlideIds,
     retrievalItems,
     slideTemplates: parseArray(
       slideTemplateSchema,
@@ -399,6 +408,7 @@ export function toWorkspaceDocument(document: BuilderDocument): WorkspaceDocumen
     activeLessonSavedAt: document.activeLessonSavedAt,
     lessonUpdatedAt: document.lessonUpdatedAt || document.updatedAt,
     slides: structuredCloneSafe(document.slides),
+    handoutSlideIds: [...document.handoutSlideIds],
     updatedAt: document.updatedAt,
   });
 }

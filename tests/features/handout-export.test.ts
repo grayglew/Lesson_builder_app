@@ -30,7 +30,7 @@ describe("production A4 handout export", () => {
     );
   });
 
-  it("keeps only the independently selected preview slides in deck order", () => {
+  it("keeps only the persisted handout slides in deck order", () => {
     const document = handoutDocument();
     document.slides.push({
       id: "blank",
@@ -38,7 +38,8 @@ describe("production A4 handout export", () => {
       title: "Blank",
     });
 
-    const selected = selectHandoutDocument(document, ["blank", "starter"]);
+    document.handoutSlideIds = ["blank", "starter"];
+    const selected = selectHandoutDocument(document);
 
     expect(selected.slides.map((slide) => slide.id)).toEqual([
       "starter",

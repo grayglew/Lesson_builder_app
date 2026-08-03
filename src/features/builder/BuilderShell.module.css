@@ -1066,26 +1066,26 @@
   box-shadow: 0 10px 22px rgba(18, 31, 36, 0.08);
 }
 
-.slideItemSelected {
+.slideItemHandout {
   border-color: var(--builder-accent);
   box-shadow:
-    0 0 0 3px rgba(15, 118, 110, 0.18),
+    0 0 0 2px color-mix(in srgb, var(--builder-accent) 18%, transparent),
     0 12px 26px rgba(18, 31, 36, 0.12);
 }
 
-.slideItemActive:not(.slideItemSelected) {
+.slideItemActive:not(.slideItemHandout) {
   border-color: var(--builder-line-strong);
 }
 
-.slideItemSelected .slideToolbar {
+.slideItemHandout .slideToolbar {
   background: var(--builder-accent-soft);
   color: var(--builder-accent-dark);
 }
 
 .slideToolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--builder-line);
@@ -1094,10 +1094,30 @@
   font-size: 12px;
 }
 
-.slideSelectButton {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.handoutSlideToggle {
+  display: grid;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  place-items: center;
+  cursor: pointer;
+}
+
+.handoutSlideCheckbox {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--builder-accent);
+  cursor: pointer;
+}
+
+.handoutSlideCheckbox:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--builder-accent) 38%, transparent);
+  outline-offset: 3px;
+}
+
+.slideTitleButton {
+  display: block;
   min-width: 0;
   overflow: hidden;
   border: 0;
@@ -1108,27 +1128,6 @@
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.slideSelectionMark {
-  display: inline-grid;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  place-items: center;
-  border: 1px solid var(--builder-line-strong);
-  border-radius: 4px;
-  background: var(--builder-surface);
-  color: var(--builder-accent-dark);
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.slideItemSelected .slideSelectionMark {
-  border-color: var(--builder-accent);
-  background: var(--builder-accent);
-  color: #fff;
 }
 
 .slideActions {
@@ -2617,8 +2616,13 @@
   border-left: 4px solid var(--builder-accent);
 }
 
-.compactConsole .slideItemSelected {
+.compactConsole .slideItemHandout {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--builder-accent) 22%, transparent);
+}
+
+.compactConsole .slideItemHandout .slideToolbar {
+  background: var(--builder-accent-soft);
+  color: var(--builder-accent-dark);
 }
 
 .compactConsole .slideItemDragging {
@@ -2640,14 +2644,18 @@
 }
 
 .compactConsole .slideToolbar {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   min-height: 2.75rem;
   padding: 0.45rem 0.5rem;
   background: var(--builder-surface-alt);
 }
 
-.compactConsole .slideSelectButton {
-  flex: 1 1 auto;
+.compactConsole .slideTitleButton {
   min-height: 2.25rem;
+}
+
+.compactConsole .handoutSlideCheckbox {
+  min-height: 18px;
 }
 
 .compactConsole .miniButton {

@@ -42,9 +42,8 @@ type RetrievalQuestion = {
 
 export function selectHandoutDocument(
   document: BuilderDocument,
-  selectedSlideIds: readonly string[],
 ): BuilderDocument {
-  const selectedIds = new Set(selectedSlideIds);
+  const selectedIds = new Set(document.handoutSlideIds);
   return {
     ...document,
     slides: document.slides.filter((slide) => selectedIds.has(slide.id)),
