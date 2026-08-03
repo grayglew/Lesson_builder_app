@@ -263,10 +263,13 @@ describe("live retrieval asset hydration", () => {
     expect(items[1]?.image?.dataUrl).toContain("second-fresh-question");
   });
 
-  it("uses request keys to distinguish partial revision results for the same retrieval item", async () => {
+  it("uses request keys when a partial revision result has no other unique identity", async () => {
     const document = createInitialBuilderDocument();
     document.className = "Year 7";
-    const firstExisting = embeddedAsset("first-shared-existing");
+    const firstExistingQuestion = embeddedAsset("first-shared-question");
+    const firstExistingAnswer = embeddedAsset("first-shared-answer");
+    const secondExistingQuestion = embeddedAsset("second-shared-question");
+    const secondExistingAnswer = embeddedAsset("second-shared-answer");
     document.slides = [
       {
         id: "revision-1",
@@ -277,25 +280,50 @@ describe("live retrieval asset hydration", () => {
             lo: "101a: Expand",
             seenCount: 1,
             retrievalItemId: "shared-item",
-            image: firstExisting,
+            contentId: "content-1",
+            currentImageSlot: 1,
+            image: firstExistingQuestion,
+            answerImage: firstExistingAnswer,
           },
           {
             lo: "101a: Expand",
-            seenCount: 2,
+            seenCount: 1,
             retrievalItemId: "shared-item",
+            contentId: "content-1",
+            currentImageSlot: 1,
+            image: secondExistingQuestion,
+            answerImage: secondExistingAnswer,
           },
         ],
       },
     ];
     const shared = retrievalItem("shared-item", "101a: Expand", 1);
+    shared.contentId = "content-1";
     const resolver = vi.fn(async (items: RetrievalItem[]) => {
-      expect(items.map((item) => item.seenCount)).toEqual([1, 2]);
+      expect(items).toEqual([
+        expect.objectContaining({
+          id: "shared-item",
+          contentId: "content-1",
+          lo: "101a: Expand",
+          className: "Year 7",
+          seenCount: 1,
+          currentImageSlot: 1,
+        }),
+        expect.objectContaining({
+          id: "shared-item",
+          contentId: "content-1",
+          lo: "101a: Expand",
+          className: "Year 7",
+          seenCount: 1,
+          currentImageSlot: 1,
+        }),
+      ]);
       return [
         {
           requestKey: "request-1",
           itemId: "shared-item",
           contentId: "content-1",
-          currentImageSlot: 2,
+          currentImageSlot: 1,
           questionImage: embeddedAsset("second-shared-fresh-question"),
           answerImage: embeddedAsset("second-shared-fresh-answer"),
         },
@@ -305,7 +333,8 @@ describe("live retrieval asset hydration", () => {
     const hydrated = await hydrateLiveRetrievalAssets(document, [shared], resolver);
 
     const items = revisionItems(hydrated.slides[0]);
-    expect(items[0]?.image).toEqual(firstExisting);
+    expect(items[0]?.image).toEqual(firstExistingQuestion);
+    expect(items[0]?.answerImage).toEqual(firstExistingAnswer);
     expect(items[1]?.image?.dataUrl).toContain("second-shared-fresh-question");
     expect(items[1]?.answerImage?.dataUrl).toContain("second-shared-fresh-answer");
   });
