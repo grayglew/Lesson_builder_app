@@ -43,6 +43,7 @@ describe("live retrieval asset hydration", () => {
         },
       ];
     });
+    const sourceDocument = structuredClone(document);
 
     const hydrated = await hydrateLiveRetrievalAssets(
       document,
@@ -61,6 +62,7 @@ describe("live retrieval asset hydration", () => {
     expect(revisionItems(document.slides[0])[0]?.answerImage?.dataUrl).toContain(
       "expired-answer",
     );
+    expect(document).toEqual(sourceDocument);
   });
 
   it("recovers a legacy revision link from a unique class-scoped asset identity", async () => {
@@ -149,7 +151,13 @@ describe("live retrieval asset hydration", () => {
     );
 
     expect(resolver).not.toHaveBeenCalled();
-    expect(revisionItems(hydrated.slides[0])[0]?.image).toEqual(sharedImage);
+    expect(revisionItems(hydrated.slides[0])[0]).toMatchObject({
+      lo: "",
+      seenCount: 1,
+      image: sharedImage,
+    });
+    expect(revisionItems(hydrated.slides[0])[0]?.retrievalItemId).toBeUndefined();
+    expect(revisionItems(hydrated.slides[0])[0]?.currentImageSlot).toBeUndefined();
   });
 
   it("hydrates starter and revision assets in their respective live modes", async () => {
@@ -195,8 +203,14 @@ describe("live retrieval asset hydration", () => {
     expect(starterSlots(hydrated.slides[0])[0]?.image?.dataUrl).toContain(
       "current-starter-item-question",
     );
+    expect(starterSlots(hydrated.slides[0])[0]?.answerImage?.dataUrl).toContain(
+      "current-starter-item-answer",
+    );
     expect(revisionItems(hydrated.slides[1])[0]?.image?.dataUrl).toContain(
       "seen-revision-item-question",
+    );
+    expect(revisionItems(hydrated.slides[1])[0]?.answerImage?.dataUrl).toContain(
+      "seen-revision-item-answer",
     );
   });
 
@@ -247,6 +261,53 @@ describe("live retrieval asset hydration", () => {
     const items = revisionItems(hydrated.slides[0]);
     expect(items[0]?.image).toEqual(firstExisting);
     expect(items[1]?.image?.dataUrl).toContain("second-fresh-question");
+  });
+
+  it("uses request keys to distinguish partial revision results for the same retrieval item", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "Year 7";
+    const firstExisting = embeddedAsset("first-shared-existing");
+    document.slides = [
+      {
+        id: "revision-1",
+        type: "revision",
+        title: "Revision",
+        items: [
+          {
+            lo: "101a: Expand",
+            seenCount: 1,
+            retrievalItemId: "shared-item",
+            image: firstExisting,
+          },
+          {
+            lo: "101a: Expand",
+            seenCount: 2,
+            retrievalItemId: "shared-item",
+          },
+        ],
+      },
+    ];
+    const shared = retrievalItem("shared-item", "101a: Expand", 1);
+    const resolver = vi.fn(async (items: RetrievalItem[]) => {
+      expect(items.map((item) => item.seenCount)).toEqual([1, 2]);
+      return [
+        {
+          requestKey: "request-1",
+          itemId: "shared-item",
+          contentId: "content-1",
+          currentImageSlot: 2,
+          questionImage: embeddedAsset("second-shared-fresh-question"),
+          answerImage: embeddedAsset("second-shared-fresh-answer"),
+        },
+      ];
+    });
+
+    const hydrated = await hydrateLiveRetrievalAssets(document, [shared], resolver);
+
+    const items = revisionItems(hydrated.slides[0]);
+    expect(items[0]?.image).toEqual(firstExisting);
+    expect(items[1]?.image?.dataUrl).toContain("second-shared-fresh-question");
+    expect(items[1]?.answerImage?.dataUrl).toContain("second-shared-fresh-answer");
   });
 });
 
