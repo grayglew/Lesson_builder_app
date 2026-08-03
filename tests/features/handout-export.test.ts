@@ -10,6 +10,7 @@ import {
   type BuilderDocument,
   type BuilderSlide,
 } from "@/features/builder/schema";
+import { prepareBuilderDocumentForExport } from "@/features/builder/prepare-export-document";
 
 describe("production A4 handout export", () => {
   it("enforces the legacy core handout content contract", () => {
@@ -30,7 +31,7 @@ describe("production A4 handout export", () => {
     );
   });
 
-  it("keeps only the independently selected preview slides in deck order", () => {
+  it("keeps only the persisted handout slides in deck order", () => {
     const document = handoutDocument();
     document.slides.push({
       id: "blank",
@@ -38,7 +39,8 @@ describe("production A4 handout export", () => {
       title: "Blank",
     });
 
-    const selected = selectHandoutDocument(document, ["blank", "starter"]);
+    document.handoutSlideIds = ["blank", "starter"];
+    const selected = selectHandoutDocument(document);
 
     expect(selected.slides.map((slide) => slide.id)).toEqual([
       "starter",
@@ -198,6 +200,103 @@ describe("production A4 handout export", () => {
       'Skipped non-PDF worksheet "questions.docx".',
     ]);
   });
+
+  it("selects before preparing and embeds fresh revision images", async () => {
+    const document = handoutDocument();
+    const revision: BuilderSlide = {
+      id: "revision",
+      type: "revision",
+      title: "Revision",
+      items: [
+        {
+          lo: "101a: Expand",
+          seenCount: 2,
+          retrievalItemId: "item-1",
+          image: managedRemote("https://expired.test/question.png", "question"),
+          answerImage: managedRemote("https://expired.test/answer.png", "answer"),
+        },
+      ],
+    };
+    document.slides.push(revision, {
+      id: "excluded",
+      type: "drawing",
+      title: "Excluded",
+      image: managedRemote("https://expired.test/excluded.png", "excluded"),
+      width: 10,
+      height: 10,
+    });
+    document.handoutSlideIds = ["starter", "example", "revision"];
+    const selected = selectHandoutDocument(document);
+    const hydrate = vi.fn(async (value: BuilderDocument) => {
+      const hydrated = structuredClone(value);
+      const hydratedRevision = hydrated.slides.find(
+        (slide) => slide.id === "revision",
+      );
+      if (hydratedRevision?.type !== "revision") {
+        throw new Error("Expected revision");
+      }
+      const items = hydratedRevision.items as Array<{
+        image: BuilderAsset | null;
+        answerImage: BuilderAsset | null;
+      }>;
+      items[0].image!.dataUrl =
+        "https://fresh.test/question.png";
+      items[0].answerImage!.dataUrl =
+        "https://fresh.test/answer.png";
+      return hydrated;
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (input) =>
+        new Response(
+          String(input).includes("answer") ? "answer" : "question",
+          { status: 200, headers: { "Content-Type": "image/png" } },
+        ),
+    );
+
+    const prepared = await prepareBuilderDocumentForExport(
+      selected,
+      document.retrievalItems,
+      { hydrate },
+    );
+    const result = await buildA4Handout(prepared);
+
+    expect(hydrate).toHaveBeenCalledOnce();
+    expect(hydrate.mock.calls[0]?.[0].slides.map((slide) => slide.id)).toEqual([
+      "starter",
+      "example",
+      "revision",
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.html).toContain('class="handout-image"');
+    expect(result.html).toContain("data:image/png;base64,cXVlc3Rpb24=");
+    expect(result.html).not.toContain("expired.test");
+  });
+
+  it("rejects a managed revision 403 instead of building a blank handout", async () => {
+    const document = handoutDocument();
+    document.slides.push({
+      id: "revision",
+      type: "revision",
+      title: "Revision",
+      items: [
+        {
+          lo: "101a: Expand",
+          image: managedRemote("https://expired.test/question.png", "question"),
+          answerImage: null,
+        },
+      ],
+    });
+    document.handoutSlideIds = ["starter", "example", "revision"];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 403 }),
+    );
+
+    await expect(
+      prepareBuilderDocumentForExport(selectHandoutDocument(document), [], {
+        hydrate: async (value) => structuredClone(value),
+      }),
+    ).rejects.toThrow("Could not embed managed lesson asset (403)");
+  });
 });
 
 function handoutDocument(): BuilderDocument {
@@ -263,5 +362,16 @@ function asset(
     type,
     size: 5,
     dataUrl: `data:${type};base64,${base64}`,
+  };
+}
+
+function managedRemote(url: string, name: string): BuilderAsset {
+  return {
+    name: `${name}.png`,
+    type: "image/png",
+    size: 1,
+    dataUrl: url,
+    assetId: `${name}-asset`,
+    storagePath: `global/${name}.png`,
   };
 }

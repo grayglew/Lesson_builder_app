@@ -15,6 +15,7 @@ import {
   loadBuilderDocument,
   loadBuilderGlobalState,
   renameClassName,
+  resolveRetrievalImages,
   saveCurrentLesson,
 } from "@/features/builder/api-client";
 import {
@@ -43,6 +44,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
     }),
     renameClassName: vi.fn(),
     archiveClassName: vi.fn(),
+    resolveRetrievalImages: vi.fn(),
     saveCurrentLesson: vi.fn(),
     syncBuilderDocument: vi.fn().mockResolvedValue(undefined),
   };
@@ -62,6 +64,7 @@ describe("BuilderShell legacy UI parity", () => {
     vi.mocked(loadV2CachedDocument).mockResolvedValue(null);
     vi.mocked(saveV2CachedDocument).mockResolvedValue(undefined);
     vi.mocked(saveCurrentLesson).mockReset();
+    vi.mocked(resolveRetrievalImages).mockReset();
     useBuilderStore
       .getState()
       .hydrate(createInitialBuilderDocument("2026-07-18T06:00:00.000Z"));
@@ -281,7 +284,9 @@ describe("BuilderShell legacy UI parity", () => {
     render(<BuilderShell userEmail="teacher@example.com" />);
 
     await user.click(
-      screen.getAllByRole("button", { name: "Select slide 1 for handout" })[0],
+      screen.getByRole("button", {
+        name: "Select slide 1 as active from preview",
+      }),
     );
     await user.click(screen.getByRole("button", { name: "Placeholder" }));
     await user.click(screen.getByRole("button", { name: "Add placeholder slide" }));
@@ -376,7 +381,7 @@ describe("BuilderShell legacy UI parity", () => {
     expect(screen.getByLabelText("Class")).toHaveValue("");
   });
 
-  it("allows several preview slides to be selected independently for a handout", async () => {
+  it("keeps persistent handout selection independent from the active slide", async () => {
     const user = userEvent.setup();
     const document = createInitialBuilderDocument(
       "2026-07-18T06:00:00.000Z",
@@ -396,21 +401,18 @@ describe("BuilderShell legacy UI parity", () => {
 
     render(<BuilderShell userEmail="teacher@example.com" />);
 
-    await user.click(
-      screen.getAllByRole("button", {
-        name: "Select slide 1 for handout",
-      })[0],
-    );
-    await user.click(
-      screen.getAllByRole("button", {
-        name: "Select slide 2 for handout",
-      })[0],
-    );
+    await user.click(screen.getByRole("checkbox", {
+      name: "Include slide 1 in handout",
+    }));
+    await user.click(screen.getByRole("checkbox", {
+      name: "Include slide 2 in handout",
+    }));
 
-    expect(useBuilderStore.getState().selectedPreviewSlideIds).toEqual([
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
       "starter",
       "example",
     ]);
+    expect(useBuilderStore.getState().selectedSlideId).toBeNull();
     expect(
       screen.getByRole("button", {
         name: "Open handout from 2 selected slides",
@@ -423,14 +425,22 @@ describe("BuilderShell legacy UI parity", () => {
       screen.getByRole("button", { name: "Move slide 2 up" }),
     ).toBeInTheDocument();
 
-    await user.click(
-      screen.getAllByRole("button", {
-        name: "Deselect slide 1 for handout",
-      })[0],
-    );
-    expect(useBuilderStore.getState().selectedPreviewSlideIds).toEqual([
+    await user.click(screen.getByRole("button", {
+      name: "Select slide 3 as active from preview",
+    }));
+    expect(useBuilderStore.getState().selectedSlideId).toBe("blank");
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "starter",
       "example",
     ]);
+
+    await user.click(screen.getByRole("checkbox", {
+      name: "Include slide 1 in handout",
+    }));
+    expect(useBuilderStore.getState().document.handoutSlideIds).toEqual([
+      "example",
+    ]);
+    expect(useBuilderStore.getState().selectedSlideId).toBe("blank");
   });
 });
 
@@ -599,7 +609,9 @@ describe("BuilderShell Compact Console action parity", () => {
     vi.mocked(loadBuilderDocument).mockResolvedValue(document);
 
     render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
-    await user.click(screen.getAllByRole("button", { name: "Select slide 1 for handout" })[0]);
+    await user.click(screen.getByRole("button", {
+      name: "Select slide 1 as active from preview",
+    }));
     await user.click(screen.getByRole("button", { name: "Placeholder" }));
     expect(screen.getByRole("region", { name: "Placeholder" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add placeholder slide" }));
@@ -629,9 +641,9 @@ describe("BuilderShell Compact Console action parity", () => {
     const thirdHandle = screen.getByRole("button", {
       name: "Drag slide 3 to reorder",
     });
-    const firstSelector = screen.getAllByRole("button", {
-      name: "Select slide 1 for handout",
-    })[0];
+    const firstSelector = screen.getByRole("checkbox", {
+      name: "Include slide 1 in handout",
+    });
     expect(
       firstHandle.compareDocumentPosition(firstSelector) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -662,5 +674,277 @@ describe("BuilderShell Compact Console action parity", () => {
       "second",
       "first",
     ]);
+  });
+
+  it("previews Starter images from the freshly loaded retrieval bank", async () => {
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 7";
+    document.slides = [
+      {
+        id: "starter",
+        type: "starter",
+        title: "Starter",
+        slots: [
+          {
+            lo: "101a: Expand",
+            retrievalItemId: "item-1",
+            currentImageSlot: 1,
+            image: {
+              name: "expired.png",
+              type: "image/png",
+              size: 4,
+              dataUrl: "https://storage.example/expired.png?token=expired",
+            },
+          },
+        ],
+      },
+    ];
+    document.retrievalItems = [
+      {
+        id: "item-1",
+        lo: "101a: Expand",
+        className: "Year 7",
+        spacingFactor: 1.3,
+        currentImageSlot: 1,
+        seenCount: 0,
+        selected: false,
+        images: [
+          {
+            name: "metadata-only.png",
+            type: "image/png",
+            size: 4,
+            dataUrl: "",
+            storagePath: "retrieval/item-1/question-1.png",
+          },
+        ],
+        answerImages: [],
+      },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(resolveRetrievalImages).mockResolvedValue([
+      {
+        itemId: "item-1",
+        currentImageSlot: 1,
+        questionImage: {
+          name: "fresh.png",
+          type: "image/png",
+          size: 4,
+          dataUrl: "https://storage.example/fresh.png?token=current",
+        },
+        answerImage: null,
+      },
+    ]);
+
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+
+    await waitFor(() =>
+      expect(screen.getByAltText("Starter image")).toHaveAttribute(
+        "src",
+        "https://storage.example/fresh.png?token=current",
+      ),
+    );
+    expect(useBuilderStore.getState().document.slides[0]).toEqual(
+      expect.objectContaining({
+        slots: [expect.objectContaining({ image: expect.objectContaining({ name: "expired.png" }) })],
+      }),
+    );
+  });
+
+  it("previews revision images from freshly resolved seen-count pairs", async () => {
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 7";
+    document.slides = [
+      {
+        id: "revision",
+        type: "revision",
+        title: "Revision",
+        items: [
+          {
+            lo: "101a: Expand",
+            seenCount: 3,
+            retrievalItemId: "item-1",
+            image: {
+              name: "expired.png",
+              type: "image/png",
+              size: 4,
+              dataUrl: "https://storage.example/expired.png?token=expired",
+            },
+          },
+        ],
+      },
+    ];
+    document.retrievalItems = [
+      {
+        id: "item-1",
+        contentId: "content-1",
+        lo: "101a: Expand",
+        className: "Year 7",
+        spacingFactor: 1.3,
+        currentImageSlot: 1,
+        seenCount: 3,
+        selected: false,
+        images: [],
+        answerImages: [],
+      },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(resolveRetrievalImages).mockResolvedValue([
+      {
+        requestKey: "request-0",
+        itemId: "item-1",
+        contentId: "content-1",
+        currentImageSlot: 3,
+        questionImage: {
+          name: "fresh-revision.png",
+          type: "image/png",
+          size: 4,
+          dataUrl: "https://storage.example/fresh-revision.png?token=current",
+        },
+        answerImage: null,
+      },
+    ]);
+
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+
+    await waitFor(() =>
+      expect(screen.getByAltText("Revision image 1")).toHaveAttribute(
+        "src",
+        "https://storage.example/fresh-revision.png?token=current",
+      ),
+    );
+    expect(resolveRetrievalImages).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: "item-1", seenCount: 3 })],
+      "seen",
+    );
+    expect(useBuilderStore.getState().document.slides[0]).toEqual(
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({
+            image: expect.objectContaining({ name: "expired.png" }),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("resolves current Starter images before building a handout", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 7";
+    document.handoutSlideIds = ["starter", "example"];
+    document.slides = [
+      {
+        id: "starter",
+        type: "starter",
+        title: "Starter",
+        slots: [
+          {
+            lo: "101a: Expand",
+            retrievalItemId: "item-1",
+            currentImageSlot: 1,
+            image: {
+              name: "expired.png",
+              type: "image/png",
+              size: 4,
+              dataUrl: "https://storage.example/expired.png?token=expired",
+            },
+          },
+        ],
+      },
+      {
+        id: "example",
+        type: "example",
+        title: "Example",
+        lo: "Expand brackets",
+        image1: {
+          name: "example.png",
+          type: "image/png",
+          size: 4,
+          dataUrl: "data:image/png;base64,dGVzdA==",
+        },
+      },
+    ];
+    document.retrievalItems = [
+      {
+        id: "item-1",
+        lo: "101a: Expand",
+        className: "Year 7",
+        spacingFactor: 1.3,
+        currentImageSlot: 1,
+        seenCount: 0,
+        selected: false,
+        images: [],
+        answerImages: [],
+      },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(resolveRetrievalImages).mockResolvedValue([
+      {
+        itemId: "item-1",
+        currentImageSlot: 1,
+        questionImage: {
+          name: "fresh.png",
+          type: "image/png",
+          size: 4,
+          dataUrl: "data:image/png;base64,ZnJlc2g=",
+        },
+        answerImage: null,
+      },
+    ]);
+    const previewWindow = {
+      close: vi.fn(),
+      document: { write: vi.fn() },
+      focus: vi.fn(),
+      location: { replace: vi.fn() },
+    } as unknown as Window;
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(previewWindow);
+    const createObjectUrl = vi.fn((blob: Blob) => {
+      void blob;
+      return "blob:handout";
+    });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrl,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Open handout from 2 selected slides",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(resolveRetrievalImages).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: "item-1", currentImageSlot: 1 })],
+        "current",
+      ),
+    );
+    await waitFor(() => expect(createObjectUrl).toHaveBeenCalledTimes(1));
+    const handoutBlob = createObjectUrl.mock.calls[0]?.[0] as Blob;
+    const handoutHtml = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(handoutBlob);
+    });
+    expect(handoutHtml).toContain("data:image/png;base64,ZnJlc2g=");
+    expect(useBuilderStore.getState().document.slides[0]).toEqual(
+      expect.objectContaining({
+        slots: [
+          expect.objectContaining({
+            image: expect.objectContaining({ name: "expired.png" }),
+          }),
+        ],
+      }),
+    );
+    openSpy.mockRestore();
   });
 });

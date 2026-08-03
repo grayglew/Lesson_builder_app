@@ -10,7 +10,36 @@ async function stubBuilder(page: Page) {
   await page.route("**/api/builder-sync/latest?kind=workspace", async (route) => {
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ ok: true, exists: false, kind: "workspace" }),
+      body: JSON.stringify({
+        ok: true,
+        exists: true,
+        kind: "workspace",
+        signedUrl: "https://storage.example/compact-workspace.json",
+        updatedAt: "2026-07-18T06:00:00.000Z",
+        revision: "compact-workspace-revision",
+      }),
+    });
+  });
+  await page.route("https://storage.example/compact-workspace.json", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        schemaVersion: 3,
+        syncKind: "workspace",
+        title: "Algebra review",
+        className: "Year 9",
+        teachingDate: "2026-07-18",
+        overallLessonLo: "Expand and factorise quadratic expressions",
+        activeLessonId: "visual-lesson",
+        activeLessonSavedAt: "2026-07-18T06:00:00.000Z",
+        lessonUpdatedAt: "2026-07-18T06:00:00.000Z",
+        slides: [
+          { id: "starter-slide", type: "starter", title: "Starter", slots: [] },
+          { id: "example-slide", type: "example", title: "Example", lo: "101a: Expand a single bracket" },
+        ],
+        handoutSlideIds: [],
+        updatedAt: "2026-07-18T06:00:00.000Z",
+      }),
     });
   });
   await page.route("**/api/builder-global/bootstrap", async (route) => {
@@ -32,6 +61,7 @@ async function stubBuilder(page: Page) {
             { id: "starter-slide", type: "starter", title: "Starter", slots: [] },
             { id: "example-slide", type: "example", title: "Example", lo: "101a: Expand a single bracket" },
           ],
+          handoutSlideIds: [],
           retrievalItems: [
             {
               id: "4eb5cf7e-5de4-4d34-9ab4-e58f67410ca1",
@@ -368,5 +398,120 @@ test.describe("Compact Console functional review", () => {
     await page.keyboard.press("Escape");
     await expect(deckButton).toBeFocused();
     await expect(draft).toHaveValue("Keep this draft mounted");
+  });
+
+  test("keeps active and handout selection independent and persistent", async ({ page }) => {
+    await stubBuilder(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/builder?visual=1&theme=light");
+    await page.getByRole("button", { name: "Placeholder" }).click();
+    await page.getByRole("button", { name: "Add placeholder slide" }).click();
+    await page.getByRole("button", { name: "Add placeholder slide" }).click();
+
+    const starterHandout = page.getByRole("checkbox", {
+      name: "Include slide 1 in handout",
+    });
+    const starterTitle = page.getByRole("button", {
+      name: "Select slide 1 as active from title",
+    });
+    const examplePreview = page.getByRole("button", {
+      name: "Select slide 2 as active from preview",
+    });
+
+    await starterHandout.check();
+    await expect(starterHandout).toBeChecked();
+    await expect(starterTitle).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      page.getByRole("button", { name: "Open handout from 1 selected slide" }),
+    ).toBeVisible();
+
+    await examplePreview.click();
+    await expect(examplePreview).toHaveAttribute("aria-pressed", "true");
+    await expect(starterHandout).toBeChecked();
+
+    await page.waitForTimeout(1_200);
+    await page.reload();
+    await expect(
+      page.getByRole("checkbox", { name: "Include slide 1 in handout" }),
+    ).toBeChecked();
+  });
+
+  test("keeps active and handout styling distinct when both states apply", async ({ page }) => {
+    await stubBuilder(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    for (const { variant, theme } of [
+      { variant: "classic", theme: "light" },
+      { variant: "compact-console", theme: "light" },
+      { variant: "compact-console", theme: "dark" },
+    ]) {
+      await page.goto(`/builder?visual=1&variant=${variant}&theme=${theme}`);
+      const checkbox = page.getByRole("checkbox", {
+        name: "Include slide 1 in handout",
+      });
+      await checkbox.check();
+      await page
+        .getByRole("button", { name: "Select slide 1 as active from preview" })
+        .click();
+
+      const selectedTile = checkbox.locator("xpath=ancestor::li");
+      const otherTile = page
+        .getByRole("checkbox", { name: "Include slide 2 in handout" })
+        .locator("xpath=ancestor::li");
+      const selectedStyle = await selectedTile.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const toolbar = element.firstElementChild as HTMLElement;
+        return {
+          borderLeftWidth: style.borderLeftWidth,
+          borderRightWidth: style.borderRightWidth,
+          toolbarBackground: getComputedStyle(toolbar).backgroundColor,
+        };
+      });
+      const otherToolbarBackground = await otherTile.evaluate((element) =>
+        getComputedStyle(element.firstElementChild as HTMLElement).backgroundColor,
+      );
+
+      expect(selectedStyle.borderLeftWidth).toBe("4px");
+      expect(selectedStyle.borderRightWidth).toBe("1px");
+      expect(selectedStyle.toolbarBackground).not.toBe(otherToolbarBackground);
+    }
+  });
+
+  test("keeps handout controls reachable at required responsive sizes and themes", async ({ page }) => {
+    test.setTimeout(60_000);
+    await stubBuilder(page);
+    for (const theme of ["light", "dark"] as const) {
+      for (const viewport of [
+        { width: 375, height: 812 },
+        { width: 768, height: 1024 },
+        { width: 1280, height: 800 },
+        { width: 1440, height: 900 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await page.goto(`/builder?visual=1&theme=${theme}`);
+        if (viewport.width < 1280) {
+          await page.getByRole("button", { name: "Deck" }).click();
+        }
+
+        const checkbox = page.getByRole("checkbox", {
+          name: "Include slide 1 in handout",
+        });
+        const wrapper = checkbox.locator("..");
+        await expect(checkbox).toBeVisible();
+        const box = await wrapper.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          ),
+        ).toBeLessThanOrEqual(0);
+        const preview = page.locator("aside[aria-label='Lesson preview']");
+        expect(
+          await preview.evaluate((element) => element.scrollWidth - element.clientWidth),
+        ).toBeLessThanOrEqual(0);
+      }
+    }
   });
 });

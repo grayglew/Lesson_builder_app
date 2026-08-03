@@ -9,7 +9,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   archiveClassName,
   loadBuilderDocument,
@@ -41,6 +47,10 @@ import { ImpersonationControl } from "./ImpersonationControl";
 import latexStyles from "./LatexComposer.module.css";
 import { LatexComposer } from "./LatexComposer";
 import { LessonTransferActions } from "./LessonTransferActions";
+import { hydrateLiveRetrievalAssets } from "./live-retrieval-assets";
+import {
+  hydrateStarterSlotsFromRetrievalItems,
+} from "./live-starter";
 import { NewLessonDialog } from "./NewLessonDialog";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
@@ -112,18 +122,35 @@ export function BuilderShell({
   const [themePreference, setThemePreference] =
     useState<BuilderThemePreference>(initialTheme);
   const document = useBuilderStore(selectDocument);
-  const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
-  const selectedPreviewSlideIds = useBuilderStore(
-    (state) => state.selectedPreviewSlideIds,
+  const fallbackPreviewSlides = useMemo(
+    () => hydrateStarterSlotsFromRetrievalItems(document).slides,
+    [document],
   );
+  const [resolvedPreview, setResolvedPreview] = useState<{
+    className: string;
+    retrievalItems: typeof document.retrievalItems;
+    sourceSlides: BuilderSlide[];
+    slides: BuilderSlide[];
+  } | null>(null);
+  const previewSlides =
+    resolvedPreview?.sourceSlides === document.slides &&
+    resolvedPreview.retrievalItems === document.retrievalItems &&
+    resolvedPreview.className === document.className
+      ? resolvedPreview.slides
+      : fallbackPreviewSlides;
+  const previewSourceSlides = document.slides;
+  const previewRetrievalItems = document.retrievalItems;
+  const previewClassName = document.className;
+  const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
   const hydrated = useBuilderStore((state) => state.hydrated);
   const hydrate = useBuilderStore((state) => state.hydrate);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const reset = useBuilderStore((state) => state.reset);
   const updateMetadata = useBuilderStore((state) => state.updateMetadata);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
-  const togglePreviewSlideSelection = useBuilderStore(
-    (state) => state.togglePreviewSlideSelection,
+  const selectSlide = useBuilderStore((state) => state.selectSlide);
+  const toggleHandoutSlide = useBuilderStore(
+    (state) => state.toggleHandoutSlide,
   );
   const addPlaceholderSlide = useBuilderStore((state) => state.addPlaceholderSlide);
   const moveSlide = useBuilderStore((state) => state.moveSlide);
@@ -193,6 +220,33 @@ export function BuilderShell({
     setDraggedSlideId("");
     setDragOverSlideId("");
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const previewDocument = {
+      ...useBuilderStore.getState().document,
+      className: previewClassName,
+      retrievalItems: previewRetrievalItems,
+      slides: previewSourceSlides,
+    };
+    void hydrateLiveRetrievalAssets(
+      previewDocument,
+      previewRetrievalItems,
+    ).then((hydratedDocument) => {
+      if (cancelled) return;
+      setResolvedPreview({
+        className: previewClassName,
+        retrievalItems: previewRetrievalItems,
+        sourceSlides: previewSourceSlides,
+        slides: hydratedDocument.slides,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewClassName, previewRetrievalItems, previewSourceSlides]);
 
   useEffect(() => {
     if (variant !== "compact-console") return;
@@ -949,7 +1003,7 @@ export function BuilderShell({
             <CompactDeckHeader
               collapsed={previewCollapsed}
               mobileDrawer={compactMobileViewport}
-              selectedCount={selectedPreviewSlideIds.length}
+              selectedCount={document.handoutSlideIds.length}
               slideCount={document.slides.length}
               transferActions={<LessonTransferActions actions={lessonActions} />}
               onCollapse={() => {
@@ -985,8 +1039,8 @@ export function BuilderShell({
               <button
                 className={styles.previewIconButton}
                 type="button"
-                aria-label={`Open handout from ${selectedPreviewSlideIds.length} selected slide${selectedPreviewSlideIds.length === 1 ? "" : "s"}`}
-                title={`Open handout (${selectedPreviewSlideIds.length} selected)`}
+                aria-label={`Open handout from ${document.handoutSlideIds.length} selected slide${document.handoutSlideIds.length === 1 ? "" : "s"}`}
+                title={`Open handout (${document.handoutSlideIds.length} selected)`}
                 onClick={() => void lessonActions.previewLesson(true)}
               >
                 ▤
@@ -1025,12 +1079,12 @@ export function BuilderShell({
           )}
 
           <ol id="v2-slide-list" className={styles.slideList}>
-            {document.slides.map((slide, index) => (
+            {previewSlides.map((slide, index) => (
               <li
                 key={slide.id}
                 className={`${styles.slideItem} ${
-                  selectedPreviewSlideIds.includes(slide.id)
-                    ? styles.slideItemSelected
+                  document.handoutSlideIds.includes(slide.id)
+                    ? styles.slideItemHandout
                     : ""
                 } ${
                   slide.id === selectedSlideId ? styles.slideItemActive : ""
@@ -1071,16 +1125,25 @@ export function BuilderShell({
                       <GripVertical size={15} aria-hidden />
                     </button>
                   ) : null}
-                  <button
-                    className={styles.slideSelectButton}
-                    type="button"
-                    aria-label={`${selectedPreviewSlideIds.includes(slide.id) ? "Deselect" : "Select"} slide ${index + 1} for handout`}
-                    aria-pressed={selectedPreviewSlideIds.includes(slide.id)}
-                    onClick={() => togglePreviewSlideSelection(slide.id)}
+                  <label
+                    className={styles.handoutSlideToggle}
+                    title={`Include slide ${index + 1} in handout`}
                   >
-                    <span aria-hidden className={styles.slideSelectionMark}>
-                      {selectedPreviewSlideIds.includes(slide.id) ? "✓" : ""}
-                    </span>
+                    <input
+                      className={styles.handoutSlideCheckbox}
+                      type="checkbox"
+                      aria-label={`Include slide ${index + 1} in handout`}
+                      checked={document.handoutSlideIds.includes(slide.id)}
+                      onChange={() => toggleHandoutSlide(slide.id)}
+                    />
+                  </label>
+                  <button
+                    className={styles.slideTitleButton}
+                    type="button"
+                    aria-label={`Select slide ${index + 1} as active from title`}
+                    aria-pressed={slide.id === selectedSlideId}
+                    onClick={() => selectSlide(slide.id)}
+                  >
                     {index + 1}. {slide.title || slide.type}
                   </button>
                   <div
@@ -1139,9 +1202,9 @@ export function BuilderShell({
                 <button
                   className={styles.slidePreviewButton}
                   type="button"
-                  aria-label={`${selectedPreviewSlideIds.includes(slide.id) ? "Deselect" : "Select"} slide ${index + 1} for handout`}
-                  aria-pressed={selectedPreviewSlideIds.includes(slide.id)}
-                  onClick={() => togglePreviewSlideSelection(slide.id)}
+                  aria-label={`Select slide ${index + 1} as active from preview`}
+                  aria-pressed={slide.id === selectedSlideId}
+                  onClick={() => selectSlide(slide.id)}
                 >
                   <SlidePreview slide={slide} />
                 </button>

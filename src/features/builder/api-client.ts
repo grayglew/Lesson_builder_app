@@ -72,6 +72,7 @@ const lessonListSchema = z.object({
 
 const resolvedRetrievalImageSchema = z
   .object({
+    requestKey: z.string().optional(),
     itemId: z.string(),
     currentImageSlot: z.number().int().min(1).max(8),
     questionImage: builderAssetSchema.nullable().optional(),
@@ -301,6 +302,7 @@ export async function saveCurrentLesson(
     teachingDate: document.teachingDate,
     overallLessonLo: document.overallLessonLo.trim(),
     slides: document.slides,
+    handoutSlideIds: document.handoutSlideIds,
     savedAt: new Date().toISOString(),
   };
   const blob = new Blob([JSON.stringify(savedDocument)], {
@@ -631,7 +633,8 @@ export async function resolveRetrievalImages(
   const result = await postJson(
     "/api/builder-global/retrieval-images/resolve",
     {
-      requests: items.map((item) => ({
+      requests: items.map((item, index) => ({
+        requestKey: `request-${index}`,
         itemId: item.id,
         contentId: item.contentId,
         lo: item.lo,

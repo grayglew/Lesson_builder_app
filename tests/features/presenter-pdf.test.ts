@@ -51,6 +51,22 @@ describe("presenter PDF snapshots", () => {
     expect(preparePresenterPdfSnapshotHtml(snapshot)).toBe(snapshot);
   });
 
+  it("preserves embedded revision question and answer sources in the PDF snapshot", () => {
+    const question = "data:image/png;base64,ZnJlc2gtcXVlc3Rpb24=";
+    const answer = "data:image/png;base64,ZnJlc2gtYW5zd2Vy";
+    const snapshot = preparePresenterPdfSnapshotHtml(`<!doctype html>
+      <html><body><main class="lesson-deck">
+        <section class="lesson-slide revision-slide">
+          <img src="${question}" alt="Revision question">
+          <img src="${answer}" alt="Revision answer">
+        </section>
+      </main><script>window.runtime=true;</script></body></html>`);
+
+    expect(snapshot).toContain(question);
+    expect(snapshot).toContain(answer);
+    expect(snapshot).not.toContain("<script");
+  });
+
   it("prepares a static PowerPoint layout without interactive controls or generic display overrides", () => {
     const snapshot = preparePowerPointSnapshotHtml(`<!doctype html>
       <html><head><style>

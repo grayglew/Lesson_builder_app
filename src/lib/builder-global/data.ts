@@ -117,6 +117,7 @@ type RetrievalProgressRow = {
 type RetrievalItemRow = RetrievalProgressRow;
 
 type ResolvedRetrievalImageRequest = {
+  requestKey?: unknown;
   itemId?: unknown;
   contentId?: unknown;
   lo?: unknown;
@@ -749,6 +750,7 @@ export async function resolveRetrievalImageRequests(
       const mode = String(request.mode || "current");
       if (mode === "all") {
         return {
+          requestKey: String(request.requestKey || ""),
           itemId: item.id,
           trackingId: item.id,
           contentId: item.retrieval_lo_id,
@@ -765,6 +767,7 @@ export async function resolveRetrievalImageRequests(
         ? normalizeImageSlot(request.seenCount || item.seen_count || 1)
         : pickDisplaySlot(request.currentImageSlot || item.current_image_slot, grouped.question);
       return {
+        requestKey: String(request.requestKey || ""),
         itemId: item.id,
         trackingId: item.id,
         contentId: item.retrieval_lo_id,

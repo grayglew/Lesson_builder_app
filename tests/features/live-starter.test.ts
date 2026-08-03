@@ -99,6 +99,14 @@ describe("live starter hydration", () => {
   it("keeps the existing starter usable when current-image resolution fails", async () => {
     const document = createInitialBuilderDocument();
     const existingImage = asset("existing.png");
+    const metadataOnlyItem = retrievalItem("item-1", "101a: Expand", 1);
+    metadataOnlyItem.images = [
+      {
+        ...asset("metadata-only.png"),
+        dataUrl: "",
+        storagePath: "retrieval/item-1/question-1.png",
+      },
+    ];
     document.slides = [
       {
         id: "starter",
@@ -119,7 +127,7 @@ describe("live starter hydration", () => {
 
     const hydrated = await hydrateLiveStarterSlots(
       document,
-      [retrievalItem("item-1", "101a: Expand", 3)],
+      [metadataOnlyItem],
       resolver as LiveStarterImageResolver,
     );
     const starter = hydrated.slides[0];
@@ -129,6 +137,96 @@ describe("live starter hydration", () => {
     expect(slots[0].lo).toBe("101a: Expand");
     expect(slots[0].image).toEqual(existingImage);
     expect(document.slides[0]).not.toBe(starter);
+  });
+
+  it("falls back to freshly loaded retrieval assets when live resolution fails", async () => {
+    const document = createInitialBuilderDocument();
+    const expiredQuestion = {
+      ...asset("expired-question.png"),
+      dataUrl: "https://storage.example/expired-question.png?token=expired",
+    };
+    const expiredAnswer = {
+      ...asset("expired-answer.png"),
+      dataUrl: "https://storage.example/expired-answer.png?token=expired",
+    };
+    document.slides = [
+      {
+        id: "starter",
+        type: "starter",
+        title: "Starter",
+        slots: [
+          {
+            lo: "",
+            retrievalItemId: "item-1",
+            image: expiredQuestion,
+            answerImage: expiredAnswer,
+          },
+        ],
+      },
+    ];
+    const item = retrievalItem("item-1", "101a: Expand", 2);
+    item.images = [asset("question-1.png"), asset("question-2.png")];
+    item.answerImages = [asset("answer-1.png"), asset("answer-2.png")];
+    const resolver = vi.fn(async () => {
+      throw new Error("offline");
+    });
+
+    const hydrated = await hydrateLiveStarterSlots(
+      document,
+      [item],
+      resolver as LiveStarterImageResolver,
+    );
+
+    const starter = hydrated.slides[0];
+    expect(starter.type).toBe("starter");
+    if (starter.type !== "starter") throw new Error("Expected starter slide.");
+    const slot = (starter as { slots: StarterSlot[] }).slots[0];
+    expect(slot.currentImageSlot).toBe(2);
+    expect(slot.image?.name).toBe("question-2.png");
+    expect(slot.answerImage?.name).toBe("answer-2.png");
+    expect(slot.image).not.toEqual(expiredQuestion);
+    expect(slot.answerImage).not.toEqual(expiredAnswer);
+  });
+
+  it("correlates partial resolver results without shifting images between slots", async () => {
+    const document = createInitialBuilderDocument();
+    const firstImage = asset("first-existing.png");
+    const secondImage = asset("second-existing.png");
+    document.slides = [
+      {
+        id: "starter",
+        type: "starter",
+        title: "Starter",
+        slots: [
+          { lo: "101a: Missing", retrievalItemId: "missing", image: firstImage },
+          { lo: "102a: Found", retrievalItemId: "found", image: secondImage },
+        ],
+      },
+    ];
+    const missing = retrievalItem("missing", "101a: Missing", 1);
+    const found = retrievalItem("found", "102a: Found", 1);
+    const resolver = vi.fn(async () => [
+      {
+        requestKey: "request-1",
+        itemId: "found",
+        currentImageSlot: 1,
+        questionImage: asset("found-fresh.png"),
+        answerImage: null,
+      },
+    ]);
+
+    const hydrated = await hydrateLiveStarterSlots(
+      document,
+      [missing, found],
+      resolver as LiveStarterImageResolver,
+    );
+
+    const starter = hydrated.slides[0];
+    expect(starter.type).toBe("starter");
+    if (starter.type !== "starter") throw new Error("Expected starter slide.");
+    const slots = (starter as { slots: StarterSlot[] }).slots;
+    expect(slots[0].image).toEqual(firstImage);
+    expect(slots[1].image?.name).toBe("found-fresh.png");
   });
 
   it("recovers a legacy starter link from a unique class-scoped image identity", async () => {

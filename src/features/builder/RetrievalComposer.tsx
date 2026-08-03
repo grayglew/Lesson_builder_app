@@ -413,6 +413,12 @@ export function RetrievalComposer({
             return {
               lo: item.lo,
               seenCount: Math.max(1, item.seenCount || 1),
+              retrievalItemId: item.id,
+              contentId:
+                String(pair?.contentId || item.contentId || "").trim() ||
+                undefined,
+              className: item.className || document.className,
+              currentImageSlot: pair?.currentImageSlot ?? slot,
               image:
                 pair?.questionImage ??
                 normalizeImageSlots(item.images)[slot - 1],

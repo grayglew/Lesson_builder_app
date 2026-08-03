@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  buildStandaloneLessonHtml,
-  embedRemoteBuilderAssets,
-} from "./lesson-export";
-import { hydrateLiveStarterSlots } from "./live-starter";
+import { buildStandaloneLessonHtml } from "./lesson-export";
+import { prepareBuilderDocumentForExport } from "./prepare-export-document";
 import {
   collectWorksheetFilesForBundle,
   createStaticExportDocument,
@@ -35,7 +32,13 @@ type BundleDependencies = {
     title: string,
   ) => Promise<Blob>;
   retrievalItems?: RetrievalItem[];
+  prepareDocument?: PrepareExportDocument;
 };
+
+type PrepareExportDocument = (
+  document: BuilderDocument,
+  retrievalItems?: readonly RetrievalItem[],
+) => Promise<BuilderDocument>;
 
 export async function prepareSavedLessonHtml(
   document: BuilderDocument,
@@ -44,17 +47,16 @@ export async function prepareSavedLessonHtml(
     studentSession?: PresenterStudentSession | null;
     retrievalItems?: RetrievalItem[];
     offlineCapabilities?: boolean;
+    prepareDocument?: PrepareExportDocument;
   } = {},
 ) {
   const lessonId = options.lessonId || "";
-  const hydratedDocument = await hydrateLiveStarterSlots(
-    document,
-    options.retrievalItems,
-  );
+  const prepareDocument =
+    options.prepareDocument ?? prepareBuilderDocumentForExport;
   const [runtimeCss, runtimeJavaScript, embeddedDocument] = await Promise.all([
     fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
     fetchAssetText("/builder-v2-assets/presenter-runtime.js"),
-    embedRemoteBuilderAssets(hydratedDocument),
+    prepareDocument(document, options.retrievalItems),
   ]);
   return buildStandaloneLessonHtml(embeddedDocument, {
     offlineCapabilities: options.offlineCapabilities,
@@ -99,11 +101,12 @@ export async function buildPowerPointBundleZip(
   if (!document.slides.length) {
     throw new Error("This saved lesson has no slides to export.");
   }
-  const hydratedDocument = await hydrateLiveStarterSlots(
+  const prepareDocument =
+    dependencies.prepareDocument ?? prepareBuilderDocumentForExport;
+  const embeddedDocument = await prepareDocument(
     document,
     dependencies.retrievalItems,
   );
-  const embeddedDocument = await embedRemoteBuilderAssets(hydratedDocument);
   const staticDocument = createStaticExportDocument(embeddedDocument);
   const html = buildStandaloneLessonHtml(staticDocument);
   const renderedSlides = await (
