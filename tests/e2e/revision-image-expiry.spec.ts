@@ -14,7 +14,11 @@ const QUESTION_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0mQAAAAASUVORK5CYII=";
 const ANSWER_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
-const EMBEDDED_PNG = `data:image/png;base64,${QUESTION_PNG_BASE64}`;
+const EMBEDDED_SVG =
+  "data:image/svg+xml;base64," +
+  Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="#0f766e"/></svg>',
+  ).toString("base64");
 const FRESH_QUESTION_DATA_URL = `data:image/png;base64,${QUESTION_PNG_BASE64}`;
 const FRESH_ANSWER_DATA_URL = `data:image/png;base64,${ANSWER_PNG_BASE64}`;
 const PDF_BASE64 =
@@ -38,9 +42,8 @@ type FixtureState = {
 };
 
 test.skip(
-  Boolean(process.env.PLAYWRIGHT_BASE_URL) &&
-    process.env.PLAYWRIGHT_VISUAL_LOCAL !== "1",
-  "The expired-image fixture is local-only and route-mocks every data boundary.",
+  !isLoopbackBaseUrl(process.env.PLAYWRIGHT_BASE_URL),
+  "The expired-image fixture always skips non-loopback deployments.",
 );
 
 test.describe("expired revision images across browser outputs", () => {
@@ -50,6 +53,7 @@ test.describe("expired revision images across browser outputs", () => {
     const state = await stubExpiredRevisionLesson(page);
     await page.goto("/builder?visual=1");
     await expect(page.getByText("3 slides", { exact: true })).toBeVisible();
+    const previewRequestCount = await waitForInitialPreviewHydration(page, state);
 
     const popupPromise = page.waitForEvent("popup");
     await page.getByRole("button", { name: "Present", exact: true }).click();
@@ -66,7 +70,7 @@ test.describe("expired revision images across browser outputs", () => {
     expect(html).toContain(FRESH_ANSWER_DATA_URL);
     expect(html).not.toContain(EXPIRED_QUESTION_URL);
     expect(html).not.toContain(EXPIRED_ANSWER_URL);
-    assertDurableResolverRequest(state);
+    assertNewOutputResolverRequest(state, previewRequestCount);
     expect(state.unexpectedApiRequests).toEqual([]);
   });
 
@@ -75,6 +79,7 @@ test.describe("expired revision images across browser outputs", () => {
   }) => {
     const state = await stubExpiredRevisionLesson(page);
     await page.goto("/builder?visual=1");
+    const previewRequestCount = await waitForInitialPreviewHydration(page, state);
 
     const popupPromise = page.waitForEvent("popup");
     await page
@@ -97,7 +102,7 @@ test.describe("expired revision images across browser outputs", () => {
     expect(html).toContain(FRESH_QUESTION_DATA_URL);
     expect(html).not.toContain(EXPIRED_QUESTION_URL);
     expect(html).not.toContain(EXPIRED_ANSWER_URL);
-    assertDurableResolverRequest(state);
+    assertNewOutputResolverRequest(state, previewRequestCount);
     expect(state.unexpectedApiRequests).toEqual([]);
   });
 
@@ -106,6 +111,7 @@ test.describe("expired revision images across browser outputs", () => {
   }) => {
     const state = await stubExpiredRevisionLesson(page);
     await page.goto("/builder?visual=1");
+    const previewRequestCount = await waitForInitialPreviewHydration(page, state);
 
     await page.getByTitle("Import or export lesson").click();
     const downloadPromise = page.waitForEvent("download");
@@ -113,11 +119,13 @@ test.describe("expired revision images across browser outputs", () => {
     const download = await downloadPromise;
 
     expect(download.suggestedFilename()).toBe("Revision-expiry-fixture.pdf");
+    expect(await download.failure()).toBeNull();
+    expect(await download.path()).not.toBeNull();
     expect(state.uploadedPdfSnapshot).toContain(FRESH_QUESTION_DATA_URL);
     expect(state.uploadedPdfSnapshot).toContain(FRESH_ANSWER_DATA_URL);
     expect(state.uploadedPdfSnapshot).not.toContain(EXPIRED_QUESTION_URL);
     expect(state.uploadedPdfSnapshot).not.toContain(EXPIRED_ANSWER_URL);
-    assertDurableResolverRequest(state);
+    assertNewOutputResolverRequest(state, previewRequestCount);
     expect(state.unexpectedApiRequests).toEqual([]);
   });
 });
@@ -380,7 +388,7 @@ function fixtureSlides() {
 }
 
 function embeddedAsset(name: string) {
-  return { name, type: "image/png", size: 68, dataUrl: EMBEDDED_PNG };
+  return { name, type: "image/svg+xml", size: 111, dataUrl: EMBEDDED_SVG };
 }
 
 function expiredAsset(name: string, dataUrl: string, storagePath: string) {
@@ -429,8 +437,31 @@ async function loadedImageState(locator: ReturnType<Page["locator"]>) {
   );
 }
 
-function assertDurableResolverRequest(state: FixtureState) {
+async function waitForInitialPreviewHydration(
+  page: Page,
+  state: FixtureState,
+) {
+  await expect.poll(() => state.resolverRequests.length).toBeGreaterThan(0);
+  const previewImage = page.getByRole("img", { name: "Revision image 1" });
+  await expect.poll(() => previewImage.evaluate((image) => ({
+    complete: (image as HTMLImageElement).complete,
+    naturalWidth: (image as HTMLImageElement).naturalWidth,
+    src: (image as HTMLImageElement).currentSrc,
+  }))).toEqual({
+    complete: true,
+    naturalWidth: 1,
+    src: FRESH_QUESTION_URL,
+  });
+  return state.resolverRequests.length;
+}
+
+function assertNewOutputResolverRequest(
+  state: FixtureState,
+  previewRequestCount: number,
+) {
+  expect(state.resolverRequests.length).toBeGreaterThan(previewRequestCount);
   const request = state.resolverRequests
+    .slice(previewRequestCount)
     .flat()
     .find((candidate) => candidate.itemId === REVISION_ITEM_ID);
   expect(request).toEqual({
@@ -443,6 +474,16 @@ function assertDurableResolverRequest(state: FixtureState) {
     currentImageSlot: 3,
     seenCount: 6,
   });
+}
+
+function isLoopbackBaseUrl(value: string | undefined) {
+  if (!value?.trim()) return true;
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
+  } catch {
+    return false;
+  }
 }
 
 function extractUploadedHtml(rawMultipartBody: string) {
