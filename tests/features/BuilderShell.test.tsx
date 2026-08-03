@@ -751,6 +751,84 @@ describe("BuilderShell Compact Console action parity", () => {
     );
   });
 
+  it("previews revision images from freshly resolved seen-count pairs", async () => {
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 7";
+    document.slides = [
+      {
+        id: "revision",
+        type: "revision",
+        title: "Revision",
+        items: [
+          {
+            lo: "101a: Expand",
+            seenCount: 3,
+            retrievalItemId: "item-1",
+            image: {
+              name: "expired.png",
+              type: "image/png",
+              size: 4,
+              dataUrl: "https://storage.example/expired.png?token=expired",
+            },
+          },
+        ],
+      },
+    ];
+    document.retrievalItems = [
+      {
+        id: "item-1",
+        contentId: "content-1",
+        lo: "101a: Expand",
+        className: "Year 7",
+        spacingFactor: 1.3,
+        currentImageSlot: 1,
+        seenCount: 3,
+        selected: false,
+        images: [],
+        answerImages: [],
+      },
+    ];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(resolveRetrievalImages).mockResolvedValue([
+      {
+        requestKey: "request-0",
+        itemId: "item-1",
+        contentId: "content-1",
+        currentImageSlot: 3,
+        questionImage: {
+          name: "fresh-revision.png",
+          type: "image/png",
+          size: 4,
+          dataUrl: "https://storage.example/fresh-revision.png?token=current",
+        },
+        answerImage: null,
+      },
+    ]);
+
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+
+    await waitFor(() =>
+      expect(screen.getByAltText("Revision image 1")).toHaveAttribute(
+        "src",
+        "https://storage.example/fresh-revision.png?token=current",
+      ),
+    );
+    expect(resolveRetrievalImages).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: "item-1", seenCount: 3 })],
+      "seen",
+    );
+    expect(useBuilderStore.getState().document.slides[0]).toEqual(
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({
+            image: expect.objectContaining({ name: "expired.png" }),
+          }),
+        ],
+      }),
+    );
+  });
+
   it("resolves current Starter images before building a handout", async () => {
     const user = userEvent.setup();
     const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");

@@ -138,6 +138,51 @@ describe("RetrievalComposer", () => {
     );
   });
 
+  it("stores durable retrieval identity on generated revision slides", async () => {
+    const user = userEvent.setup();
+    const [source] = useBuilderStore.getState().document.retrievalItems;
+    useBuilderStore.getState().updateGlobalData({
+      retrievalItems: useBuilderStore
+        .getState()
+        .document.retrievalItems.map((item, index) => ({
+          ...item,
+          contentId: index === 0 ? "content-101a" : item.contentId,
+          selected: index === 0,
+        })),
+    });
+    vi.mocked(resolveRetrievalImages).mockResolvedValue([
+      {
+        requestKey: "request-0",
+        itemId: source.id,
+        contentId: "content-101a",
+        currentImageSlot: 1,
+        questionImage: null,
+        answerImage: null,
+      },
+    ]);
+    render(<RetrievalComposer compact />);
+
+    await user.click(screen.getByRole("button", { name: "2-per-slide" }));
+
+    await waitFor(() => {
+      expect(useBuilderStore.getState().document.slides).toHaveLength(1);
+    });
+    expect(useBuilderStore.getState().document.slides[0]).toEqual(
+      expect.objectContaining({
+        type: "revision",
+        items: [
+          expect.objectContaining({
+            retrievalItemId: source.id,
+            contentId: "content-101a",
+            className: "Year 9",
+            currentImageSlot: 1,
+            seenCount: 1,
+          }),
+        ],
+      }),
+    );
+  });
+
   it("changes progress only when Log selected is explicitly used", async () => {
     const user = userEvent.setup();
     vi.mocked(logRetrievalItems).mockResolvedValue([

@@ -47,8 +47,8 @@ import { ImpersonationControl } from "./ImpersonationControl";
 import latexStyles from "./LatexComposer.module.css";
 import { LatexComposer } from "./LatexComposer";
 import { LessonTransferActions } from "./LessonTransferActions";
+import { hydrateLiveRetrievalAssets } from "./live-retrieval-assets";
 import {
-  hydrateLiveStarterSlots,
   hydrateStarterSlotsFromRetrievalItems,
 } from "./live-starter";
 import { NewLessonDialog } from "./NewLessonDialog";
@@ -230,7 +230,7 @@ export function BuilderShell({
       retrievalItems: previewRetrievalItems,
       slides: previewSourceSlides,
     };
-    void hydrateLiveStarterSlots(
+    void hydrateLiveRetrievalAssets(
       previewDocument,
       previewRetrievalItems,
     ).then((hydratedDocument) => {

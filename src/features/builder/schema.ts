@@ -75,6 +75,10 @@ const revisionSlideSchema = z
           .object({
             lo: z.string().default(""),
             seenCount: z.number().optional(),
+            retrievalItemId: z.string().optional(),
+            contentId: z.string().optional(),
+            className: z.string().optional(),
+            currentImageSlot: z.number().int().min(1).max(8).optional(),
             ...imagePairShape,
           })
           .passthrough(),
