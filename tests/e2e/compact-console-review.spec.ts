@@ -436,6 +436,47 @@ test.describe("Compact Console functional review", () => {
     ).toBeChecked();
   });
 
+  test("keeps active and handout styling distinct when both states apply", async ({ page }) => {
+    await stubBuilder(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    for (const { variant, theme } of [
+      { variant: "classic", theme: "light" },
+      { variant: "compact-console", theme: "light" },
+      { variant: "compact-console", theme: "dark" },
+    ]) {
+      await page.goto(`/builder?visual=1&variant=${variant}&theme=${theme}`);
+      const checkbox = page.getByRole("checkbox", {
+        name: "Include slide 1 in handout",
+      });
+      await checkbox.check();
+      await page
+        .getByRole("button", { name: "Select slide 1 as active from preview" })
+        .click();
+
+      const selectedTile = checkbox.locator("xpath=ancestor::li");
+      const otherTile = page
+        .getByRole("checkbox", { name: "Include slide 2 in handout" })
+        .locator("xpath=ancestor::li");
+      const selectedStyle = await selectedTile.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const toolbar = element.firstElementChild as HTMLElement;
+        return {
+          borderLeftWidth: style.borderLeftWidth,
+          borderRightWidth: style.borderRightWidth,
+          toolbarBackground: getComputedStyle(toolbar).backgroundColor,
+        };
+      });
+      const otherToolbarBackground = await otherTile.evaluate((element) =>
+        getComputedStyle(element.firstElementChild as HTMLElement).backgroundColor,
+      );
+
+      expect(selectedStyle.borderLeftWidth).toBe("4px");
+      expect(selectedStyle.borderRightWidth).toBe("1px");
+      expect(selectedStyle.toolbarBackground).not.toBe(otherToolbarBackground);
+    }
+  });
+
   test("keeps handout controls reachable at required responsive sizes and themes", async ({ page }) => {
     test.setTimeout(60_000);
     await stubBuilder(page);
