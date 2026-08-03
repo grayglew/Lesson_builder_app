@@ -92,6 +92,9 @@ export async function hydrateLiveRetrievalAssets(
 
   try {
     const resolvedItems = await resolver(requests, "seen");
+    const hasRequestKeys = resolvedItems.some((item) =>
+      Boolean(stringValue(item.requestKey)),
+    );
     references.forEach((reference, index) => {
       const slide = hydrated.slides[reference.slideIndex];
       if (slide?.type !== "revision") return;
@@ -101,7 +104,7 @@ export async function hydrateLiveRetrievalAssets(
         resolvedItems.find(
           (candidate) => candidate.requestKey === `request-${index}`,
         ) ||
-        (resolvedItems.length === references.length
+        (!hasRequestKeys && resolvedItems.length === references.length
           ? resolvedItems[index]
           : undefined);
       if (!resolved) return;

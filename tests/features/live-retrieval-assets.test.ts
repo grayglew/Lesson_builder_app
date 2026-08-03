@@ -338,6 +338,116 @@ describe("live retrieval asset hydration", () => {
     expect(items[1]?.image?.dataUrl).toContain("second-shared-fresh-question");
     expect(items[1]?.answerImage?.dataUrl).toContain("second-shared-fresh-answer");
   });
+
+  it("never falls back by position when a full revision response contains mixed duplicate request keys", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "Year 7";
+    document.slides = [
+      {
+        id: "revision-1",
+        type: "revision",
+        title: "Revision",
+        items: [
+          {
+            lo: "101a: Expand",
+            seenCount: 1,
+            retrievalItemId: "first",
+            image: embeddedAsset("first-existing"),
+          },
+          {
+            lo: "102a: Factorise",
+            seenCount: 2,
+            retrievalItemId: "second",
+            image: embeddedAsset("second-existing"),
+          },
+          {
+            lo: "103a: Simplify",
+            seenCount: 3,
+            retrievalItemId: "third",
+            image: embeddedAsset("third-existing"),
+          },
+        ],
+      },
+    ];
+    const resolver = vi.fn(async () => [
+      {
+        requestKey: "request-2",
+        itemId: "third",
+        currentImageSlot: 3,
+        questionImage: embeddedAsset("third-fresh"),
+        answerImage: embeddedAsset("third-fresh-answer"),
+      },
+      {
+        requestKey: "request-2",
+        itemId: "third-duplicate",
+        currentImageSlot: 3,
+        questionImage: embeddedAsset("duplicate-must-not-drift"),
+        answerImage: null,
+      },
+      {
+        itemId: "keyless-must-not-drift",
+        currentImageSlot: 1,
+        questionImage: embeddedAsset("keyless-must-not-drift"),
+        answerImage: null,
+      },
+    ]);
+
+    const hydrated = await hydrateLiveRetrievalAssets(
+      document,
+      [
+        retrievalItem("first", "101a: Expand", 1),
+        retrievalItem("second", "102a: Factorise", 2),
+        retrievalItem("third", "103a: Simplify", 3),
+      ],
+      resolver,
+    );
+
+    const items = revisionItems(hydrated.slides[0]);
+    expect(items[0]?.image?.dataUrl).toContain("first-existing");
+    expect(items[1]?.image?.dataUrl).toContain("second-existing");
+    expect(items[2]?.image?.dataUrl).toContain("third-fresh");
+  });
+
+  it("keeps renderable Starter pairs when combined hydration returns metadata-only assets", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "Year 7";
+    const existingQuestion = embeddedAsset("starter-existing-question");
+    const existingAnswer = embeddedAsset("starter-existing-answer");
+    document.slides = [
+      {
+        id: "starter-1",
+        type: "starter",
+        title: "Starter",
+        slots: [
+          {
+            lo: "101a: Expand",
+            retrievalItemId: "starter-item",
+            image: existingQuestion,
+            answerImage: existingAnswer,
+          },
+        ],
+      },
+    ];
+    const starter = retrievalItem("starter-item", "101a: Expand", 1);
+    const resolver = vi.fn(async () => [
+      {
+        requestKey: "request-0",
+        itemId: "starter-item",
+        currentImageSlot: 1,
+        questionImage: metadataAsset("metadata-question"),
+        answerImage: metadataAsset("metadata-answer"),
+      },
+    ]);
+
+    const hydrated = await hydrateLiveRetrievalAssets(
+      document,
+      [starter],
+      resolver,
+    );
+
+    expect(starterSlots(hydrated.slides[0])[0]?.image).toEqual(existingQuestion);
+    expect(starterSlots(hydrated.slides[0])[0]?.answerImage).toEqual(existingAnswer);
+  });
 });
 
 function revisionItems(slide: BuilderSlide | undefined) {
@@ -392,5 +502,15 @@ function remoteAsset(name: string): BuilderAsset {
     type: "image/png",
     size: 4,
     dataUrl: `https://storage.example/${name}.png?token=expired`,
+  };
+}
+
+function metadataAsset(name: string): BuilderAsset {
+  return {
+    name: `${name}.png`,
+    type: "image/png",
+    size: 4,
+    dataUrl: "",
+    storagePath: `retrieval/${name}.png`,
   };
 }

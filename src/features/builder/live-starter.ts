@@ -92,6 +92,9 @@ export async function hydrateLiveStarterSlots(
 
   try {
     const resolvedItems = await resolver(requests, "current");
+    const hasRequestKeys = resolvedItems.some((item) =>
+      Boolean(String(item.requestKey || "").trim()),
+    );
     references.forEach((reference, index) => {
       const slide = hydrated.slides[reference.slideIndex];
       const slots = starterSlots(slide);
@@ -100,7 +103,7 @@ export async function hydrateLiveStarterSlots(
       const requestKey = `request-${index}`;
       const resolved =
         resolvedItems.find((item) => item.requestKey === requestKey) ||
-        (resolvedItems.length === references.length
+        (!hasRequestKeys && resolvedItems.length === references.length
           ? resolvedItems[index]
           : undefined);
       if (!slot || !resolved) return;
@@ -112,8 +115,9 @@ export async function hydrateLiveStarterSlots(
           slot.currentImageSlot ||
           reference.item.currentImageSlot ||
           1,
-        image: resolved.questionImage || slot.image || null,
-        answerImage: resolved.answerImage || slot.answerImage || null,
+        image: usableAsset(resolved.questionImage) || slot.image || null,
+        answerImage:
+          usableAsset(resolved.answerImage) || slot.answerImage || null,
       };
     });
   } catch {
