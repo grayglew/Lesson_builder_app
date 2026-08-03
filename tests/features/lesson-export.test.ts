@@ -614,6 +614,44 @@ describe("standalone lesson export", () => {
     ).rejects.toThrow("Could not embed managed lesson asset (403)");
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+
+  it("embeds a managed blob source in strict mode instead of leaving it live", async () => {
+    const document = lessonDocument();
+    const starter = document.slides[0];
+    if (starter.type !== "starter") throw new Error("Expected starter");
+    const slots = starter.slots as StarterSlot[];
+    const blobUrl = "blob:https://lesson-builder.test/managed-question";
+    slots[0].image = {
+      name: "managed-question.png",
+      type: "image/png",
+      size: 8,
+      dataUrl: blobUrl,
+      assetId: "managed-question",
+      storagePath: "global/managed-question.png",
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("blob-question", {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+
+    const embedded = await embedRemoteBuilderAssets(document, {
+      managedAssetFailure: "throw",
+      traversalScope: "slides",
+    });
+    const embeddedStarter = embedded.slides[0];
+    if (embeddedStarter.type !== "starter") throw new Error("Expected starter");
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(blobUrl, { cache: "no-store" });
+    expect((embeddedStarter.slots as StarterSlot[])[0].image?.dataUrl).toBe(
+      "data:image/png;base64,YmxvYi1xdWVzdGlvbg==",
+    );
+    expect((embeddedStarter.slots as StarterSlot[])[0].image?.dataUrl).not.toBe(
+      blobUrl,
+    );
+  });
 });
 
 function lessonDocument(): BuilderDocument {

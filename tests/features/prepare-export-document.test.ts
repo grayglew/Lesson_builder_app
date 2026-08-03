@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { prepareBuilderDocumentForExport } from "@/features/builder/prepare-export-document";
-import { createInitialBuilderDocument } from "@/features/builder/schema";
+import { hydrateLiveRetrievalAssets } from "@/features/builder/live-retrieval-assets";
+import {
+  createInitialBuilderDocument,
+  type BuilderAsset,
+  type RetrievalItem,
+} from "@/features/builder/schema";
 
 describe("builder output preparation", () => {
   it("hydrates then embeds exactly once without mutating the source", async () => {
@@ -48,6 +53,55 @@ describe("builder output preparation", () => {
       "https://expired.test/question.png",
     );
   });
+
+  it("uses real revision hydration and embedding to produce a self-contained pair", async () => {
+    const source = createInitialBuilderDocument("2026-08-03T03:00:00.000Z");
+    source.className = "Year 7";
+    source.retrievalItems = [retrievalItem()];
+    source.slides = [revisionSlide("https://expired.test/question.png")];
+    const original = structuredClone(source);
+    const resolver = vi.fn(async () => [
+      {
+        requestKey: "request-0",
+        itemId: "item-1",
+        contentId: "content-1",
+        currentImageSlot: 2,
+        questionImage: managedAsset(
+          "https://fresh.test/question.png",
+          "fresh-question",
+        ),
+        answerImage: managedAsset(
+          "https://fresh.test/answer.png",
+          "fresh-answer",
+        ),
+      },
+    ]);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      new Response(String(input).includes("answer") ? "answer" : "question", {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+
+    const prepared = await prepareBuilderDocumentForExport(
+      source,
+      source.retrievalItems,
+      {
+        hydrate: (document, items) =>
+          hydrateLiveRetrievalAssets(document, items, resolver),
+      },
+    );
+
+    const pair = revisionItems(prepared.slides[0])[0];
+    expect(pair.image?.dataUrl).toBe(
+      "data:image/png;base64,cXVlc3Rpb24=",
+    );
+    expect(pair.answerImage?.dataUrl).toBe(
+      "data:image/png;base64,YW5zd2Vy",
+    );
+    expect(JSON.stringify(prepared)).not.toContain("expired.test");
+    expect(source).toEqual(original);
+  });
 });
 
 function revisionSlide(questionUrl: string) {
@@ -78,9 +132,24 @@ function managedAsset(url: string, name: string) {
   };
 }
 
+function retrievalItem(): RetrievalItem {
+  return {
+    id: "item-1",
+    contentId: "content-1",
+    lo: "101a: Expand",
+    className: "Year 7",
+    spacingFactor: 1,
+    seenCount: 2,
+    currentImageSlot: 2,
+    selected: false,
+    images: [],
+    answerImages: [],
+  };
+}
+
 function revisionItems(slide: unknown) {
   return (slide as { items: unknown }).items as Array<{
-    image: { dataUrl: string } | null;
-    answerImage: { dataUrl: string } | null;
+    image: BuilderAsset | null;
+    answerImage: BuilderAsset | null;
   }>;
 }

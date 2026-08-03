@@ -194,7 +194,7 @@ export async function embedRemoteBuilderAssets(
         }
         return;
       }
-      if (!/^https?:\/\//i.test(source)) return;
+      if (!/^(?:https?:\/\/|blob:)/i.test(source)) return;
       let pending = dataUrlCache.get(source);
       if (!pending) {
         pending = fetch(source, { cache: "no-store" })

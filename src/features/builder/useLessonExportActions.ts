@@ -27,6 +27,16 @@ type CurrentOutputDependencies = {
   ) => Promise<BuilderDocument>;
 };
 
+type CurrentLessonOutputServiceDependencies = CurrentOutputDependencies & {
+  loadRuntimeAssets?: () => Promise<{
+    css: string;
+    javaScript: string;
+  }>;
+  saveLesson?: typeof saveCurrentLesson;
+  syncDocument?: typeof syncBuilderDocument;
+  downloadPdf?: typeof downloadPresenterPdf;
+};
+
 export function prepareCurrentOutputDocument(
   document: BuilderDocument,
   dependencies: CurrentOutputDependencies = {},
@@ -50,12 +60,100 @@ export async function prepareCurrentA4Handout(
   return buildA4Handout(preparedDocument);
 }
 
+export function createCurrentLessonOutputService(
+  document: BuilderDocument,
+  dependencies: CurrentLessonOutputServiceDependencies = {},
+) {
+  const loadRuntimeAssets =
+    dependencies.loadRuntimeAssets ?? loadPresenterRuntimeAssets;
+  const saveLesson = dependencies.saveLesson ?? saveCurrentLesson;
+  const syncDocument = dependencies.syncDocument ?? syncBuilderDocument;
+  const downloadPdf = dependencies.downloadPdf ?? downloadPresenterPdf;
+
+  async function prepareStandalone(options: {
+    presenterLessonId?: string;
+    studentSession?: PresenterStudentSession | null;
+    offlineCapabilities?: boolean;
+  }) {
+    const presenterLessonId = options.presenterLessonId || "";
+    const [runtime, embeddedDocument] = await Promise.all([
+      loadRuntimeAssets(),
+      prepareCurrentOutputDocument(document, dependencies),
+    ]);
+    return buildStandaloneLessonHtml(embeddedDocument, {
+      offlineCapabilities: options.offlineCapabilities,
+      runtimeCss: runtime.css,
+      runtimeJavaScript: runtime.javaScript.replace(/<\/script/gi, "<\\/script"),
+      liveRetrieval: presenterLessonId
+        ? {
+            enabled: true,
+            endpoint: appEndpoint("/api/presenter/retrieval-log"),
+            nextEndpoint: appEndpoint("/api/presenter/retrieval-next"),
+            lessonId: presenterLessonId,
+            className: embeddedDocument.className,
+            teachingDate: embeddedDocument.teachingDate,
+          }
+        : null,
+      presenterConfig: presenterLessonId
+        ? {
+            enabled: true,
+            sourceLessonId: presenterLessonId,
+            originalTitle: embeddedDocument.title,
+            className: embeddedDocument.className,
+            teachingDate: embeddedDocument.teachingDate,
+            uploadEndpoint: appEndpoint("/api/builder-lessons/upload-url"),
+            completeEndpoint: appEndpoint("/api/builder-lessons/complete"),
+            taughtEndpoint: appEndpoint("/api/builder-lessons/taught"),
+            studentSession: options.studentSession || null,
+            studentSessionUploadEndpoint: appEndpoint(
+              "/api/presenter/student-session/upload-url",
+            ),
+            studentSessionCompleteEndpoint: appEndpoint(
+              "/api/presenter/student-session/complete",
+            ),
+          }
+        : null,
+    });
+  }
+
+  return {
+    preparePresenterHtml(
+      presenterLessonId: string,
+      studentSession: PresenterStudentSession | null,
+    ) {
+      return prepareStandalone({ presenterLessonId, studentSession });
+    },
+    prepareDownloadHtml() {
+      return prepareStandalone({ offlineCapabilities: true });
+    },
+    async preparePdf() {
+      const [html, saved] = await Promise.all([
+        prepareStandalone({}),
+        saveLesson(document),
+        syncDocument(document),
+      ]);
+      return {
+        html,
+        saved,
+        pdf: await downloadPdf(saved.id, html),
+      };
+    },
+    buildJsonPayload() {
+      return {
+        lessonBuilder: document,
+        exportedAt: new Date().toISOString(),
+      };
+    },
+  };
+}
+
 export function useLessonExportActions() {
   const document = useBuilderStore((state) => state.document);
   const hydrate = useBuilderStore((state) => state.hydrate);
   const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const setStatus = useBuilderStore((state) => state.setStatus);
   const { confirmDialog } = useAppNotifications();
+  const outputService = createCurrentLessonOutputService(document);
 
   async function previewLesson(handout = false) {
     const previewWindow = window.open("", "_blank");
@@ -103,8 +201,7 @@ export function useLessonExportActions() {
       const output = handout
         ? await prepareA4Handout()
         : {
-            html: await prepareStandaloneHtml(
-              false,
+            html: await outputService.preparePresenterHtml(
               presenterLessonId,
               studentSession,
             ),
@@ -136,7 +233,7 @@ export function useLessonExportActions() {
   async function exportHtml() {
     setStatus({ tone: "working", message: "Preparing standalone lesson HTML..." });
     try {
-      const html = await prepareStandaloneHtml(false, "", null, true);
+      const html = await outputService.prepareDownloadHtml();
       downloadBlob(
         new Blob([html], { type: "text/html" }),
         `${safeFileName(document.title)}.html`,
@@ -160,13 +257,8 @@ export function useLessonExportActions() {
     }
     setStatus({ tone: "working", message: "Rendering the lesson PDF..." });
     try {
-      const [html, saved] = await Promise.all([
-        prepareStandaloneHtml(false),
-        saveCurrentLesson(document),
-        syncBuilderDocument(document),
-      ]);
+      const { pdf, saved } = await outputService.preparePdf();
       markLessonSaved(saved);
-      const pdf = await downloadPresenterPdf(saved.id, html);
       downloadBlob(pdf, `${safeFileName(document.title)}.pdf`);
       setStatus({ tone: "success", message: "Exported the lesson PDF." });
     } catch (error) {
@@ -178,10 +270,7 @@ export function useLessonExportActions() {
   }
 
   function exportJson() {
-    const payload = {
-      lessonBuilder: document,
-      exportedAt: new Date().toISOString(),
-    };
+    const payload = outputService.buildJsonPayload();
     downloadBlob(
       new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
@@ -255,57 +344,6 @@ export function useLessonExportActions() {
     return true;
   }
 
-  async function prepareStandaloneHtml(
-    handout: boolean,
-    presenterLessonId = "",
-    studentSession: PresenterStudentSession | null = null,
-    offlineCapabilities = false,
-  ) {
-    const [runtimeCss, runtimeJavaScript, embeddedDocument] = await Promise.all([
-      fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
-      fetchAssetText("/builder-v2-assets/presenter-runtime.js"),
-      prepareCurrentOutputDocument(document),
-    ]);
-    return buildStandaloneLessonHtml(embeddedDocument, {
-      handout,
-      offlineCapabilities,
-      runtimeCss,
-      runtimeJavaScript: runtimeJavaScript.replace(
-        /<\/script/gi,
-        "<\\/script",
-      ),
-      liveRetrieval: presenterLessonId
-        ? {
-            enabled: true,
-            endpoint: appEndpoint("/api/presenter/retrieval-log"),
-            nextEndpoint: appEndpoint("/api/presenter/retrieval-next"),
-            lessonId: presenterLessonId,
-            className: embeddedDocument.className,
-            teachingDate: embeddedDocument.teachingDate,
-          }
-        : null,
-      presenterConfig: presenterLessonId
-        ? {
-            enabled: true,
-            sourceLessonId: presenterLessonId,
-            originalTitle: embeddedDocument.title,
-            className: embeddedDocument.className,
-            teachingDate: embeddedDocument.teachingDate,
-            uploadEndpoint: appEndpoint("/api/builder-lessons/upload-url"),
-            completeEndpoint: appEndpoint("/api/builder-lessons/complete"),
-            taughtEndpoint: appEndpoint("/api/builder-lessons/taught"),
-            studentSession,
-            studentSessionUploadEndpoint: appEndpoint(
-              "/api/presenter/student-session/upload-url",
-            ),
-            studentSessionCompleteEndpoint: appEndpoint(
-              "/api/presenter/student-session/complete",
-            ),
-          }
-        : null,
-    });
-  }
-
   async function prepareA4Handout() {
     return prepareCurrentA4Handout(document);
   }
@@ -326,6 +364,14 @@ async function fetchAssetText(url: string) {
     throw new Error(`Could not load presenter assets (${response.status}).`);
   }
   return response.text();
+}
+
+async function loadPresenterRuntimeAssets() {
+  const [css, javaScript] = await Promise.all([
+    fetchAssetText("/builder-v2-assets/presenter-runtime.css"),
+    fetchAssetText("/builder-v2-assets/presenter-runtime.js"),
+  ]);
+  return { css, javaScript };
 }
 
 function downloadBlob(blob: Blob, fileName: string) {

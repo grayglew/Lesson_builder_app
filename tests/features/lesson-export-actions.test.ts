@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createCurrentLessonOutputService,
   prepareCurrentA4Handout,
-  prepareCurrentOutputDocument,
 } from "@/features/builder/useLessonExportActions";
 import {
   createInitialBuilderDocument,
@@ -9,19 +9,58 @@ import {
 } from "@/features/builder/schema";
 
 describe("current lesson output preparation wiring", () => {
-  it("prepares the current presenter/HTML/PDF document exactly once", async () => {
+  it.each([
+    ["presenter", (service: ReturnType<typeof createCurrentLessonOutputService>) => service.preparePresenterHtml("lesson-1", null)],
+    ["HTML", (service: ReturnType<typeof createCurrentLessonOutputService>) => service.prepareDownloadHtml()],
+  ])("prepares the %s output exactly once", async (_label, run) => {
     const document = createInitialBuilderDocument();
-    const prepared = structuredClone(document);
-    const prepareDocument = vi.fn().mockResolvedValue(prepared);
+    document.title = "Original";
+    const prepared = { ...structuredClone(document), title: "Prepared" };
+    const dependencies = outputDependencies(prepared);
+    const service = createCurrentLessonOutputService(document, dependencies);
 
-    await expect(
-      prepareCurrentOutputDocument(document, { prepareDocument }),
-    ).resolves.toBe(prepared);
-    expect(prepareDocument).toHaveBeenCalledOnce();
-    expect(prepareDocument).toHaveBeenCalledWith(
+    const html = await run(service);
+
+    expect(dependencies.prepareDocument).toHaveBeenCalledOnce();
+    expect(dependencies.prepareDocument).toHaveBeenCalledWith(
       document,
       document.retrievalItems,
     );
+    expect(html).toContain("Prepared");
+  });
+
+  it("prepares PDF once while saving and syncing the original document", async () => {
+    const document = createInitialBuilderDocument();
+    document.title = "Original";
+    const prepared = { ...structuredClone(document), title: "Prepared" };
+    const dependencies = outputDependencies(prepared);
+    const service = createCurrentLessonOutputService(document, dependencies);
+
+    const result = await service.preparePdf();
+
+    expect(dependencies.prepareDocument).toHaveBeenCalledOnce();
+    expect(dependencies.saveLesson).toHaveBeenCalledOnce();
+    expect(dependencies.saveLesson).toHaveBeenCalledWith(document);
+    expect(dependencies.syncDocument).toHaveBeenCalledOnce();
+    expect(dependencies.syncDocument).toHaveBeenCalledWith(document);
+    expect(dependencies.downloadPdf).toHaveBeenCalledWith(
+      "saved-lesson",
+      expect.stringContaining("Prepared"),
+    );
+    expect(result.pdf).toBeInstanceOf(Blob);
+  });
+
+  it("exports JSON without preparing or changing the durable document", () => {
+    const document = createInitialBuilderDocument();
+    const dependencies = outputDependencies(structuredClone(document));
+    const service = createCurrentLessonOutputService(document, dependencies);
+
+    const payload = service.buildJsonPayload();
+
+    expect(dependencies.prepareDocument).not.toHaveBeenCalled();
+    expect(dependencies.saveLesson).not.toHaveBeenCalled();
+    expect(dependencies.syncDocument).not.toHaveBeenCalled();
+    expect(payload.lessonBuilder).toBe(document);
   });
 
   it("selects persisted handout slides before preparing exactly once", async () => {
@@ -42,6 +81,27 @@ describe("current lesson output preparation wiring", () => {
     expect(result.html).toContain('aria-label="Handout page 1"');
   });
 });
+
+function outputDependencies(prepared: BuilderDocument) {
+  return {
+    prepareDocument: vi.fn().mockResolvedValue(prepared),
+    loadRuntimeAssets: vi.fn().mockResolvedValue({
+      css: "/* runtime css */",
+      javaScript: "window.runtime=true;",
+    }),
+    saveLesson: vi.fn().mockResolvedValue({
+      id: "saved-lesson",
+      title: "Original",
+      className: "",
+      teachingDate: "",
+      updatedAt: "2026-08-03T00:00:00.000Z",
+    }),
+    syncDocument: vi.fn().mockResolvedValue(undefined),
+    downloadPdf: vi.fn().mockResolvedValue(
+      new Blob(["pdf"], { type: "application/pdf" }),
+    ),
+  };
+}
 
 function currentHandoutDocument() {
   const document = createInitialBuilderDocument();
