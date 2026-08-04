@@ -182,7 +182,7 @@ describe("BuilderShell legacy UI parity", () => {
       id: "new-lesson-id",
       title: "New algebra lesson",
       className: "Year 9",
-      teachingDate: "2026-07-27",
+      teachingDate: "2026-08-12",
       byteSize: 100,
       taughtAt: "",
       isTaught: false,
@@ -204,6 +204,9 @@ describe("BuilderShell legacy UI parity", () => {
     await user.type(within(dialog).getByLabelText("Lesson title"), "New algebra lesson");
     expect(submit).toBeDisabled();
     await user.selectOptions(within(dialog).getByLabelText("Class"), "Year 9");
+    const teachingDate = within(dialog).getByLabelText("Teaching date");
+    await user.clear(teachingDate);
+    await user.type(teachingDate, "2026-08-12");
     expect(submit).toBeEnabled();
     await user.click(submit);
 
@@ -212,6 +215,7 @@ describe("BuilderShell legacy UI parity", () => {
         expect.objectContaining({
           title: "New algebra lesson",
           className: "Year 9",
+          teachingDate: "2026-08-12",
           activeLessonId: "",
           slides: [],
         }),
@@ -223,6 +227,7 @@ describe("BuilderShell legacy UI parity", () => {
         expect.objectContaining({
           title: "New algebra lesson",
           className: "Year 9",
+          teachingDate: "2026-08-12",
           activeLessonId: "new-lesson-id",
           slides: [],
           retrievalItems: document.retrievalItems,

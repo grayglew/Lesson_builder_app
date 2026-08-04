@@ -502,11 +502,13 @@ export function BuilderShell({
   async function createAndSaveNewLesson(details: {
     title: string;
     className: string;
+    teachingDate: string;
   }) {
     const nextDocument = {
       ...createInitialBuilderDocument(),
       title: details.title,
       className: details.className,
+      teachingDate: details.teachingDate,
       classNames: [...document.classNames],
       retrievalItems: document.retrievalItems,
       slideTemplates: document.slideTemplates,

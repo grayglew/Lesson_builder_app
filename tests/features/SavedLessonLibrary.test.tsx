@@ -50,7 +50,16 @@ describe("SavedLessonLibrary production actions", () => {
     vi.mocked(listSavedLessons).mockResolvedValue({
       ok: true,
       lessons: [
-        lesson("taught", "Already taught", "2026-01-01", true),
+        {
+          ...lesson("taught", "Already taught", "2026-01-01", true),
+          confidenceSummary: {
+            version: 1,
+            counts: { "1": 0, "2": 1, "3": 8, "4": 1, "5": 0 },
+            total: 10,
+            average: 3,
+            completedAt: "2026-07-19T01:00:00.000Z",
+          },
+        },
         lesson("active", "Active lesson", "2026-04-02", false),
         {
           ...lesson("confidence", "Confidence lesson", "2026-04-01", false),
@@ -76,11 +85,14 @@ describe("SavedLessonLibrary production actions", () => {
     expect(within(rows[2]).getByText("Confidence lesson")).toBeInTheDocument();
     expect(rows[1]).toHaveTextContent("unsaved changes");
     expect(within(rows[3]).getByText("Already taught")).toBeInTheDocument();
-    expect(rows[2]).toHaveStyle({
-      backgroundColor: "#dcfce7",
-      boxShadow: "inset 4px 0 0 #22c55e",
-    });
-    expect(rows[3]).toHaveClass("bg-slate-100", "opacity-70", "grayscale");
+    expect(rows[2].style.getPropertyValue("--saved-lesson-confidence-background")).toBe("");
+    expect(rows[2]).toHaveClass("bg-white");
+    expect(
+      rows[3].style.getPropertyValue("--saved-lesson-confidence-background"),
+    ).toBe("#fef9c3");
+    expect(
+      rows[3].style.getPropertyValue("--saved-lesson-confidence-border"),
+    ).toBe("#eab308");
 
     const activeRow = rows[1];
     expect(

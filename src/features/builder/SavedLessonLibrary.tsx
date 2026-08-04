@@ -38,6 +38,7 @@ import {
 } from "./api-client";
 import { useAppNotifications } from "./AppNotifications";
 import { BuilderActionMenu } from "./BuilderActionMenu";
+import styles from "./BuilderShell.module.css";
 import { ConfidenceModal } from "./ConfidenceModal";
 import {
   buildPowerPointBundleZip,
@@ -537,17 +538,19 @@ export function SavedLessonLibrary({
                   const confidence = usableConfidenceSummary(
                     lesson as SavedLessonWithConfidence,
                   );
-                  const confidenceColors = confidence
+                  const confidenceColors = lesson.isTaught && confidence
                     ? confidenceAverageColors(confidence.average || 3)
                     : null;
                   const rowStyle: CSSProperties | undefined = confidenceColors
                     ? {
-                        backgroundColor: confidenceColors.background,
-                        boxShadow: `inset 4px 0 0 ${confidenceColors.border}`,
-                      }
+                        "--saved-lesson-confidence-background":
+                          confidenceColors.background,
+                        "--saved-lesson-confidence-border":
+                          confidenceColors.border,
+                      } as CSSProperties
                     : undefined;
                   const rowClassName = confidenceColors
-                    ? ""
+                    ? styles.savedLessonConfidenceRow
                     : lesson.isTaught
                       ? "bg-slate-100 opacity-70 grayscale"
                       : active

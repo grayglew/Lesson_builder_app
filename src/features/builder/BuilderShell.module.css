@@ -579,6 +579,11 @@
   padding-top: 4px;
 }
 
+.savedLessonConfidenceRow {
+  background-color: var(--saved-lesson-confidence-background);
+  box-shadow: inset 4px 0 0 var(--saved-lesson-confidence-border);
+}
+
 .exampleRetrievalToggle {
   display: inline-flex;
   flex: 0 0 auto;
@@ -1624,6 +1629,14 @@
   color-scheme: dark;
 }
 
+.compactConsole[data-builder-theme="dark"] .savedLessonConfidenceRow {
+  background-color: color-mix(
+    in srgb,
+    var(--saved-lesson-confidence-border) 18%,
+    var(--builder-surface)
+  );
+}
+
 @media (prefers-color-scheme: dark) {
   .compactConsole[data-builder-theme="system"] {
     --builder-bg: #141917;
@@ -1642,6 +1655,14 @@
     --builder-danger-soft: #482722;
     --builder-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.42);
     color-scheme: dark;
+  }
+
+  .compactConsole[data-builder-theme="system"] .savedLessonConfidenceRow {
+    background-color: color-mix(
+      in srgb,
+      var(--saved-lesson-confidence-border) 18%,
+      var(--builder-surface)
+    );
   }
 
   .subsectionHead {
