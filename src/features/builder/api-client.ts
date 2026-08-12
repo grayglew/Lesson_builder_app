@@ -642,6 +642,8 @@ export async function resolveRetrievalImages(
         mode,
         currentImageSlot: item.currentImageSlot,
         seenCount: item.seenCount,
+        questionStoragePath: item.images[0]?.storagePath,
+        answerStoragePath: item.answerImages[0]?.storagePath,
       })),
     },
     z.object({

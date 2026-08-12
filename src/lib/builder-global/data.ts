@@ -125,6 +125,8 @@ type ResolvedRetrievalImageRequest = {
   mode?: unknown;
   seenCount?: unknown;
   currentImageSlot?: unknown;
+  questionStoragePath?: unknown;
+  answerStoragePath?: unknown;
 };
 
 type AssetRow = {
@@ -730,10 +732,24 @@ export async function resolveRetrievalImageRequests(
   const foundItems = [];
   for (const request of Array.isArray(requests) ? requests : []) {
     const item = await findRetrievalItemForImageRequest(supabase, userId, request);
-    if (item) foundItems.push({ request, item });
+    const questionStoragePath = ownedLegacyRetrievalPath(
+      userId,
+      request.questionStoragePath,
+      "question",
+    );
+    const answerStoragePath = ownedLegacyRetrievalPath(
+      userId,
+      request.answerStoragePath,
+      "answer",
+    );
+    if (item || questionStoragePath || answerStoragePath) {
+      foundItems.push({ request, item, questionStoragePath, answerStoragePath });
+    }
   }
 
-  const itemRows = foundItems.map((entry) => entry.item);
+  const itemRows = foundItems
+    .map((entry) => entry.item)
+    .filter((item): item is RetrievalItemRow => Boolean(item));
   const imageRows = await loadRetrievalLoImages(
     supabase,
     userId,
@@ -741,42 +757,62 @@ export async function resolveRetrievalImageRequests(
     assetSupabase,
   );
   const signedUrlByPath = await createSignedUrlMap(assetSupabase, imageRows);
+  const legacySignedUrlByPath = await createSignedUrlMapForPaths(
+    assetSupabase,
+    uniqueStrings(
+      foundItems.flatMap((entry) => [
+        entry.questionStoragePath,
+        entry.answerStoragePath,
+      ]),
+    ),
+  );
   const imagesByItem = groupImagesByItem(imageRows, signedUrlByPath, true);
 
   return {
-    items: foundItems.map(({ request, item }) => {
-      const retrievalLo = firstRetrievalLo(item.retrieval_lo);
-      const grouped = imagesByItem.get(item.retrieval_lo_id) || emptyGroupedImages();
+    items: foundItems.map(
+      ({ request, item, questionStoragePath, answerStoragePath }) => {
+      const retrievalLo = firstRetrievalLo(item?.retrieval_lo);
+      const grouped = item
+        ? imagesByItem.get(item.retrieval_lo_id) || emptyGroupedImages()
+        : emptyGroupedImages();
       const mode = String(request.mode || "current");
       if (mode === "all") {
         return {
           requestKey: String(request.requestKey || ""),
-          itemId: item.id,
-          trackingId: item.id,
-          contentId: item.retrieval_lo_id,
+          itemId: item?.id || String(request.itemId || ""),
+          trackingId: item?.id || String(request.itemId || ""),
+          contentId: item?.retrieval_lo_id || String(request.contentId || ""),
           loCode: retrievalLo?.lo_code || extractRetrievalLoCode(retrievalLo?.lo_text || ""),
-          lo: retrievalLo?.lo_text || "",
-          className: item.class_name || "",
-          currentImageSlot: normalizeImageSlot(item.current_image_slot),
+          lo: retrievalLo?.lo_text || String(request.lo || ""),
+          className: item?.class_name || String(request.className || ""),
+          currentImageSlot: normalizeImageSlot(item?.current_image_slot || request.currentImageSlot),
           images: grouped.question,
           answerImages: grouped.answer,
         };
       }
 
       const slot = mode === "seen"
-        ? normalizeImageSlot(request.seenCount || item.seen_count || 1)
-        : pickDisplaySlot(request.currentImageSlot || item.current_image_slot, grouped.question);
+        ? normalizeImageSlot(request.seenCount || item?.seen_count || 1)
+        : pickDisplaySlot(request.currentImageSlot || item?.current_image_slot, grouped.question);
+      const legacyQuestionImage = legacyImagePayload(
+        questionStoragePath,
+        legacySignedUrlByPath,
+      );
+      const legacyAnswerImage = legacyImagePayload(
+        answerStoragePath,
+        legacySignedUrlByPath,
+      );
       return {
         requestKey: String(request.requestKey || ""),
-        itemId: item.id,
-        trackingId: item.id,
-        contentId: item.retrieval_lo_id,
+        itemId: item?.id || String(request.itemId || ""),
+        trackingId: item?.id || String(request.itemId || ""),
+        contentId: item?.retrieval_lo_id || String(request.contentId || ""),
         loCode: retrievalLo?.lo_code || extractRetrievalLoCode(retrievalLo?.lo_text || ""),
-        lo: retrievalLo?.lo_text || "",
-        className: item.class_name || "",
+        lo: retrievalLo?.lo_text || String(request.lo || ""),
+        className: item?.class_name || String(request.className || ""),
         currentImageSlot: slot,
-        questionImage: grouped.question[slot - 1] || null,
-        answerImage: grouped.answer[slot - 1] || null,
+        questionImage: grouped.question[slot - 1] || legacyQuestionImage || null,
+        answerImage: grouped.answer[slot - 1] || legacyAnswerImage || null,
       };
     }),
   };
@@ -1007,6 +1043,58 @@ async function createSignedUrlMap(supabase: SupabaseClient, imageRows: Retrieval
   }
 
   return signedUrlByPath;
+}
+
+async function createSignedUrlMapForPaths(
+  supabase: SupabaseClient,
+  paths: string[],
+) {
+  const signedUrlByPath = new Map<string, string>();
+  for (let index = 0; index < paths.length; index += 100) {
+    const batch = paths.slice(index, index + 100);
+    const { data, error } = await supabase.storage
+      .from(IMAGE_BUCKET)
+      .createSignedUrls(batch, SIGNED_URL_SECONDS);
+    if (error) throw error;
+    (data || []).forEach((entry) => {
+      if (entry.path && entry.signedUrl) {
+        signedUrlByPath.set(entry.path, entry.signedUrl);
+      }
+    });
+  }
+  return signedUrlByPath;
+}
+
+export function ownedLegacyRetrievalPath(
+  userId: string,
+  value: unknown,
+  role: RetrievalImageRole,
+) {
+  const path = String(value || "").trim().replace(/\\/g, "/");
+  const prefix = `${userId}/retrieval/`;
+  if (!path.startsWith(prefix) || path.includes("..") || path.includes("?")) {
+    return "";
+  }
+  const fileName = path.split("/").pop() || "";
+  return new RegExp(`^${role}-[1-8](?:-|\\.)`, "i").test(fileName)
+    ? path
+    : "";
+}
+
+function legacyImagePayload(
+  path: string,
+  signedUrlByPath: Map<string, string>,
+): BuilderImagePayload | null {
+  if (!path) return null;
+  const signedUrl = signedUrlByPath.get(path) || "";
+  if (!signedUrl) return null;
+  return {
+    name: path.split("/").pop() || "retrieval-image.png",
+    type: "image/png",
+    size: 0,
+    dataUrl: signedUrl,
+    storagePath: path,
+  };
 }
 
 function groupImagesByItem(imageRows: RetrievalImageRow[], signedUrlByPath: Map<string, string>, includeSignedUrls = true) {

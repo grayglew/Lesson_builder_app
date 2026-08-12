@@ -472,7 +472,7 @@ function assertNewOutputResolverRequest(
     className: "Year 9",
     mode: "seen",
     currentImageSlot: 3,
-    seenCount: 6,
+    seenCount: 3,
   });
 }
 

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { lookupRetrievalLo } from "@/features/builder/api-client";
+import {
+  lookupRetrievalLo,
+  resolveRetrievalImages,
+} from "@/features/builder/api-client";
 
 describe("lookupRetrievalLo", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -36,5 +39,57 @@ describe("lookupRetrievalLo", () => {
       expect.objectContaining({ signal, cache: "no-store" }),
     );
     expect(result.match?.loCode).toBe("101a");
+  });
+});
+
+describe("resolveRetrievalImages", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("sends owned legacy storage paths so expired saved-slide URLs can be re-signed", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          items: [],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await resolveRetrievalImages(
+      [
+        {
+          id: "88968498-c80e-47ed-980c-e58d27985a2b",
+          lo: "501b: Expand using Pascal's triangle",
+          className: "10Ma1",
+          spacingFactor: 1,
+          seenCount: 2,
+          currentImageSlot: 2,
+          selected: false,
+          images: [
+            {
+              name: "question-2.png",
+              type: "image/png",
+              size: 0,
+              dataUrl: "https://storage.example/expired",
+              storagePath:
+                "owner-id/retrieval/88968498-c80e-47ed-980c-e58d27985a2b/question-2.png",
+            },
+          ],
+          answerImages: [],
+        },
+      ],
+      "seen",
+    );
+
+    const [, init] = fetchMock.mock.calls[0] || [];
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      requests: [
+        {
+          questionStoragePath:
+            "owner-id/retrieval/88968498-c80e-47ed-980c-e58d27985a2b/question-2.png",
+        },
+      ],
+    });
   });
 });
