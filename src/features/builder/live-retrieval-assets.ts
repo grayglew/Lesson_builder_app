@@ -57,7 +57,9 @@ export async function hydrateLiveRetrievalAssets(
   hydrated.slides.forEach((slide, slideIndex) => {
     if (slide.type !== "revision") return;
     revisionItems(slide).forEach((item, itemIndex) => {
-      const source = retrievalItemIdFromRevisionAssets(item)
+      const managedPathItemId = retrievalItemIdFromRevisionAssets(item);
+      const managedPathImageSlot = retrievalImageSlotFromRevisionAssets(item);
+      const source = managedPathItemId
         ? revisionRequestSource(item, hydrated.className)
         : findRetrievalItemForRevision(
             retrievalItems,
@@ -67,7 +69,7 @@ export async function hydrateLiveRetrievalAssets(
       if (!source) return;
 
       const currentImageSlot = normalizeImageSlot(
-        item.currentImageSlot ?? source.currentImageSlot,
+        managedPathImageSlot || item.currentImageSlot || source.currentImageSlot,
       );
       Object.assign(item, {
         retrievalItemId: item.retrievalItemId || source.id,
@@ -82,9 +84,9 @@ export async function hydrateLiveRetrievalAssets(
         contentId: item.contentId || source.contentId,
         lo: item.lo || source.lo,
         className: item.className || source.className || hydrated.className,
-        seenCount: Number.isFinite(Number(item.seenCount))
+        seenCount: managedPathImageSlot || (Number.isFinite(Number(item.seenCount))
           ? Math.max(0, Math.round(Number(item.seenCount)))
-          : source.seenCount,
+          : source.seenCount),
         currentImageSlot,
       });
     });
@@ -316,4 +318,23 @@ function normalizeImageSlot(value: unknown) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 1;
   return Math.max(1, Math.min(8, Math.round(number)));
+}
+
+function retrievalImageSlotFromRevisionAssets(revision: RevisionItem) {
+  const questionSlot = retrievalImageSlotFromAsset(revision.image);
+  const answerSlot = retrievalImageSlotFromAsset(revision.answerImage);
+  if (questionSlot && answerSlot && questionSlot !== answerSlot) return 0;
+  return questionSlot || answerSlot;
+}
+
+function retrievalImageSlotFromAsset(asset: unknown) {
+  if (!asset || typeof asset !== "object" || Array.isArray(asset)) return 0;
+  const record = asset as Record<string, unknown>;
+  for (const value of [record.storagePath, record.dataUrl, record.url]) {
+    const text = stringValue(value);
+    if (!text) continue;
+    const match = text.match(/\/(?:question|answer)-([1-8])(?:-|\.)/i);
+    if (match?.[1]) return Number(match[1]);
+  }
+  return 0;
 }

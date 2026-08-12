@@ -179,7 +179,7 @@ describe("live retrieval asset hydration", () => {
         items: [
           {
             lo: "501b: Expand using Pascal's triangle",
-            seenCount: 2,
+            seenCount: 7,
             retrievalItemId: "11111111-1111-4111-8111-111111111111",
             className: "9L2FM",
             image: {
