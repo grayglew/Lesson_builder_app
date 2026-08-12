@@ -57,11 +57,12 @@ export async function hydrateLiveRetrievalAssets(
   hydrated.slides.forEach((slide, slideIndex) => {
     if (slide.type !== "revision") return;
     revisionItems(slide).forEach((item, itemIndex) => {
-      const source = findRetrievalItemForRevision(
-        retrievalItems,
-        item,
-        item.className || hydrated.className,
-      );
+      const source =
+        findRetrievalItemForRevision(
+          retrievalItems,
+          item,
+          item.className || hydrated.className,
+        ) || revisionRequestSource(item, hydrated.className);
       if (!source) return;
 
       const currentImageSlot = normalizeImageSlot(
@@ -136,6 +137,28 @@ export async function hydrateLiveRetrievalAssets(
 function revisionItems(slide: BuilderSlide): RevisionItem[] {
   const items = (slide as { items?: unknown }).items;
   return Array.isArray(items) ? (items as RevisionItem[]) : [];
+}
+
+function revisionRequestSource(
+  revision: RevisionItem,
+  defaultClassName: string,
+): RetrievalItem | null {
+  const itemId = stringValue(revision.retrievalItemId);
+  const contentId = stringValue(revision.contentId);
+  if (!itemId && !contentId) return null;
+
+  return {
+    id: itemId,
+    contentId: contentId || undefined,
+    lo: stringValue(revision.lo),
+    className: stringValue(revision.className) || defaultClassName,
+    spacingFactor: 1,
+    seenCount: Math.max(0, Math.round(Number(revision.seenCount) || 0)),
+    currentImageSlot: normalizeImageSlot(revision.currentImageSlot),
+    selected: false,
+    images: revision.image ? [revision.image] : [],
+    answerImages: revision.answerImage ? [revision.answerImage] : [],
+  };
 }
 
 function findRetrievalItemForRevision(

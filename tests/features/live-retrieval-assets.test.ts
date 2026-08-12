@@ -121,6 +121,53 @@ describe("live retrieval asset hydration", () => {
     expect(item?.answerImage?.dataUrl).toContain("fresh-cross-class-answer");
   });
 
+  it("refreshes a saved revision by its exact id when the browser catalogue is missing it", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "10Ma1";
+    document.slides = [
+      {
+        id: "revision-1",
+        type: "revision",
+        title: "Revision copied from another class",
+        items: [
+          {
+            lo: "501b: Expand using Pascal's triangle",
+            seenCount: 2,
+            retrievalItemId: "88968498-c80e-47ed-980c-e58d27985a2b",
+            className: "9L2FM",
+            image: remoteAsset("expired-missing-catalogue-question"),
+            answerImage: remoteAsset("expired-missing-catalogue-answer"),
+          },
+        ],
+      },
+    ];
+    const resolver = vi.fn(async (items: RetrievalItem[]) => {
+      expect(items).toEqual([
+        expect.objectContaining({
+          id: "88968498-c80e-47ed-980c-e58d27985a2b",
+          className: "9L2FM",
+          seenCount: 2,
+        }),
+      ]);
+      return [
+        {
+          requestKey: "request-0",
+          itemId: "88968498-c80e-47ed-980c-e58d27985a2b",
+          currentImageSlot: 2,
+          questionImage: embeddedAsset("fresh-missing-catalogue-question"),
+          answerImage: embeddedAsset("fresh-missing-catalogue-answer"),
+        },
+      ];
+    });
+
+    const hydrated = await hydrateLiveRetrievalAssets(document, [], resolver);
+
+    expect(resolver).toHaveBeenCalledOnce();
+    expect(revisionItems(hydrated.slides[0])[0]?.image?.dataUrl).toContain(
+      "fresh-missing-catalogue-question",
+    );
+  });
+
   it("does not match another class by LO wording alone", async () => {
     const document = createInitialBuilderDocument();
     document.className = "10Ma1";
