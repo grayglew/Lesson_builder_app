@@ -747,23 +747,6 @@ export async function resolveRetrievalImageRequests(
     }
   }
 
-  console.info("Resolved retrieval image request identities.", {
-    requestCount: Array.isArray(requests) ? requests.length : 0,
-    providedQuestionPathCount: requests.filter((request) =>
-      Boolean(String(request.questionStoragePath || "").trim()),
-    ).length,
-    providedAnswerPathCount: requests.filter((request) =>
-      Boolean(String(request.answerStoragePath || "").trim()),
-    ).length,
-    matchedProgressCount: foundItems.filter((entry) => Boolean(entry.item)).length,
-    ownedLegacyQuestionPathCount: foundItems.filter((entry) =>
-      Boolean(entry.questionStoragePath),
-    ).length,
-    ownedLegacyAnswerPathCount: foundItems.filter((entry) =>
-      Boolean(entry.answerStoragePath),
-    ).length,
-  });
-
   const itemRows = foundItems
     .map((entry) => entry.item)
     .filter((item): item is RetrievalItemRow => Boolean(item));
