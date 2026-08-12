@@ -180,6 +180,7 @@ describe("live retrieval asset hydration", () => {
           {
             lo: "501b: Expand using Pascal's triangle",
             seenCount: 2,
+            retrievalItemId: "legacy-501b",
             className: "9L2FM",
             image: {
               ...remoteAsset("expired-legacy-question"),
