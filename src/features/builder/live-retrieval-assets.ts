@@ -143,7 +143,9 @@ function revisionRequestSource(
   revision: RevisionItem,
   defaultClassName: string,
 ): RetrievalItem | null {
-  const itemId = stringValue(revision.retrievalItemId);
+  const itemId =
+    stringValue(revision.retrievalItemId) ||
+    retrievalItemIdFromRevisionAssets(revision);
   const contentId = stringValue(revision.contentId);
   if (!itemId && !contentId) return null;
 
@@ -159,6 +161,34 @@ function revisionRequestSource(
     images: revision.image ? [revision.image] : [],
     answerImages: revision.answerImage ? [revision.answerImage] : [],
   };
+}
+
+function retrievalItemIdFromRevisionAssets(revision: RevisionItem) {
+  const questionItemId = retrievalItemIdFromAsset(revision.image);
+  const answerItemId = retrievalItemIdFromAsset(revision.answerImage);
+  if (questionItemId && answerItemId && questionItemId !== answerItemId) {
+    return "";
+  }
+  return questionItemId || answerItemId;
+}
+
+function retrievalItemIdFromAsset(asset: unknown) {
+  if (!asset || typeof asset !== "object" || Array.isArray(asset)) return "";
+  const record = asset as Record<string, unknown>;
+  for (const value of [
+    record.storagePath,
+    record.dataUrl,
+    record.url,
+    record.assetId,
+  ]) {
+    const text = stringValue(value);
+    if (!text) continue;
+    const match = text.match(
+      /(?:^|\/)retrieval\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/|$)/i,
+    );
+    if (match?.[1]) return match[1].toLowerCase();
+  }
+  return "";
 }
 
 function findRetrievalItemForRevision(

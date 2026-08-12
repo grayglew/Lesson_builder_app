@@ -168,6 +168,60 @@ describe("live retrieval asset hydration", () => {
     );
   });
 
+  it("recovers the exact retrieval id from a legacy managed asset path", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "10Ma1";
+    document.slides = [
+      {
+        id: "revision-1",
+        type: "revision",
+        title: "Legacy revision copied from another class",
+        items: [
+          {
+            lo: "501b: Expand using Pascal's triangle",
+            seenCount: 2,
+            className: "9L2FM",
+            image: {
+              ...remoteAsset("expired-legacy-question"),
+              storagePath:
+                "225f2092-e96f-4065-bf8f-0d68d7c3cf78/retrieval/88968498-c80e-47ed-980c-e58d27985a2b/question-2-964dd7c595869acb89b3c3bd.png",
+            },
+            answerImage: {
+              ...remoteAsset("expired-legacy-answer"),
+              storagePath:
+                "225f2092-e96f-4065-bf8f-0d68d7c3cf78/retrieval/88968498-c80e-47ed-980c-e58d27985a2b/answer-2-c6b5ec8a.png",
+            },
+          },
+        ],
+      },
+    ];
+    const resolver = vi.fn(async (items: RetrievalItem[]) => {
+      expect(items).toEqual([
+        expect.objectContaining({
+          id: "88968498-c80e-47ed-980c-e58d27985a2b",
+          className: "9L2FM",
+          seenCount: 2,
+        }),
+      ]);
+      return [
+        {
+          requestKey: "request-0",
+          itemId: "88968498-c80e-47ed-980c-e58d27985a2b",
+          currentImageSlot: 2,
+          questionImage: embeddedAsset("fresh-legacy-question"),
+          answerImage: embeddedAsset("fresh-legacy-answer"),
+        },
+      ];
+    });
+
+    const hydrated = await hydrateLiveRetrievalAssets(document, [], resolver);
+
+    expect(resolver).toHaveBeenCalledOnce();
+    expect(revisionItems(hydrated.slides[0])[0]?.image?.dataUrl).toContain(
+      "fresh-legacy-question",
+    );
+  });
+
   it("does not match another class by LO wording alone", async () => {
     const document = createInitialBuilderDocument();
     document.className = "10Ma1";
