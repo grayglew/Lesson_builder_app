@@ -215,7 +215,16 @@ describe("live retrieval asset hydration", () => {
       ];
     });
 
-    const hydrated = await hydrateLiveRetrievalAssets(document, [], resolver);
+    const misleadingBrowserItem = retrievalItem(
+      "11111111-1111-4111-8111-111111111111",
+      "501b: Expand using Pascal's triangle",
+      2,
+    );
+    const hydrated = await hydrateLiveRetrievalAssets(
+      document,
+      [misleadingBrowserItem],
+      resolver,
+    );
 
     expect(resolver).toHaveBeenCalledOnce();
     expect(revisionItems(hydrated.slides[0])[0]?.image?.dataUrl).toContain(

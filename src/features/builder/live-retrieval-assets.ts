@@ -57,12 +57,13 @@ export async function hydrateLiveRetrievalAssets(
   hydrated.slides.forEach((slide, slideIndex) => {
     if (slide.type !== "revision") return;
     revisionItems(slide).forEach((item, itemIndex) => {
-      const source =
-        findRetrievalItemForRevision(
-          retrievalItems,
-          item,
-          item.className || hydrated.className,
-        ) || revisionRequestSource(item, hydrated.className);
+      const source = retrievalItemIdFromRevisionAssets(item)
+        ? revisionRequestSource(item, hydrated.className)
+        : findRetrievalItemForRevision(
+            retrievalItems,
+            item,
+            item.className || hydrated.className,
+          ) || revisionRequestSource(item, hydrated.className);
       if (!source) return;
 
       const currentImageSlot = normalizeImageSlot(
