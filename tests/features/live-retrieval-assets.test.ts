@@ -65,6 +65,99 @@ describe("live retrieval asset hydration", () => {
     expect(document).toEqual(sourceDocument);
   });
 
+  it("refreshes a revision item by its exact id even when it came from another class", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "10Ma1";
+    document.slides = [
+      {
+        id: "revision-1",
+        type: "revision",
+        title: "Revision copied from another class",
+        items: [
+          {
+            lo: "501b: Expand using Pascal's triangle",
+            seenCount: 2,
+            retrievalItemId: "9l2fm-item",
+            image: remoteAsset("expired-cross-class-question"),
+            answerImage: remoteAsset("expired-cross-class-answer"),
+          },
+        ],
+      },
+    ];
+    const source = retrievalItem(
+      "9l2fm-item",
+      "501b: Expand using Pascal's triangle",
+      2,
+    );
+    source.className = "9L2FM";
+    const resolver = vi.fn(async (items: RetrievalItem[]) => {
+      expect(items).toEqual([
+        expect.objectContaining({
+          id: "9l2fm-item",
+          className: "9L2FM",
+          seenCount: 2,
+        }),
+      ]);
+      return [
+        {
+          requestKey: "request-0",
+          itemId: "9l2fm-item",
+          currentImageSlot: 2,
+          questionImage: embeddedAsset("fresh-cross-class-question"),
+          answerImage: embeddedAsset("fresh-cross-class-answer"),
+        },
+      ];
+    });
+
+    const hydrated = await hydrateLiveRetrievalAssets(
+      document,
+      [source],
+      resolver,
+    );
+
+    const item = revisionItems(hydrated.slides[0])[0];
+    expect(resolver).toHaveBeenCalledOnce();
+    expect(item?.image?.dataUrl).toContain("fresh-cross-class-question");
+    expect(item?.answerImage?.dataUrl).toContain("fresh-cross-class-answer");
+  });
+
+  it("does not match another class by LO wording alone", async () => {
+    const document = createInitialBuilderDocument();
+    document.className = "10Ma1";
+    document.slides = [
+      {
+        id: "revision-1",
+        type: "revision",
+        title: "Revision",
+        items: [
+          {
+            lo: "501b: Expand using Pascal's triangle",
+            seenCount: 2,
+            image: remoteAsset("expired-unlinked-question"),
+          },
+        ],
+      },
+    ];
+    const otherClass = retrievalItem(
+      "9l2fm-item",
+      "501b: Expand using Pascal's triangle",
+      2,
+    );
+    otherClass.className = "9L2FM";
+    const resolver = vi.fn();
+
+    const hydrated = await hydrateLiveRetrievalAssets(
+      document,
+      [otherClass],
+      resolver,
+    );
+
+    expect(resolver).not.toHaveBeenCalled();
+    expect(revisionItems(hydrated.slides[0])[0]?.image?.dataUrl).toContain(
+      "expired-unlinked-question",
+    );
+  });
+
   it("recovers a legacy revision link from a unique class-scoped asset identity", async () => {
     const document = createInitialBuilderDocument();
     document.className = "Year 7";

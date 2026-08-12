@@ -143,11 +143,9 @@ function findRetrievalItemForRevision(
   revision: RevisionItem,
   className: string,
 ) {
-  const scoped = scopeRetrievalItems(items, className);
-
   const itemId = stringValue(revision.retrievalItemId);
   if (itemId) {
-    const match = uniqueMatch(scoped, (candidate) =>
+    const match = uniqueMatch(items, (candidate) =>
       [
         candidate.id,
         candidate.trackingId,
@@ -161,39 +159,48 @@ function findRetrievalItemForRevision(
   const contentId = stringValue(revision.contentId);
   if (contentId) {
     const match = uniqueMatch(
-      scoped,
+      items,
       (candidate) => stringValue(candidate.contentId) === contentId,
-    );
-    if (match.kind !== "none") return match.item;
-  }
-
-  const lo = normalizeText(revision.lo);
-  if (lo) {
-    const match = uniqueMatch(
-      scoped,
-      (candidate) => normalizeText(candidate.lo) === lo,
     );
     if (match.kind !== "none") return match.item;
   }
 
   const questionIdentities = new Set(assetIdentities(revision.image));
   const answerIdentities = new Set(assetIdentities(revision.answerImage));
-  if (!questionIdentities.size && !answerIdentities.size) return null;
-  const match = uniqueMatch(scoped, (candidate) => {
-    const questionMatches =
-      !questionIdentities.size ||
-      candidate.images.some((asset) =>
-        assetIdentities(asset).some((identity) =>
-          questionIdentities.has(identity),
-        ),
-      );
-    const answerMatches =
-      !answerIdentities.size ||
-      candidate.answerImages.some((asset) =>
-        assetIdentities(asset).some((identity) => answerIdentities.has(identity)),
-      );
-    return questionMatches && answerMatches;
-  });
+  if (questionIdentities.size || answerIdentities.size) {
+    const matchesAssetIdentity = (candidate: RetrievalItem) => {
+      const questionMatches =
+        !questionIdentities.size ||
+        candidate.images.some((asset) =>
+          assetIdentities(asset).some((identity) =>
+            questionIdentities.has(identity),
+          ),
+        );
+      const answerMatches =
+        !answerIdentities.size ||
+        candidate.answerImages.some((asset) =>
+          assetIdentities(asset).some((identity) =>
+            answerIdentities.has(identity),
+          ),
+        );
+      return questionMatches && answerMatches;
+    };
+    const match = uniqueMatch(items, matchesAssetIdentity);
+    if (match.kind === "ambiguous") {
+      return uniqueMatch(
+        scopeRetrievalItems(items, className),
+        matchesAssetIdentity,
+      ).item;
+    }
+    if (match.kind !== "none") return match.item;
+  }
+
+  const lo = normalizeText(revision.lo);
+  if (!lo) return null;
+  const match = uniqueMatch(
+    scopeRetrievalItems(items, className),
+    (candidate) => normalizeText(candidate.lo) === lo,
+  );
   return match.item;
 }
 
