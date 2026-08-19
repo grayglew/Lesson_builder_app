@@ -78,7 +78,7 @@ describe("current lesson output preparation wiring", () => {
     });
 
     expect(prepareDocument).toHaveBeenCalledOnce();
-    expect(result.html).toContain('aria-label="Handout page 1"');
+    expect(result.html).toContain('aria-label="Starter handout page"');
   });
 });
 

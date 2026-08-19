@@ -13,21 +13,30 @@ import {
 import { prepareBuilderDocumentForExport } from "@/features/builder/prepare-export-document";
 
 describe("production A4 handout export", () => {
-  it("enforces the legacy core handout content contract", () => {
+  it("accepts flexible printable selections and rejects invalid compositions", async () => {
     const document = handoutDocument();
     document.slides = [];
     expect(() => validateHandoutDocument(document)).toThrow(
-      "Select one starter slide and one or two example slides",
+      "Select at least one slide",
     );
 
     document.slides = [starter("starter-1"), starter("starter-2"), example()];
     expect(() => validateHandoutDocument(document)).toThrow(
-      "Select exactly one starter slide",
+      "Select no more than one starter slide",
     );
 
     document.slides = [starter("starter-1")];
-    expect(() => validateHandoutDocument(document)).toThrow(
-      "Select one or two worked example slides",
+    expect(() => validateHandoutDocument(document)).not.toThrow();
+
+    document.slides = [example()];
+    expect(() => validateHandoutDocument(document)).not.toThrow();
+
+    document.slides = [retrievalStarter()];
+    expect(() => validateHandoutDocument(document)).not.toThrow();
+
+    document.slides = [{ id: "unsupported", type: "cfu", title: "CFU" }];
+    await expect(buildA4Handout(document)).rejects.toThrow(
+      "did not produce any printable handout pages",
     );
   });
 
@@ -59,20 +68,126 @@ describe("production A4 handout export", () => {
       '<div class="handout-column handout-glue">glue</div>',
     );
     expect(result.html).toContain("Algebra handout");
-    expect(result.html).toContain("<strong>Date:</strong> 19/07/2026");
-    expect(result.html).toContain("<strong>LO:</strong> Expand brackets");
+    expect(result.html).toContain(
+      '<h1 class="handout-lo">Expand brackets</h1>',
+    );
+    expect(result.html).toContain(
+      '<strong class="handout-date">Date: 19/07/2026</strong>',
+    );
     expect(result.html).toContain('aria-label="Starter"');
     expect(result.html).toContain("data:image/png;base64,c3RhcnRlcg==");
-    expect(result.html).toContain(
-      'aria-label="Worked example questions"',
-    );
-    expect(result.html).toContain(
-      'aria-label="Worked example answer prompts"',
-    );
+    expect(result.html).toContain('aria-label="Worked example page"');
     expect(result.html).toContain("data:image/png;base64,YW5zd2Vy");
-    expect(result.html.match(/class="handout-page"/g)).toHaveLength(2);
+    expect(result.html.match(/class="handout-page/g)).toHaveLength(2);
     expect(result.html).not.toContain("presenter-tools");
     expect(result.html).not.toContain("lesson-deck");
+  });
+
+  it("keeps each worked example's questions and first answer together", async () => {
+    const document = handoutDocument();
+    document.title = "7Ma3 18-08 - taught 2026-08-18 1401";
+    document.slides = [
+      starter("starter-7ma3"),
+      example("example-1", "one"),
+      example("example-2", "two"),
+    ];
+
+    const result = await buildA4Handout(document);
+
+    expect(result.warnings).toEqual([]);
+    expect(result.html.match(/class="handout-example-block"/g)).toHaveLength(2);
+    expect(result.html.match(/aria-label="Worked example page"/g)).toHaveLength(1);
+    expect(result.html.match(/class="handout-page/g)).toHaveLength(2);
+    expect(result.html).toMatch(
+      /example-one-q1[\s\S]*example-one-a1[\s\S]*example-one-q2[\s\S]*Student working space/,
+    );
+    expect(result.html).toMatch(
+      /example-two-q1[\s\S]*example-two-a1[\s\S]*example-two-q2[\s\S]*Student working space/,
+    );
+    expect(result.html).not.toContain("example-one-a2");
+    expect(result.html).not.toContain("example-two-a2");
+  });
+
+  it("paginates any number of consecutive examples two per A4 page", async () => {
+    const document = handoutDocument();
+    document.slides = [
+      example("example-1", "one"),
+      example("example-2", "two"),
+      example("example-3", "three"),
+    ];
+
+    const result = await buildA4Handout(document);
+
+    expect(result.html.match(/aria-label="Worked example page"/g)).toHaveLength(2);
+    expect(result.html.match(/class="handout-example-block"/g)).toHaveLength(3);
+    expect(result.html).toContain('class="handout-example-stack is-double"');
+    expect(result.html).toContain('class="handout-example-stack is-single"');
+  });
+
+  it("builds a two-sided duplicated A5 booklet for starter-only selection", async () => {
+    const document = handoutDocument();
+    document.title = "7Ma3 18-08";
+    document.overallLessonLo = "Recognise prime numbers";
+    document.teachingDate = "2026-08-18";
+    document.slides = [bookletStarter()];
+
+    const result = await buildA4Handout(document);
+
+    expect(result.html.match(/class="handout-page handout-booklet-side"/g)).toHaveLength(2);
+    expect(result.html.match(/class="handout-booklet-copy"/g)).toHaveLength(4);
+    expect(result.html).toContain('aria-label="Starter booklet outer side"');
+    expect(result.html).toContain('aria-label="Starter booklet inner side"');
+    expect(result.html.match(/>GLUE</g)).toHaveLength(2);
+    expect(result.html.match(/Starter question 1/g)).toHaveLength(2);
+    expect(result.html.match(/Starter question 2/g)).toHaveLength(2);
+    expect(result.html.match(/Starter question 3/g)).toHaveLength(2);
+    expect(result.html.match(/Starter question 4/g)).toHaveLength(2);
+    expect(result.html).toContain('<h1 class="handout-lo">Recognise prime numbers</h1>');
+    expect(result.html).toContain('<div class="handout-lesson-title">7Ma3 18-08</div>');
+    expect(result.html).toContain('<strong class="handout-date">Date: 18/08/2026</strong>');
+    expect(result.html).toContain("duplex flip on long edge");
+  });
+
+  it("builds retrieval-only handouts without requiring a starter or example", async () => {
+    const document = handoutDocument();
+    document.slides = [retrievalStarter()];
+
+    const result = await buildA4Handout(document);
+
+    expect(result.warnings).toEqual([]);
+    expect(result.html.match(/aria-label="Retrieval handout page"/g)).toHaveLength(1);
+    expect(result.html).toContain("Retrieval 1");
+  });
+
+  it("preserves selected deck order across different printable slide types", async () => {
+    const document = handoutDocument();
+    document.slides = [
+      {
+        id: "template-before",
+        type: "template",
+        title: "Before examples",
+        bullets: ["First selected section"],
+      },
+      example("example-ordered", "ordered"),
+      retrievalStarter(),
+      {
+        id: "placeholder-after",
+        type: "placeholder",
+        title: "After retrieval",
+        text: "Last selected section",
+      },
+    ];
+
+    const result = await buildA4Handout(document);
+    const before = result.html.indexOf("First selected section");
+    const examplePage = result.html.indexOf('aria-label="Worked example page"');
+    const retrievalPage = result.html.indexOf('aria-label="Retrieval handout page"');
+    const after = result.html.indexOf("Last selected section");
+
+    expect(before).toBeGreaterThan(-1);
+    expect(examplePage).toBeGreaterThan(before);
+    expect(retrievalPage).toBeGreaterThan(examplePage);
+    expect(after).toBeGreaterThan(retrievalPage);
   });
 
   it("lays out retrieval, PDF, worksheet, and half-page content", async () => {
@@ -326,16 +441,35 @@ function starter(id: string): BuilderSlide {
   };
 }
 
-function example(): BuilderSlide {
+function example(id = "example", marker = "default"): BuilderSlide {
+  const isDefault = marker === "default";
   return {
-    id: "example",
+    id,
     type: "example",
     title: "Example",
     lo: "Expand brackets",
-    image1: asset("example-1.png"),
-    image2: asset("example-2.png"),
-    answerImage1: asset("answer.png", "image/png", "YW5zd2Vy"),
-    answerImage2: null,
+    image1: asset(
+      `example-${marker}-q1.png`,
+      "image/png",
+      isDefault ? "aW1hZ2U=" : `example-${marker}-q1`,
+    ),
+    image2: asset(
+      `example-${marker}-q2.png`,
+      "image/png",
+      isDefault ? "aW1hZ2U=" : `example-${marker}-q2`,
+    ),
+    answerImage1: asset(
+      `example-${marker}-a1.png`,
+      "image/png",
+      isDefault ? "YW5zd2Vy" : `example-${marker}-a1`,
+    ),
+    answerImage2: isDefault
+      ? null
+      : asset(
+          `example-${marker}-a2.png`,
+          "image/png",
+          `example-${marker}-a2`,
+        ),
   };
 }
 
@@ -347,6 +481,23 @@ function retrievalStarter(): BuilderSlide {
     slots: Array.from({ length: 4 }, (_, index) => ({
       lo: `Retrieval ${index + 1}`,
       image: asset(`retrieval-${index + 1}.png`),
+      answerImage: null,
+    })),
+  };
+}
+
+function bookletStarter(): BuilderSlide {
+  return {
+    id: "starter-booklet",
+    type: "starter",
+    title: "Starter",
+    slots: Array.from({ length: 4 }, (_, index) => ({
+      lo: `Starter ${index + 1}`,
+      image: asset(
+        `starter-${index + 1}.png`,
+        "image/png",
+        `starter-${index + 1}`,
+      ),
       answerImage: null,
     })),
   };

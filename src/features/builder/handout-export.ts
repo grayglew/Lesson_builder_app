@@ -28,11 +28,18 @@ type HandoutOptions = {
   ) => Promise<HandoutWorksheetPage[]>;
 };
 
-type HandoutSelection = {
-  starter: BuilderSlide;
-  examples: BuilderSlide[];
-  extraSlides: BuilderSlide[];
-};
+type HandoutSection =
+  | { kind: "starter"; slide: BuilderSlide }
+  | { kind: "examples"; slides: BuilderSlide[] }
+  | { kind: "retrieval"; slides: BuilderSlide[] }
+  | { kind: "worksheet"; slide: BuilderSlide }
+  | { kind: "pdf-page"; slide: BuilderSlide }
+  | { kind: "half-page"; slides: BuilderSlide[] }
+  | { kind: "unsupported"; slide: BuilderSlide };
+
+type HandoutComposition =
+  | { mode: "starter-booklet"; starter: BuilderSlide }
+  | { mode: "standard"; sections: HandoutSection[] };
 
 type RetrievalQuestion = {
   image: BuilderAsset | null;
@@ -52,54 +59,112 @@ export function selectHandoutDocument(
 
 export function validateHandoutDocument(
   document: Pick<BuilderDocument, "slides">,
-): HandoutSelection {
-  const starters: BuilderSlide[] = [];
-  const examples: BuilderSlide[] = [];
-  const extraSlides: BuilderSlide[] = [];
-
-  document.slides.forEach((slide) => {
-    if (isCoreStarterSlide(slide)) starters.push(slide);
-    else if (slide.type === "example") examples.push(slide);
-    else extraSlides.push(slide);
-  });
-
+): HandoutComposition {
   if (!document.slides.length) {
+    throw new Error("Select at least one slide for the handout.");
+  }
+  const starters = document.slides.filter(isCoreStarterSlide);
+  if (starters.length > 1) {
     throw new Error(
-      "Select one starter slide and one or two example slides for the handout.",
+      "Select no more than one starter slide for the handout. Retrieval starters do not count.",
     );
   }
-  if (starters.length !== 1) {
-    throw new Error(
-      "Select exactly one starter slide for the handout. Retrieval starters do not count.",
-    );
-  }
-  if (examples.length < 1 || examples.length > 2) {
-    throw new Error(
-      "Select one or two worked example slides for the handout.",
-    );
+
+  if (document.slides.length === 1 && starters.length === 1) {
+    return { mode: "starter-booklet", starter: starters[0] };
   }
 
   return {
-    starter: starters[0],
-    examples,
-    extraSlides,
+    mode: "standard",
+    sections: composeStandardSections(document.slides),
   };
+}
+
+function composeStandardSections(slides: BuilderSlide[]): HandoutSection[] {
+  const sections: HandoutSection[] = [];
+  let index = 0;
+
+  while (index < slides.length) {
+    const slide = slides[index];
+    if (isCoreStarterSlide(slide)) {
+      sections.push({ kind: "starter", slide });
+      index += 1;
+      continue;
+    }
+    if (slide.type === "example") {
+      const examples: BuilderSlide[] = [];
+      while (slides[index]?.type === "example") {
+        examples.push(slides[index]);
+        index += 1;
+      }
+      sections.push({ kind: "examples", slides: examples });
+      continue;
+    }
+    if (isRetrievalHandoutSlide(slide)) {
+      const retrieval: BuilderSlide[] = [];
+      while (slides[index] && isRetrievalHandoutSlide(slides[index])) {
+        retrieval.push(slides[index]);
+        index += 1;
+      }
+      sections.push({ kind: "retrieval", slides: retrieval });
+      continue;
+    }
+    if (slide.type === "worksheet") {
+      sections.push({ kind: "worksheet", slide });
+      index += 1;
+      continue;
+    }
+    if (slide.type === "pdf-page") {
+      sections.push({ kind: "pdf-page", slide });
+      index += 1;
+      continue;
+    }
+    if (isHalfPageSlide(slide)) {
+      const halfPages: BuilderSlide[] = [];
+      while (slides[index] && isHalfPageSlide(slides[index])) {
+        halfPages.push(slides[index]);
+        index += 1;
+      }
+      sections.push({ kind: "half-page", slides: halfPages });
+      continue;
+    }
+    sections.push({ kind: "unsupported", slide });
+    index += 1;
+  }
+
+  return sections;
 }
 
 export async function buildA4Handout(
   document: BuilderDocument,
   options: HandoutOptions = {},
 ): Promise<HandoutBuildResult> {
-  const selection = validateHandoutDocument(document);
+  const composition = validateHandoutDocument(document);
   const warnings: string[] = [];
   const renderWorksheetPages =
     options.renderWorksheetPages ?? renderWorksheetPdfPages;
-  const extraPages = await buildExtraPages(
-    selection.extraSlides,
-    warnings,
-    renderWorksheetPages,
-  );
   const title = document.title.trim() || "Lesson handout";
+  const pages =
+    composition.mode === "starter-booklet"
+      ? starterBookletPages(
+          composition.starter,
+          title,
+          formatHandoutDate(document.teachingDate),
+          document.overallLessonLo.trim(),
+        )
+      : await buildStandardPages(
+          composition.sections,
+          title,
+          formatHandoutDate(document.teachingDate),
+          document.overallLessonLo.trim(),
+          warnings,
+          renderWorksheetPages,
+        );
+  if (!pages.length) {
+    throw new Error(
+      "The selected slides did not produce any printable handout pages.",
+    );
+  }
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -110,13 +175,7 @@ export async function buildA4Handout(
 </head>
 <body>
 <main class="handout-document">
-${corePages(
-  selection,
-  title,
-  formatHandoutDate(document.teachingDate),
-  document.overallLessonLo.trim(),
-)}
-${extraPages}
+${pages.join("\n")}
 </main>
 </body>
 </html>`;
@@ -124,29 +183,18 @@ ${extraPages}
   return { html, warnings };
 }
 
-function corePages(
-  selection: HandoutSelection,
+function standardStarterPage(
+  starter: BuilderSlide,
   title: string,
   teachingDate: string,
   overallLessonLo: string,
 ) {
-  return `
-<section class="handout-page" aria-label="Handout page 1">
+  return `<section class="handout-page" aria-label="Starter handout page">
   <div class="handout-column handout-glue">glue</div>
   <div class="handout-column handout-starter-column">
-    <header class="handout-heading">
-      <div class="handout-title">${escapeHtml(title)}</div>
-      <div class="handout-meta">
-        <div><strong>Date:</strong> ${escapeHtml(teachingDate)}</div>
-        <div><strong>LO:</strong> ${escapeHtml(overallLessonLo || " ")}</div>
-      </div>
-    </header>
-    ${starterHtml(selection.starter)}
+    ${starterHeading(title, teachingDate, overallLessonLo)}
+    ${starterHtml(starter)}
   </div>
-</section>
-<section class="handout-page" aria-label="Handout page 2">
-  <div class="handout-column">${exampleQuestionsHtml(selection.examples)}</div>
-  <div class="handout-column">${exampleAnswersHtml(selection.examples)}</div>
 </section>`;
 }
 
@@ -160,75 +208,119 @@ ${Array.from({ length: 4 }, (_, index) => {
 </section>`;
 }
 
-function exampleQuestionsHtml(examples: BuilderSlide[]) {
-  const questions: Array<{ image: BuilderAsset; label: string }> = [];
-  examples.forEach((example) => {
-    const data = recordOf(example);
-    const lo = String(data.lo || "Worked example");
-    const image1 = assetOf(data.image1);
-    const image2 = assetOf(data.image2);
-    if (image1) questions.push({ image: image1, label: `${lo} question 1` });
-    if (image2) questions.push({ image: image2, label: `${lo} question 2` });
-  });
-  return `<section class="handout-example-questions" aria-label="Worked example questions">
-${Array.from({ length: 4 }, (_, index) => {
-  const item = questions[index];
-  return `<div class="handout-question-box">${item ? imageHtml(item.image, item.label) : emptyHtml()}</div>`;
-}).join("")}
-</section>`;
+function starterHeading(
+  title: string,
+  teachingDate: string,
+  overallLessonLo: string,
+) {
+  return `<header class="handout-heading">
+  <h1 class="handout-lo">${escapeHtml(overallLessonLo || " ")}</h1>
+  <div class="handout-lesson-title">${escapeHtml(title)}</div>
+  <strong class="handout-date">Date: ${escapeHtml(teachingDate)}</strong>
+</header>`;
 }
 
-function exampleAnswersHtml(examples: BuilderSlide[]) {
-  return `<section class="handout-example-answers" aria-label="Worked example answer prompts">
-${examples
-  .slice(0, 2)
-  .map((example, index) => {
-    const answer = assetOf(recordOf(example).answerImage1);
-    return `<div class="handout-answer-pair">
-  <div class="handout-answer-box">
-    <span class="handout-mini-label">Example ${index + 1} answer</span>
-    ${imageHtml(answer, `Worked example ${index + 1} answer 1`)}
-  </div>
-  <div class="handout-student-space" aria-label="Student working space"></div>
+function starterBookletPages(
+  starter: BuilderSlide,
+  title: string,
+  teachingDate: string,
+  overallLessonLo: string,
+) {
+  const heading = starterHeading(title, teachingDate, overallLessonLo);
+  const outerCopy = `<div class="handout-booklet-copy">
+  <section class="handout-booklet-panel handout-booklet-glue">GLUE</section>
+  <section class="handout-booklet-panel handout-booklet-front">
+    ${heading}
+    ${starterCellsHtml(starter, 0, 2)}
+  </section>
 </div>`;
-  })
-  .join("")}
+  const innerCopy = `<div class="handout-booklet-copy">
+  <section class="handout-booklet-panel handout-booklet-inside-questions">
+    ${starterCellsHtml(starter, 2, 2)}
+  </section>
+  <section class="handout-booklet-panel handout-booklet-inside-blank" aria-label="Blank inside page"></section>
+</div>`;
+  return [
+    `<section class="handout-page handout-booklet-side" aria-label="Starter booklet outer side" data-print-instructions="duplex flip on long edge; cut horizontally; fold vertically">
+  <div class="handout-booklet-copies">${outerCopy}${outerCopy}</div>
+</section>`,
+    `<section class="handout-page handout-booklet-side" aria-label="Starter booklet inner side" data-print-instructions="duplex flip on long edge; cut horizontally; fold vertically">
+  <div class="handout-booklet-copies">${innerCopy}${innerCopy}</div>
+</section>`,
+  ];
+}
+
+function starterCellsHtml(starter: BuilderSlide, start: number, count: number) {
+  const slots = records(recordOf(starter).slots).slice(start, start + count);
+  return `<section class="handout-booklet-starter">${Array.from(
+    { length: count },
+    (_, offset) => {
+      const questionNumber = start + offset + 1;
+      const slot = slots[offset] ?? {};
+      return `<div class="handout-starter-cell"><span class="handout-starter-number">${questionNumber}</span>${imageHtml(assetOf(slot.image), `Starter question ${questionNumber}`)}</div>`;
+    },
+  ).join("")}</section>`;
+}
+
+function examplePages(examples: BuilderSlide[]) {
+  const pages: string[] = [];
+  for (let index = 0; index < examples.length; index += 2) {
+    const pageExamples = examples.slice(index, index + 2);
+    const density = pageExamples.length === 1 ? "is-single" : "is-double";
+    pages.push(`<section class="handout-page handout-page-full handout-example-page" aria-label="Worked example page">
+  <div class="handout-example-stack ${density}">
+    ${pageExamples.map((example, offset) => exampleBlockHtml(example, index + offset + 1)).join("")}
+  </div>
+</section>`);
+  }
+  return pages;
+}
+
+function exampleBlockHtml(example: BuilderSlide, exampleNumber: number) {
+  const data = recordOf(example);
+  const lo = String(data.lo || example.title || `Worked example ${exampleNumber}`);
+  return `<section class="handout-example-block" aria-label="Example ${exampleNumber}: ${escapeAttr(lo)}">
+  <div class="handout-example-cell">${imageHtml(assetOf(data.image1), `${lo} question 1`)}</div>
+  <div class="handout-example-cell handout-example-answer">${imageHtml(assetOf(data.answerImage1), `${lo} answer 1`)}</div>
+  <div class="handout-example-cell">${imageHtml(assetOf(data.image2), `${lo} question 2`)}</div>
+  <div class="handout-example-cell handout-student-space" aria-label="Student working space"></div>
 </section>`;
 }
 
-async function buildExtraPages(
-  slides: BuilderSlide[],
+async function buildStandardPages(
+  sections: HandoutSection[],
+  title: string,
+  teachingDate: string,
+  overallLessonLo: string,
   warnings: string[],
   renderWorksheetPages: (
     worksheet: BuilderAsset,
   ) => Promise<HandoutWorksheetPage[]>,
 ) {
   const pages: string[] = [];
-  let retrievalSlides: BuilderSlide[] = [];
-  let halfSlides: BuilderSlide[] = [];
 
-  function flushRetrieval() {
-    if (!retrievalSlides.length) return;
-    pages.push(retrievalPages(retrievalSlides));
-    retrievalSlides = [];
-  }
-
-  function flushHalf() {
-    if (!halfSlides.length) return;
-    pages.push(halfPages(halfSlides));
-    halfSlides = [];
-  }
-
-  for (const slide of slides) {
-    if (isRetrievalHandoutSlide(slide)) {
-      flushHalf();
-      retrievalSlides.push(slide);
+  for (const section of sections) {
+    if (section.kind === "starter") {
+      pages.push(
+        standardStarterPage(
+          section.slide,
+          title,
+          teachingDate,
+          overallLessonLo,
+        ),
+      );
       continue;
     }
-
-    flushRetrieval();
-    if (slide.type === "worksheet") {
-      flushHalf();
+    if (section.kind === "examples") {
+      pages.push(...examplePages(section.slides));
+      continue;
+    }
+    if (section.kind === "retrieval") {
+      pages.push(...retrievalPages(section.slides));
+      continue;
+    }
+    if (section.kind === "worksheet") {
+      const slide = section.slide;
       const worksheet = assetOf(recordOf(slide).worksheet);
       if (!worksheet || !isPdfAsset(worksheet)) {
         warnings.push(
@@ -256,9 +348,8 @@ async function buildExtraPages(
       }
       continue;
     }
-
-    if (slide.type === "pdf-page") {
-      flushHalf();
+    if (section.kind === "pdf-page") {
+      const slide = section.slide;
       const data = recordOf(slide);
       pages.push(
         fullImagePage(
@@ -269,25 +360,16 @@ async function buildExtraPages(
       );
       continue;
     }
-
-    if (
-      ["drawing", "template", "placeholder", "blank", "math"].includes(
-        slide.type,
-      )
-    ) {
-      halfSlides.push(slide);
+    if (section.kind === "half-page") {
+      pages.push(...halfPages(section.slides));
       continue;
     }
-
-    flushHalf();
+    const slide = section.slide;
     warnings.push(
       `Skipped unsupported handout slide "${slide.title || slide.type || "Untitled"}".`,
     );
   }
-
-  flushRetrieval();
-  flushHalf();
-  return pages.join("");
+  return pages;
 }
 
 function retrievalPages(slides: BuilderSlide[]) {
@@ -310,7 +392,7 @@ function retrievalPages(slides: BuilderSlide[]) {
   </div>
 </section>`);
   }
-  return pages.join("");
+  return pages;
 }
 
 function retrievalQuestions(slide: BuilderSlide): RetrievalQuestion[] {
@@ -373,7 +455,7 @@ function halfPages(slides: BuilderSlide[]) {
   </div>
 </section>`);
   }
-  return pages.join("");
+  return pages;
 }
 
 function halfSlideHtml(slide: BuilderSlide) {
@@ -453,6 +535,12 @@ function isRetrievalHandoutSlide(slide: BuilderSlide) {
     isRetrievalStarterSlide(slide) ||
     slide.type === "revision" ||
     slide.type === "retrieval"
+  );
+}
+
+function isHalfPageSlide(slide: BuilderSlide) {
+  return ["drawing", "template", "placeholder", "blank", "math"].includes(
+    slide.type,
   );
 }
 
@@ -540,12 +628,12 @@ html,body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,
 .handout-column{min-width:0;min-height:0;height:100%;max-height:100%;border:1px solid #111827;padding:4mm;overflow:hidden}
 .handout-glue{display:grid;place-items:center;font-size:34px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .handout-starter-column{display:grid;grid-template-rows:auto minmax(0,1fr);gap:4mm}
-.handout-heading{display:grid;gap:2mm}.handout-title{font-size:13px;font-weight:800;line-height:1.2}.handout-meta{display:grid;gap:1mm;font-size:10px;line-height:1.25}
+.handout-heading{display:grid;gap:1.5mm}.handout-lo{margin:0;font-size:20px;font-weight:800;line-height:1.15}.handout-lesson-title{font-size:10px;line-height:1.2;color:#4b5563}.handout-date{font-size:10px;line-height:1.2}
 .handout-starter{height:100%;min-height:0;display:grid;grid-template-rows:repeat(4,minmax(0,1fr));border:1px solid #111827;overflow:hidden}
 .handout-starter-cell,.handout-retrieval-cell{position:relative;min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}
 .handout-starter-number,.handout-retrieval-number{position:absolute;top:2mm;left:2mm;z-index:2;display:grid;place-items:center;width:7mm;height:7mm;border:1px solid rgba(17,24,39,.35);border-radius:999px;background:rgba(255,255,255,.86);color:rgba(17,24,39,.72);font-size:10px;font-weight:800;line-height:1}
-.handout-example-questions{height:100%;display:grid;grid-template-rows:repeat(4,minmax(0,1fr));gap:3mm}.handout-question-box{min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}
-.handout-example-answers{height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));gap:4mm}.handout-answer-pair{min-height:0;display:grid;grid-template-rows:1fr 1fr;gap:3mm}.handout-answer-box{min-height:0;border:1px solid #111827;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}.handout-student-space{min-height:0;background:#fff}.handout-mini-label{padding:1.5mm 2mm;border-bottom:1px solid #111827;font-size:9px;font-weight:800;text-transform:uppercase;color:#374151}
+.handout-example-page{padding:4mm}.handout-example-stack{width:100%;height:100%;display:grid;gap:4mm}.handout-example-stack.is-single{grid-template-rows:minmax(0,1fr)}.handout-example-stack.is-double{grid-template-rows:repeat(2,minmax(0,1fr))}.handout-example-block{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-example-cell{min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.handout-student-space{min-height:0;background:#fff}
+.handout-booklet-side{display:block}.handout-booklet-copies{width:100%;height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr))}.handout-booklet-copy{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-booklet-panel{min-width:0;min-height:0;border:1px solid #111827;padding:3mm;overflow:hidden}.handout-booklet-glue{display:grid;place-items:center;font-size:28px;font-weight:800;letter-spacing:.08em}.handout-booklet-front{display:grid;grid-template-rows:auto minmax(0,1fr);gap:2mm}.handout-booklet-starter{min-height:0;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));overflow:hidden}.handout-booklet-inside-questions{padding:0}.handout-booklet-inside-blank{background:#fff}
 .handout-image{width:100%;height:100%;min-height:0;display:block;object-fit:contain;object-position:top center}.handout-empty{display:grid;place-items:center;width:100%;height:100%;min-height:20mm;color:#6b7280;font-size:11px;text-align:center}
 .handout-page-full{display:block;padding:0}.handout-full-page-content{width:100%;height:100%;display:grid;place-items:center;overflow:hidden}.handout-pdf-page-image{width:100%;height:100%;object-fit:contain;object-position:center}.handout-pdf-page-image.is-rotated-landscape{width:281mm;height:194mm;max-width:none;max-height:none;transform:rotate(90deg);transform-origin:center}
 .handout-retrieval-grid{width:100%;height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:3mm;padding:4mm}.handout-retrieval-text{align-self:center;justify-self:stretch;padding:8mm 5mm 5mm;font-size:13px;line-height:1.35}
