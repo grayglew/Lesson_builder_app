@@ -4,11 +4,27 @@
 
 - Production domain: `https://lesson-builder-online.vercel.app`
 - Unified builder route: `/builder`
-- Current production commit: `2ce40590740fbde4b539412ac92e113e1bb08bed`
+- Default builder interface: Compact Console
+- Current production commit: `1aa2b35b7647b522de4fc065465017c28956fc79`
 - Current immutable deployment:
-  `https://lesson-builder-online-peayciemg-grayglew-8338s-projects.vercel.app`
+  `https://lesson-builder-online-dvxu3ix16-grayglew-8338s-projects.vercel.app`
+- Current deployment ID: `dpl_2GkyVzJUeZLYoTpmeGHGyhf7YYdZ`
 - Previous rollback deployment:
-  `https://lesson-builder-online-olj1q9o61-grayglew-8338s-projects.vercel.app`
+  `https://lesson-builder-online-nvrnuei3x-grayglew-8338s-projects.vercel.app`
+- Previous rollback deployment ID: `dpl_4AvRXrPqbxFMFTiZSggRrZB3dWBG`
+- Promoted and verified: `2026-07-28`
+
+The authenticated production smoke check passed Save and reload, Presenter and
+student-session creation, light/dark theme switching, and the mobile Lesson and
+Deck drawers. This release did not change the database, Storage objects, API
+contracts, or document schemas. The classic shell remains in the codebase as a
+tested fallback for this release cycle.
+
+The candidate was created from a local Vercel CLI checkout pinned to the commit
+above. Vercel did not inject Git metadata into that CLI-built artifact, so its
+`/api/health` `commit` and `buildCommit` fields report `local`; the source
+checkout and `origin/main` were both verified at the recorded commit before the
+candidate was built.
 
 Update this section whenever a newer production deployment is promoted.
 
