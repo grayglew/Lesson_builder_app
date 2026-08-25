@@ -196,8 +196,13 @@ try {
     });
 
     let pinchScale = 0;
+    const pinchPhases = [];
     document.addEventListener("lessonpresenterpinch", (event) => {
-      pinchScale = Number(event.detail && event.detail.scale) || 0;
+      pinchScale = Math.max(
+        pinchScale,
+        Number(event.detail && event.detail.scale) || 0,
+      );
+      pinchPhases.push(event.detail && event.detail.phase);
     });
     dispatch(slide, "pointerdown", {
       pointerId: 6,
@@ -209,6 +214,12 @@ try {
       pointerId: 7,
       pointerType: "touch",
       clientX: 240,
+      clientY: 180,
+    });
+    dispatch(slide, "pointerdown", {
+      pointerId: 8,
+      pointerType: "touch",
+      clientX: 340,
       clientY: 180,
     });
     dispatch(document, "pointermove", {
@@ -229,6 +240,12 @@ try {
       clientX: 140,
       clientY: 180,
     });
+    dispatch(document, "pointerup", {
+      pointerId: 8,
+      pointerType: "touch",
+      clientX: 340,
+      clientY: 180,
+    });
 
     controller.shiftSlideIndicesForInsert(0);
     const strokeCountAfterShift = controller.getAnnotations()["1"]?.length || 0;
@@ -244,6 +261,7 @@ try {
       penWidth: penStroke?.width,
       touchScrollTop: deck.scrollTop,
       pinchScale,
+      pinchPhases,
       svgPathCount: slide.querySelectorAll(".annotation-svg path").length,
       undoWorked: controller.undo(),
       strokeCountAfterShift,
@@ -264,6 +282,22 @@ try {
   );
   assert(result.touchScrollTop > 100, "One-finger touch must pan the lesson deck.");
   assert(result.pinchScale > 1, "Pinch input must request presenter zoom.");
+  assert(
+    result.pinchPhases[0] === "start",
+    "Pinch input must identify the gesture start so zoom can use its current scale.",
+  );
+  assert(
+    result.pinchPhases.includes("move"),
+    "Pinch input must identify gesture movement.",
+  );
+  assert(
+    result.pinchPhases.at(-1) === "end",
+    "Pinch input must identify the gesture end so its zoom anchor can be cleared.",
+  );
+  assert(
+    result.pinchPhases.join(",") === "start,move,end",
+    "A pinch must keep exactly two owning pointers and emit one lifecycle.",
+  );
   assert(result.svgPathCount === 3, "All live strokes must render as SVG paths.");
   assert(
     result.strokeCountAfterShift === 3,

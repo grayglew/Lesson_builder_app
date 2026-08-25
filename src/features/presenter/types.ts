@@ -54,6 +54,11 @@ export interface PresenterRuntimeOptions {
   ) => boolean | Promise<boolean>;
   onAnnotationsChange?: (annotations: PresenterAnnotations) => void;
   onPinchZoom?: (scale: number, clientPoint: PresenterPoint) => void;
+  onPinchZoomLifecycle?: (
+    phase: "start" | "move" | "end",
+    scale: number,
+    clientPoint: PresenterPoint,
+  ) => void;
 }
 
 export interface PresenterRuntimeController {

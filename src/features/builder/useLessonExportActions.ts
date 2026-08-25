@@ -50,6 +50,7 @@ export async function prepareCurrentA4Handout(
   document: BuilderDocument,
   dependencies: CurrentOutputDependencies = {},
 ) {
+  requireOverallLessonLoForHandout(document);
   const selectedDocument = selectHandoutDocument(document);
   const prepareDocument =
     dependencies.prepareDocument ?? prepareBuilderDocumentForExport;
@@ -58,6 +59,14 @@ export async function prepareCurrentA4Handout(
     document.retrievalItems,
   );
   return buildA4Handout(preparedDocument);
+}
+
+function requireOverallLessonLoForHandout(
+  document: Pick<BuilderDocument, "overallLessonLo">,
+) {
+  if (!document.overallLessonLo.trim()) {
+    throw new Error("Add an overall lesson LO before creating a handout.");
+  }
 }
 
 export function createCurrentLessonOutputService(
@@ -156,6 +165,17 @@ export function useLessonExportActions() {
   const outputService = createCurrentLessonOutputService(document);
 
   async function previewLesson(handout = false) {
+    if (handout) {
+      try {
+        requireOverallLessonLoForHandout(document);
+      } catch (error) {
+        setStatus({
+          tone: "error",
+          message: errorMessage(error, "Could not open the lesson handout."),
+        });
+        return;
+      }
+    }
     const previewWindow = window.open("", "_blank");
     if (!previewWindow) {
       setStatus({

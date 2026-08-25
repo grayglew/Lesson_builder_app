@@ -80,6 +80,18 @@ describe("current lesson output preparation wiring", () => {
     expect(prepareDocument).toHaveBeenCalledOnce();
     expect(result.html).toContain('aria-label="Starter handout page"');
   });
+
+  it("rejects a handout before asset preparation when the overall lesson LO is blank", async () => {
+    const document = currentHandoutDocument();
+    document.overallLessonLo = "   ";
+    const prepareDocument = vi.fn();
+
+    await expect(
+      prepareCurrentA4Handout(document, { prepareDocument }),
+    ).rejects.toThrow("Add an overall lesson LO before creating a handout.");
+
+    expect(prepareDocument).not.toHaveBeenCalled();
+  });
 });
 
 function outputDependencies(prepared: BuilderDocument) {
@@ -105,6 +117,7 @@ function outputDependencies(prepared: BuilderDocument) {
 
 function currentHandoutDocument() {
   const document = createInitialBuilderDocument();
+  document.overallLessonLo = "Expand and simplify expressions";
   document.slides = [
     {
       id: "starter",

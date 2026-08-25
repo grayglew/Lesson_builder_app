@@ -447,6 +447,35 @@ describe("BuilderShell legacy UI parity", () => {
     ]);
     expect(useBuilderStore.getState().selectedSlideId).toBe("blank");
   });
+
+  it("requires an overall lesson LO before opening a handout window", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument(
+      "2026-07-18T06:00:00.000Z",
+    );
+    document.slides = [
+      { id: "starter", type: "starter", title: "Starter", slots: [] },
+    ];
+    document.handoutSlideIds = ["starter"];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Open handout from 1 selected slide",
+      }),
+    );
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(
+        "Add an overall lesson LO before creating a handout.",
+      ),
+    ).toBeInTheDocument();
+    openSpy.mockRestore();
+  });
 });
 
 function installCompactViewportMatchMedia() {
@@ -838,6 +867,7 @@ describe("BuilderShell Compact Console action parity", () => {
     const user = userEvent.setup();
     const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
     document.className = "Year 7";
+    document.overallLessonLo = "Expand brackets";
     document.handoutSlideIds = ["starter", "example"];
     document.slides = [
       {

@@ -86,6 +86,7 @@ interface TouchPan {
 interface PinchGesture {
   pointerIds: [number, number];
   startDistance: number;
+  lastMidpoint: PresenterPoint;
 }
 
 function asQueryRoot(
@@ -494,6 +495,11 @@ export function mountPresenterRuntime(
 
   function beginTouch(event: PointerEvent, slide: HTMLElement): void {
     if (activePointer) return;
+    if (activePinch && !activePinch.pointerIds.includes(event.pointerId)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const allowTap = isAnswerRevealTarget(event.target);
     if (isInteractivePointerTarget(event.target) && !allowTap) return;
 
@@ -531,7 +537,13 @@ export function mountPresenterRuntime(
         activePinch = {
           pointerIds: [points[0].pointerId, points[1].pointerId],
           startDistance,
+          lastMidpoint: midpoint(points[0], points[1]),
         };
+        options.onPinchZoomLifecycle?.(
+          "start",
+          1,
+          activePinch.lastMidpoint,
+        );
         suppressRevealClickUntil =
           Date.now() + REVEAL_CLICK_SUPPRESSION_MS;
         event.preventDefault();
@@ -566,9 +578,13 @@ export function mountPresenterRuntime(
       event.preventDefault();
       event.stopPropagation();
       suppressRevealClickUntil = Date.now() + REVEAL_CLICK_SUPPRESSION_MS;
-      options.onPinchZoom?.(
-        distance(first, second) / activePinch.startDistance,
-        midpoint(first, second),
+      activePinch.lastMidpoint = midpoint(first, second);
+      const scale = distance(first, second) / activePinch.startDistance;
+      options.onPinchZoom?.(scale, activePinch.lastMidpoint);
+      options.onPinchZoomLifecycle?.(
+        "move",
+        scale,
+        activePinch.lastMidpoint,
       );
       return;
     }
@@ -597,8 +613,14 @@ export function mountPresenterRuntime(
     if (activePinch?.pointerIds.includes(event.pointerId)) {
       event.preventDefault();
       event.stopPropagation();
+      const completedPinch = activePinch;
+      activePinch = null;
+      options.onPinchZoomLifecycle?.(
+        "end",
+        1,
+        completedPinch.lastMidpoint,
+      );
       touchPoints.delete(event.pointerId);
-      if (touchPoints.size < 2) activePinch = null;
       return;
     }
     if (activeTouchPan?.pointerId === event.pointerId) {
@@ -612,6 +634,9 @@ export function mountPresenterRuntime(
   }
 
   function cancelInput(): void {
+    if (activePinch) {
+      options.onPinchZoomLifecycle?.("end", 1, activePinch.lastMidpoint);
+    }
     activePointer = null;
     activeTouchPan = null;
     activePinch = null;
@@ -913,10 +938,10 @@ export function autoMountPresenterRuntime(): PresenterRuntimeController | null {
         cancelLabel: "Keep annotations",
         tone: "danger",
       }) ?? Promise.resolve(false),
-    onPinchZoom: (scale, clientPoint) => {
+    onPinchZoomLifecycle: (phase, scale, clientPoint) => {
       document.dispatchEvent(
         new CustomEvent("lessonpresenterpinch", {
-          detail: { scale, clientPoint },
+          detail: { scale, clientPoint, phase },
         }),
       );
     },

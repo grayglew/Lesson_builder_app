@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+// jsdom is provided by Vitest's test environment but does not ship declarations here.
+// @ts-expect-error -- test-only transitive dependency without local type declarations
+import { JSDOM } from "jsdom";
 import {
   buildStandaloneLessonHtml,
   embedRemoteBuilderAssets,
@@ -58,6 +61,12 @@ describe("standalone lesson export", () => {
     expect(html).not.toContain('Math.min(3.5, numericScale)');
     expect(html).toContain("overflow:auto");
     expect(html).toContain("@media print");
+    expect(html).toContain(
+      "body:not(.handout-mode) .lesson-deck{display:block;padding:0!important;scroll-padding:0!important}",
+    );
+    expect(html).toContain(
+      ".handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:6mm;padding:8mm}",
+    );
     expect(html).toContain('canvas.width = 1600');
     expect(html).toContain('canvas.height = 1000');
     expect(html).toContain('canvas.toDataURL("image/jpeg", 0.88)');
@@ -186,6 +195,67 @@ describe("standalone lesson export", () => {
 
     expect(scripts.length).toBeGreaterThan(0);
     scripts.forEach((source) => expect(() => new Function(source)).not.toThrow());
+  });
+
+  it("continues pinch zoom from the current scale and keeps the touched content anchored", () => {
+    const dom = new JSDOM(buildStandaloneLessonHtml(lessonDocument()), {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://presenter.example.test/lesson",
+      beforeParse(window: Window & typeof globalThis) {
+        Object.defineProperty(window, "innerWidth", { value: 1200 });
+        Object.defineProperty(window, "innerHeight", { value: 800 });
+        window.HTMLElement.prototype.scrollIntoView = vi.fn();
+      },
+    });
+    const { document, CustomEvent } = dom.window;
+    const deck = document.querySelector<HTMLElement>(".lesson-deck");
+    const slide = document.querySelector<HTMLElement>(".lesson-slide");
+    const zoomButton = document.querySelector<HTMLButtonElement>("#presenter-zoom");
+    if (!deck || !slide || !zoomButton) throw new Error("Presenter fixture did not render.");
+
+    deck.scrollLeft = 200;
+    deck.scrollTop = 100;
+    deck.getBoundingClientRect = () => domRect(0, 0, 1200, 800);
+    slide.getBoundingClientRect = () => {
+      const scale = Number(slide.style.zoom) || 1;
+      return domRect(
+        100 - deck.scrollLeft,
+        80 - deck.scrollTop,
+        1000 * scale,
+        625 * scale,
+      );
+    };
+
+    zoomButton.click();
+    expect(slide.style.zoom).toBe("1.6");
+
+    document.dispatchEvent(
+      new CustomEvent("lessonpresenterpinch", {
+        detail: {
+          phase: "start",
+          scale: 1,
+          clientPoint: { x: 400, y: 300 },
+        },
+      }),
+    );
+    expect(slide.style.zoom).toBe("1.6");
+
+    document.dispatchEvent(
+      new CustomEvent("lessonpresenterpinch", {
+        detail: {
+          phase: "move",
+          scale: 1.25,
+          clientPoint: { x: 420, y: 320 },
+        },
+      }),
+    );
+
+    expect(slide.style.zoom).toBe("2");
+    const anchoredPoint = slide.getBoundingClientRect();
+    expect(anchoredPoint.left + anchoredPoint.width * 0.3125).toBeCloseTo(420, 4);
+    expect(anchoredPoint.top + anchoredPoint.height * 0.32).toBeCloseTo(320, 4);
+    dom.window.close();
   });
 
   it("preserves a PDF page aspect ratio so portrait pages can scroll", () => {
@@ -710,4 +780,18 @@ function testImage(name: string, base64: string) {
     size: base64.length,
     dataUrl: `data:${name.endsWith(".jpg") ? "image/jpeg" : "image/png"};base64,${base64}`,
   };
+}
+
+function domRect(left: number, top: number, width: number, height: number) {
+  return {
+    x: left,
+    y: top,
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+    toJSON: () => ({}),
+  } as DOMRect;
 }
