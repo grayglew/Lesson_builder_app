@@ -776,6 +776,7 @@ function standaloneInteractionScript() {
     if (!rect.width || !rect.height) return null;
     return {
       startScale: zoomScale,
+      lastRelativeScale: 1,
       slide,
       xRatio: Math.max(0, Math.min(1, (point.x - rect.left) / rect.width)),
       yRatio: Math.max(0, Math.min(1, (point.y - rect.top) / rect.height)),
@@ -1848,6 +1849,15 @@ function standaloneInteractionScript() {
   document.addEventListener("lessonpresenterpinch", (event) => {
     const detail = event.detail || {};
     if (detail.phase === "end") {
+      const point = presenterPoint(detail);
+      const relativeScale = Number(activePinchZoom?.lastRelativeScale);
+      if (activePinchZoom && point && Number.isFinite(relativeScale)) {
+        setZoom(activePinchZoom.startScale * relativeScale, {
+          ...activePinchZoom,
+          clientX: point.x,
+          clientY: point.y,
+        });
+      }
       activePinchZoom = null;
       return;
     }
@@ -1858,6 +1868,7 @@ function standaloneInteractionScript() {
     const point = presenterPoint(detail);
     const relativeScale = Number(detail.scale);
     if (!activePinchZoom || !point || !Number.isFinite(relativeScale)) return;
+    activePinchZoom.lastRelativeScale = relativeScale;
     setZoom(activePinchZoom.startScale * relativeScale, {
       ...activePinchZoom,
       clientX: point.x,

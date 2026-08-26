@@ -87,6 +87,7 @@ interface PinchGesture {
   pointerIds: [number, number];
   startDistance: number;
   lastMidpoint: PresenterPoint;
+  lastScale: number;
 }
 
 function asQueryRoot(
@@ -538,6 +539,7 @@ export function mountPresenterRuntime(
           pointerIds: [points[0].pointerId, points[1].pointerId],
           startDistance,
           lastMidpoint: midpoint(points[0], points[1]),
+          lastScale: 1,
         };
         options.onPinchZoomLifecycle?.(
           "start",
@@ -580,6 +582,7 @@ export function mountPresenterRuntime(
       suppressRevealClickUntil = Date.now() + REVEAL_CLICK_SUPPRESSION_MS;
       activePinch.lastMidpoint = midpoint(first, second);
       const scale = distance(first, second) / activePinch.startDistance;
+      activePinch.lastScale = scale;
       options.onPinchZoom?.(scale, activePinch.lastMidpoint);
       options.onPinchZoomLifecycle?.(
         "move",
@@ -617,7 +620,7 @@ export function mountPresenterRuntime(
       activePinch = null;
       options.onPinchZoomLifecycle?.(
         "end",
-        1,
+        completedPinch.lastScale,
         completedPinch.lastMidpoint,
       );
       touchPoints.delete(event.pointerId);
@@ -635,7 +638,11 @@ export function mountPresenterRuntime(
 
   function cancelInput(): void {
     if (activePinch) {
-      options.onPinchZoomLifecycle?.("end", 1, activePinch.lastMidpoint);
+      options.onPinchZoomLifecycle?.(
+        "end",
+        activePinch.lastScale,
+        activePinch.lastMidpoint,
+      );
     }
     activePointer = null;
     activeTouchPan = null;
