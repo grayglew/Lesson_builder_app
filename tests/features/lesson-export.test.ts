@@ -62,14 +62,29 @@ describe("standalone lesson export", () => {
       'data-builder-slide-id="annotated-slide"',
     );
     const annotationStart = withStaticAnnotations.indexOf(
-      "static-annotation-svg",
+      '<svg class="annotation-svg static-annotation-svg"',
     );
     const slideEnd = withStaticAnnotations.indexOf("</section>", annotationStart);
 
-    expect(withoutStaticAnnotations).not.toContain("static-annotation-svg");
-    expect(withStaticAnnotations).toContain("static-annotation-svg");
+    expect(withoutStaticAnnotations).not.toContain(
+      '<svg class="annotation-svg static-annotation-svg"',
+    );
+    expect(withStaticAnnotations).toContain(
+      '<svg class="annotation-svg static-annotation-svg"',
+    );
     expect(annotationStart).toBeGreaterThan(slideStart);
     expect(annotationStart).toBeLessThan(slideEnd);
+
+    const dom = new JSDOM(withStaticAnnotations);
+    const svg = dom.window.document.querySelector(".static-annotation-svg");
+    if (!svg) throw new Error("Expected static annotation SVG.");
+    const style = dom.window.getComputedStyle(svg);
+
+    expect(style.position).toBe("absolute");
+    expect(style.width).toBe("100%");
+    expect(style.height).toBe("100%");
+    expect(style.pointerEvents).toBe("none");
+    dom.window.close();
   });
 
   it("keeps the production scroll presenter toolbar and printable slides", () => {
