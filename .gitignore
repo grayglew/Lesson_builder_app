@@ -42,6 +42,7 @@ backups/
 drfrost-import-reports/
 supabase/.temp/
 .superpowers/
+.worktrees/
 
 # typescript
 *.tsbuildinfo
