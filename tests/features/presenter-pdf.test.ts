@@ -7,6 +7,7 @@ import {
 } from "@/features/builder/presenter-pdf";
 import {
   BuilderApiError,
+  downloadA4BundlePdf,
   downloadPresenterPdf,
   downloadPresenterSlideImages,
 } from "@/features/builder/api-client";
@@ -213,6 +214,69 @@ describe("presenter PDF snapshots", () => {
       }),
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("uploads a snapshot and returns the A4 lesson bundle PDF", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          path: "user/presenter-pdf/lesson/snapshot.html",
+          signedUrl: "https://storage.example.test/upload",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), {
+          status: 200,
+          headers: { "Content-Type": "application/pdf" },
+        }),
+      );
+
+    const pdf = await downloadA4BundlePdf(
+      "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c",
+      '<!doctype html><section class="lesson-slide">Lesson</section>',
+    );
+
+    expect(pdf.type).toBe("application/pdf");
+    expect(fetchMock.mock.calls[2]?.[1]?.body).toBe(
+      '{"lessonId":"48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c","snapshotPath":"user/presenter-pdf/lesson/snapshot.html","output":"a4-bundle"}',
+    );
+  });
+
+  it("surfaces A4 bundle renderer errors to the builder", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          path: "user/presenter-pdf/lesson/snapshot.html",
+          signedUrl: "https://storage.example.test/upload",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            ok: false,
+            error: "The A4 lesson PDF could not be rendered. Please try again.",
+          },
+          503,
+        ),
+      );
+
+    await expect(
+      downloadA4BundlePdf(
+        "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c",
+        '<!doctype html><section class="lesson-slide">Lesson</section>',
+      ),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<BuilderApiError>>({
+        name: "BuilderApiError",
+        message: "The A4 lesson PDF could not be rendered. Please try again.",
+        status: 503,
+      }),
+    );
   });
 
   it("uploads a static snapshot and reads server-rendered JPEG slides", async () => {

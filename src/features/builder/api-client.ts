@@ -365,6 +365,22 @@ export async function downloadPresenterPdf(lessonId: string, html: string) {
   return response.blob();
 }
 
+export async function downloadA4BundlePdf(lessonId: string, html: string) {
+  const ticket = await uploadPresenterSnapshot(lessonId, html);
+  const response = await requestPresenterSnapshotRender(
+    lessonId,
+    ticket.path,
+    "a4-bundle",
+  );
+  if (!response.ok) {
+    throw await presenterRenderError(
+      response,
+      `Could not render the A4 lesson PDF (${response.status}).`,
+    );
+  }
+  return response.blob();
+}
+
 export async function downloadPresenterSlideImages(
   lessonId: string,
   html: string,
@@ -462,7 +478,7 @@ async function uploadPresenterSnapshot(lessonId: string, html: string) {
 function requestPresenterSnapshotRender(
   lessonId: string,
   snapshotPath: string,
-  output: "pdf" | "slide-images" = "pdf",
+  output: "pdf" | "a4-bundle" | "slide-images" = "pdf",
 ) {
   return fetch("/api/presenter/pdf", {
     method: "POST",
