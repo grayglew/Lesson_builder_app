@@ -31,9 +31,15 @@ vi.mock("@/lib/builder-sync/auth", () => ({
 }));
 
 import {
+  POST,
+  renderA4BundleSnapshotToPdf,
   renderPresenterSnapshotToPdf,
   renderPresenterSnapshotToSlideImages,
 } from "@/app/api/presenter/pdf/route";
+import {
+  getAuthorizedBuilderSyncClient,
+  isPresenterPdfSnapshotPath,
+} from "@/lib/builder-sync/auth";
 
 describe("presenter PDF route renderer", () => {
   beforeEach(() => {
@@ -140,6 +146,171 @@ describe("presenter PDF route renderer", () => {
     ).rejects.toThrow("Failed to launch browser process");
   });
 
+  it("renders A4 bundle sheets in source order with portrait and landscape media boxes", async () => {
+    const snapshotPaths: string[] = [];
+    const goto = vi.fn(async (url: string) => {
+      snapshotPaths.push(fileURLToPath(url));
+    });
+    const emulateMediaType = vi.fn().mockResolvedValue(undefined);
+    const evaluate = vi.fn().mockResolvedValue(undefined);
+    const pdf = vi
+      .fn()
+      .mockResolvedValueOnce(await validOnePagePdf(595.28, 841.89))
+      .mockResolvedValueOnce(await validOnePagePdf(595.28, 841.89))
+      .mockResolvedValueOnce(await validOnePagePdf(841.89, 595.28));
+    const closePage = vi.fn().mockResolvedValue(undefined);
+    const closeBrowser = vi.fn().mockResolvedValue(undefined);
+    const newPage = vi.fn().mockResolvedValue({
+      goto,
+      emulateMediaType,
+      evaluate,
+      pdf,
+      close: closePage,
+    });
+    mocks.launch.mockResolvedValue({ newPage, close: closeBrowser });
+
+    const result = await renderA4BundleSnapshotToPdf(`<!doctype html><html><body>
+      <main class="lesson-deck">
+        <section class="lesson-slide">Ordinary one</section>
+        <section class="lesson-slide">Ordinary two</section>
+        <section class="lesson-slide pdf-page-slide portrait">Portrait PDF</section>
+        <section class="lesson-slide pdf-page-slide landscape">Landscape PDF</section>
+      </main>
+    </body></html>`);
+    const resultDocument = await PDFDocument.load(result);
+
+    expect(newPage).toHaveBeenCalledTimes(3);
+    expect(pdf).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ format: "A4", landscape: false }),
+    );
+    expect(pdf).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ format: "A4", landscape: false }),
+    );
+    expect(pdf).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ format: "A4", landscape: true }),
+    );
+    expect(resultDocument.getPageCount()).toBe(3);
+    expect(resultDocument.getPages().map((page) => page.getMediaBox())).toEqual([
+      { x: 0, y: 0, width: 595.28, height: 841.89 },
+      { x: 0, y: 0, width: 595.28, height: 841.89 },
+      { x: 0, y: 0, width: 841.89, height: 595.28 },
+    ]);
+    await Promise.all(
+      snapshotPaths.map((snapshotPath) =>
+        expect(readFile(snapshotPath)).rejects.toMatchObject({ code: "ENOENT" }),
+      ),
+    );
+  });
+
+  it("removes A4 bundle temporary HTML files after a rendering failure", async () => {
+    const snapshotPaths: string[] = [];
+    const goto = vi.fn(async (url: string) => {
+      snapshotPaths.push(fileURLToPath(url));
+    });
+    const pdf = vi.fn().mockRejectedValue(new Error("renderer failed"));
+    const closePage = vi.fn().mockResolvedValue(undefined);
+    const closeBrowser = vi.fn().mockResolvedValue(undefined);
+    const newPage = vi.fn().mockResolvedValue({
+      goto,
+      emulateMediaType: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(undefined),
+      pdf,
+      close: closePage,
+    });
+    mocks.launch.mockResolvedValue({ newPage, close: closeBrowser });
+
+    await expect(
+      renderA4BundleSnapshotToPdf(
+        '<!doctype html><main class="lesson-deck"><section class="lesson-slide">Lesson</section></main>',
+      ),
+    ).rejects.toThrow("renderer failed");
+
+    expect(newPage).toHaveBeenCalledOnce();
+    expect(closePage).toHaveBeenCalledOnce();
+    expect(closeBrowser).toHaveBeenCalledOnce();
+    await Promise.all(
+      snapshotPaths.map((snapshotPath) =>
+        expect(readFile(snapshotPath)).rejects.toMatchObject({ code: "ENOENT" }),
+      ),
+    );
+  });
+
+  it("returns an A4 PDF for an authenticated a4-bundle request", async () => {
+    const onePagePdf = await validOnePagePdf(595.28, 841.89);
+    const pdf = vi.fn().mockResolvedValue(onePagePdf);
+    const newPage = vi.fn().mockResolvedValue({
+      goto: vi.fn().mockResolvedValue(undefined),
+      emulateMediaType: vi.fn().mockResolvedValue(undefined),
+      evaluate: vi.fn().mockResolvedValue(undefined),
+      pdf,
+      close: vi.fn().mockResolvedValue(undefined),
+    });
+    mocks.launch.mockResolvedValue({
+      newPage,
+      close: vi.fn().mockResolvedValue(undefined),
+    });
+    const snapshotPath = "user/presenter-pdf/lesson/snapshot.html";
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const snapshot = {
+      size: 96,
+      text: vi.fn().mockResolvedValue(
+        '<!doctype html><main class="lesson-deck"><section class="lesson-slide">Lesson</section></main>',
+      ),
+    };
+    const download = vi.fn().mockResolvedValue({
+      data: snapshot,
+      error: null,
+    });
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c", title: "A4 lesson" },
+      error: null,
+    });
+    const lessons = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      maybeSingle,
+    };
+    vi.mocked(getAuthorizedBuilderSyncClient).mockResolvedValue({
+      user: { id: "user" },
+      supabase: {
+        from: vi.fn().mockReturnValue(lessons),
+        storage: {
+          from: vi.fn().mockReturnValue({ download, remove }),
+        },
+      },
+    } as never);
+    vi.mocked(isPresenterPdfSnapshotPath).mockReturnValue(true);
+
+    const response = await POST(
+      new Request("http://localhost/api/presenter/pdf", {
+        method: "POST",
+        body: JSON.stringify({
+          lessonId: "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c",
+          snapshotPath,
+          output: "a4-bundle",
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const resultDocument = await PDFDocument.load(await response.arrayBuffer());
+
+    expect(response.headers.get("Content-Type")).toBe("application/pdf");
+    expect(resultDocument.getPages()[0].getMediaBox()).toEqual({
+      x: 0,
+      y: 0,
+      width: 595.28,
+      height: 841.89,
+    });
+    expect(pdf).toHaveBeenCalledWith(
+      expect.objectContaining({ format: "A4", landscape: false }),
+    );
+    expect(remove).toHaveBeenCalledWith([snapshotPath]);
+  });
+
   it("screenshots slide images server-side without using a browser canvas", async () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
     const screenshot = vi.fn().mockResolvedValue(jpeg);
@@ -201,9 +372,9 @@ describe("presenter PDF route renderer", () => {
   });
 });
 
-async function validOnePagePdf() {
+async function validOnePagePdf(width = 1152, height = 720) {
   const document = await PDFDocument.create();
-  document.addPage([1152, 720]);
+  document.addPage([width, height]);
   return document.save();
 }
 

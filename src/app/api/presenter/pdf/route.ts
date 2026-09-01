@@ -22,6 +22,7 @@ import {
   createPresenterPdfSlideDocuments,
   presenterPdfError,
 } from "@/features/builder/presenter-pdf";
+import { createA4BundleSheetDocuments } from "@/features/builder/a4-bundle-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,12 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const lessonId = String(body.lessonId || "").trim();
   const snapshotPath = String(body.snapshotPath || "").trim();
-  const output = body.output === "slide-images" ? "slide-images" : "pdf";
+  const output =
+    body.output === "slide-images"
+      ? "slide-images"
+      : body.output === "a4-bundle"
+        ? "a4-bundle"
+        : "pdf";
 
   if (!isUuid(lessonId) || !isPresenterPdfSnapshotPath(auth.user.id, lessonId, snapshotPath)) {
     return NextResponse.json({ ok: false, error: "Invalid presenter PDF snapshot path." }, { status: 400 });
@@ -118,7 +124,10 @@ export async function POST(request: Request) {
       });
     }
 
-    const pdf = await renderPresenterSnapshotToPdf(html);
+    const pdf =
+      output === "a4-bundle"
+        ? await renderA4BundleSnapshotToPdf(html)
+        : await renderPresenterSnapshotToPdf(html);
     const pdfBody = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
     return new NextResponse(pdfBody, {
       status: 200,
@@ -147,6 +156,29 @@ export async function renderPresenterSnapshotToPdf(html: string) {
     await page.emulateMediaType("print");
     return page.pdf(pdfPageOptions());
   });
+  return mergeOnePagePdfs(pagePdfs);
+}
+
+export async function renderA4BundleSnapshotToPdf(html: string) {
+  const sheets = createA4BundleSheetDocuments(html);
+  const pagePdfs = await renderSnapshotDocuments(
+    sheets.map((sheet) => sheet.html),
+    async (page, index) => {
+      await page.emulateMediaType("print");
+      return page.pdf({
+        printBackground: true,
+        preferCSSPageSize: true,
+        format: "A4",
+        landscape: sheets[index].orientation === "landscape",
+        margin: { top: "0", right: "0", bottom: "0", left: "0" },
+        timeout: 120000,
+      });
+    },
+  );
+  return mergeOnePagePdfs(pagePdfs);
+}
+
+async function mergeOnePagePdfs(pagePdfs: Uint8Array[]) {
   const merged = await PDFDocument.create();
   for (const onePagePdf of pagePdfs) {
     const source = await PDFDocument.load(onePagePdf);
@@ -202,7 +234,13 @@ async function renderPresenterSnapshotPages<T>(
   html: string,
   renderPage: (page: Page) => Promise<T>,
 ) {
-  const slideDocuments = createPresenterPdfSlideDocuments(html);
+  return renderSnapshotDocuments(createPresenterPdfSlideDocuments(html), renderPage);
+}
+
+async function renderSnapshotDocuments<T>(
+  documents: string[],
+  renderPage: (page: Page, index: number) => Promise<T>,
+) {
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
   const rendered: T[] = [];
 
@@ -225,14 +263,14 @@ async function renderPresenterSnapshotPages<T>(
       protocolTimeout: 180000,
     });
 
-    for (const [index, slideHtml] of slideDocuments.entries()) {
+    for (const [index, documentHtml] of documents.entries()) {
       const snapshotFile = join(
         tmpdir(),
         `lesson-builder-presenter-${randomUUID()}-${index + 1}.html`,
       );
       let page: Page | undefined;
       try {
-        await writeFile(snapshotFile, slideHtml, "utf8");
+        await writeFile(snapshotFile, documentHtml, "utf8");
         page = await browser.newPage();
         await page.goto(pathToFileURL(snapshotFile).href, {
           waitUntil: "load",
@@ -248,7 +286,7 @@ async function renderPresenterSnapshotPages<T>(
             ),
           );
         });
-        rendered.push(await renderPage(page));
+        rendered.push(await renderPage(page, index));
       } finally {
         await page?.close().catch(() => undefined);
         await unlink(snapshotFile).catch(() => undefined);
