@@ -81,6 +81,7 @@ describe("standalone lesson export", () => {
     const style = dom.window.getComputedStyle(svg);
 
     expect(style.position).toBe("absolute");
+    expect(style.inset).toBe("0");
     expect(style.width).toBe("100%");
     expect(style.height).toBe("100%");
     expect(style.pointerEvents).toBe("none");
