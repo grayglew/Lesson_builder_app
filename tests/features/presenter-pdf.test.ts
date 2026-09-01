@@ -1,5 +1,6 @@
 import {
   createPresenterPdfSlideDocuments,
+  prepareStaticPresenterSnapshotHtml,
   preparePowerPointSnapshotHtml,
   preparePresenterPdfSnapshotHtml,
   presenterPdfError,
@@ -15,6 +16,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 describe("presenter PDF snapshots", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("prepares a reusable static snapshot without presenter print geometry", () => {
+    const html = `<!doctype html><html><head><title>Lesson</title></head><body>
+      <section class="lesson-slide starter-slide">Starter</section>
+      <script id="lesson-builder-state" type="application/json">{"slides":[]}</script>
+      <script>window.presenterLoaded = true;</script>
+    </body></html>`;
+
+    const snapshot = prepareStaticPresenterSnapshotHtml(html);
+
+    expect(snapshot).not.toContain("<script");
+    expect(snapshot).not.toContain("lesson-builder-state");
+    expect(snapshot).not.toContain("presenterLoaded");
+    expect(snapshot).not.toContain('id="presenter-pdf-print-css"');
+    expect(snapshot).not.toContain("@page{size:16in 10in");
+    expect(prepareStaticPresenterSnapshotHtml(snapshot)).toBe(snapshot);
   });
 
   it("removes duplicate builder state and runtime scripts from a mixed lesson", () => {

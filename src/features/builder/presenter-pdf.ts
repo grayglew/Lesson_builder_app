@@ -19,11 +19,15 @@ const POWERPOINT_BUNDLE_STATIC_CSS = `
 .example-reveal-region{visibility:visible!important;}
 `;
 
-export function preparePresenterPdfSnapshotHtml(html: string) {
-  const staticHtml = String(html || "").replace(
+export function prepareStaticPresenterSnapshotHtml(html: string) {
+  return String(html || "").replace(
     /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi,
     "",
   );
+}
+
+export function preparePresenterPdfSnapshotHtml(html: string) {
+  const staticHtml = prepareStaticPresenterSnapshotHtml(html);
   if (staticHtml.includes(`id="${PRINT_STYLE_ID}"`)) return staticHtml;
 
   const printStyle = `<style id="${PRINT_STYLE_ID}">${PRESENTER_PDF_PRINT_CSS}</style>`;
@@ -103,7 +107,7 @@ export function presenterPdfError(
   };
 }
 
-function extractLessonSlides(html: string) {
+export function extractLessonSlides(html: string) {
   const sectionTag = /<\/?section\b[^>]*>/gi;
   const slides: string[] = [];
   let slideStart = -1;
