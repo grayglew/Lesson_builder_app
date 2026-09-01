@@ -5,12 +5,14 @@ import type {
 import { renderLatexDocument } from "./latex";
 import { inlineMarkdownToHtml } from "./markdown";
 import { normalizeBuilderDocument } from "./schema";
+import { renderStaticAnnotationSvg } from "./static-annotations";
 
-type StandaloneLessonOptions = {
+export type StandaloneLessonOptions = {
   runtimeCss?: string;
   runtimeJavaScript?: string;
   handout?: boolean;
   offlineCapabilities?: boolean;
+  staticAnnotations?: boolean;
   liveRetrieval?: {
     enabled: boolean;
     endpoint: string;
@@ -52,9 +54,16 @@ export function buildStandaloneLessonHtml(
       ? options.presenterConfig
       : null;
   const slides = document.slides
-    .map((slide, index) =>
-      renderStandaloneSlide(slide, index, Boolean(liveRetrieval)),
-    )
+    .map((slide, index) => {
+      const renderedSlide = renderStandaloneSlide(
+        slide,
+        index,
+        Boolean(liveRetrieval),
+      );
+      return options.staticAnnotations
+        ? injectStaticAnnotations(renderedSlide, slide.annotations)
+        : renderedSlide;
+    })
     .join("");
   const title = escapeHtml(document.title || "Lesson");
   const handoutClass = options.handout ? " handout-mode" : "";
@@ -124,6 +133,15 @@ ${options.offlineCapabilities ? `<details class="presenter-capability-note" open
 <script>${options.runtimeJavaScript || ""}</script>
 </body>
 </html>`;
+}
+
+function injectStaticAnnotations(slideHtml: string, value: unknown): string {
+  const annotations = renderStaticAnnotationSvg(value);
+  if (!annotations) return slideHtml;
+  const closingSectionIndex = slideHtml.lastIndexOf("</section>");
+  return closingSectionIndex >= 0
+    ? `${slideHtml.slice(0, closingSectionIndex)}${annotations}${slideHtml.slice(closingSectionIndex)}`
+    : slideHtml;
 }
 
 export function parseStandaloneLessonHtml(html: string): BuilderDocument {

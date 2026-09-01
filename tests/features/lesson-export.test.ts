@@ -35,6 +35,43 @@ describe("standalone lesson export", () => {
     });
   });
 
+  it("includes persisted annotations only when static export markup is requested", () => {
+    const document = lessonDocument();
+    document.slides = [
+      {
+        id: "annotated-slide",
+        type: "blank",
+        title: "Annotated",
+        annotations: [
+          {
+            id: "annotation-1",
+            mode: "pen",
+            color: "#dc2626",
+            width: 6,
+            points: [{ x: 10, y: 20 }, { x: 30, y: 40 }],
+          },
+        ],
+      },
+    ];
+
+    const withoutStaticAnnotations = buildStandaloneLessonHtml(document);
+    const withStaticAnnotations = buildStandaloneLessonHtml(document, {
+      staticAnnotations: true,
+    });
+    const slideStart = withStaticAnnotations.indexOf(
+      'data-builder-slide-id="annotated-slide"',
+    );
+    const annotationStart = withStaticAnnotations.indexOf(
+      "static-annotation-svg",
+    );
+    const slideEnd = withStaticAnnotations.indexOf("</section>", annotationStart);
+
+    expect(withoutStaticAnnotations).not.toContain("static-annotation-svg");
+    expect(withStaticAnnotations).toContain("static-annotation-svg");
+    expect(annotationStart).toBeGreaterThan(slideStart);
+    expect(annotationStart).toBeLessThan(slideEnd);
+  });
+
   it("keeps the production scroll presenter toolbar and printable slides", () => {
     const html = buildStandaloneLessonHtml(lessonDocument());
 
