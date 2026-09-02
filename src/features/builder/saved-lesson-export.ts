@@ -25,12 +25,18 @@ export type RenderedSlide = {
   dataUrl: string;
 };
 
-type BundleDependencies = {
+type PowerPointBundleDependencies = {
   renderSlides?: (html: string) => Promise<RenderedSlide[]>;
   buildPowerPoint?: (
     slides: readonly RenderedSlide[],
     title: string,
   ) => Promise<Blob>;
+  retrievalItems?: RetrievalItem[];
+  prepareDocument?: PrepareExportDocument;
+};
+
+export type BundleDependencies = {
+  renderPdf: (html: string) => Promise<Blob>;
   retrievalItems?: RetrievalItem[];
   prepareDocument?: PrepareExportDocument;
 };
@@ -96,7 +102,7 @@ export async function prepareSavedLessonHtml(
 
 export async function buildPowerPointBundleZip(
   document: BuilderDocument,
-  dependencies: BundleDependencies = {},
+  dependencies: PowerPointBundleDependencies = {},
 ) {
   if (!document.slides.length) {
     throw new Error("This saved lesson has no slides to export.");
@@ -138,6 +144,53 @@ export async function buildPowerPointBundleZip(
       "The PowerPoint and PDF are static image-based versions of the lesson slides.",
       ...describeStaticExportBehavior(embeddedDocument),
       "Worksheet files are included in the worksheets/ folder.",
+    ].join("\n"),
+  );
+  return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+}
+
+export async function buildLessonBundleZip(
+  document: BuilderDocument,
+  dependencies: BundleDependencies,
+) {
+  if (!document.slides.length) {
+    throw new Error("This saved lesson has no slides to export.");
+  }
+  const prepareDocument =
+    dependencies.prepareDocument ?? prepareBuilderDocumentForExport;
+  const embeddedDocument = await prepareDocument(
+    document,
+    dependencies.retrievalItems,
+  );
+  const staticDocument = createStaticExportDocument(embeddedDocument);
+  const html = buildStandaloneLessonHtml(staticDocument, {
+    staticAnnotations: true,
+  });
+  const [lessonPdf, worksheetFiles] = await Promise.all([
+    dependencies.renderPdf(html),
+    Promise.all(
+      collectWorksheetFilesForBundle(embeddedDocument).map(async (entry) => ({
+        path: entry.path,
+        file: await builderAssetToBlobStrict(entry.file, entry.path),
+      })),
+    ),
+  ]);
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+  const baseName = safeFileName(embeddedDocument.title);
+
+  zip.file(`${baseName}.pdf`, lessonPdf);
+  worksheetFiles.forEach(({ path, file }) => zip.file(path, file));
+  zip.file(
+    "README.txt",
+    [
+      `${embeddedDocument.title || "Lesson"} export bundle`,
+      "",
+      "This bundle was exported from Lesson Builder.",
+      "The lesson PDF uses A4 pages. Ordinary lesson slides are arranged two per page; imported PDF pages use a full A4 page.",
+      "Annotations saved to Lesson Builder are included.",
+      ...describeStaticExportBehavior(embeddedDocument),
+      "Worksheet and answer PDFs are included in the worksheets/ folder.",
     ].join("\n"),
   );
   return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
@@ -446,6 +499,36 @@ async function builderAssetToBlob(asset: BuilderAsset) {
   const response = await fetch(source, { cache: "no-store" });
   if (!response.ok) return null;
   return response.blob();
+}
+
+async function builderAssetToBlobStrict(
+  asset: BuilderAsset,
+  path: string,
+): Promise<Blob> {
+  const source = String(asset.dataUrl || "").trim();
+  const fail = (): never => {
+    throw new Error(`Could not include "${path}" in the lesson bundle.`);
+  };
+  if (!source) fail();
+  try {
+    if (/^data:/i.test(source)) {
+      const commaIndex = source.indexOf(",");
+      if (commaIndex < 5 || !source.slice(commaIndex + 1).trim()) fail();
+    }
+    const response = await fetch(source, { cache: "no-store" });
+    if (!response.ok) fail();
+    const blob = await response.blob();
+    if (!blob.size) fail();
+    return blob;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === `Could not include "${path}" in the lesson bundle.`
+    ) {
+      throw error;
+    }
+    return fail();
+  }
 }
 
 function dataUrlToBytes(dataUrl: string) {

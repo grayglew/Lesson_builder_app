@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { describe, expect, it, vi } from "vitest";
+import * as savedLessonExport from "@/features/builder/saved-lesson-export";
 import {
   buildPowerPointBundleZip,
   prepareSavedLessonHtml,
@@ -116,6 +117,167 @@ describe("saved lesson static bundle", () => {
     );
     expect(await zip.file("README.txt")?.async("string")).toContain(
       "answer images appear twice",
+    );
+  });
+
+  it("creates a PDF-led ZIP with static annotations, hydrated assets, and answer variants", async () => {
+    const document = createInitialBuilderDocument("2026-09-02T01:00:00.000Z");
+    document.title = "Fractions & ratios";
+    document.slides = [
+      {
+        id: "worksheet",
+        type: "worksheet",
+        title: "Practice",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 3,
+          dataUrl: "data:application/pdf;base64,cWRm",
+        },
+        answers: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 3,
+          dataUrl: "data:application/pdf;base64,YW5z",
+        },
+      },
+      {
+        ...revision("https://expired.test/question.png"),
+        annotations: [
+          {
+            id: "saved-pen",
+            mode: "pen",
+            color: "#2563eb",
+            width: 3,
+            points: [
+              { x: 20, y: 30 },
+              { x: 40, y: 50 },
+            ],
+          },
+        ],
+      },
+    ];
+    const prepared = structuredClone(document);
+    const preparedRevision = prepared.slides[1];
+    if (preparedRevision?.type !== "revision") throw new Error("Expected revision");
+    const preparedItems = revisionItems(preparedRevision);
+    preparedItems[0].image!.dataUrl =
+      "data:image/png;base64,ZnJlc2gtcXVlc3Rpb24=";
+    preparedItems[0].answerImage!.dataUrl =
+      "data:image/png;base64,ZnJlc2gtYW5zd2Vy";
+    const prepareDocument = vi.fn().mockResolvedValue(prepared);
+    const renderPdf = vi.fn().mockResolvedValue(
+      new Blob(["%PDF-1.7\nlesson"], { type: "application/pdf" }),
+    );
+
+    expect(typeof savedLessonExport.buildLessonBundleZip).toBe("function");
+    const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
+      prepareDocument,
+      renderPdf,
+    });
+    const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
+
+    expect(prepareDocument).toHaveBeenCalledOnce();
+    expect(renderPdf).toHaveBeenCalledOnce();
+    const html = String(renderPdf.mock.calls[0]?.[0]);
+    expect(html).toContain("static-annotation-svg");
+    expect(html).toContain("data:image/png;base64,ZnJlc2gtcXVlc3Rpb24=");
+    expect(html).toContain("data:image/png;base64,ZnJlc2gtYW5zd2Vy");
+    expect(Object.keys(zip.files)).toEqual(
+      expect.arrayContaining([
+        "Fractions-ratios.pdf",
+        "worksheets/practice.pdf",
+        "worksheets/practice-2.pdf",
+        "README.txt",
+      ]),
+    );
+    expect(Object.keys(zip.files).some((name) => /\.pptx$/i.test(name))).toBe(false);
+    expect(await zip.file("README.txt")?.async("string")).toContain(
+      "Ordinary lesson slides are arranged two per page",
+    );
+  });
+
+  it("rejects when a worksheet cannot be downloaded", async () => {
+    const document = createInitialBuilderDocument("2026-09-02T02:00:00.000Z");
+    document.slides = [
+      {
+        id: "worksheet",
+        type: "worksheet",
+        title: "Practice",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 3,
+          dataUrl: "https://assets.example/practice.pdf",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("missing", { status: 404 }),
+    );
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, {
+        renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+      }),
+    ).rejects.toThrow(
+      'Could not include "worksheets/practice.pdf" in the lesson bundle.',
+    );
+  });
+
+  it("rejects when a managed worksheet resolves to an empty blob", async () => {
+    const document = createInitialBuilderDocument("2026-09-02T03:00:00.000Z");
+    document.slides = [
+      {
+        id: "worksheet",
+        type: "worksheet",
+        title: "Practice",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 3,
+          dataUrl: "https://assets.example/practice.pdf",
+          assetId: "managed-practice",
+          storagePath: "owner/practice.pdf",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new Blob()));
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, {
+        renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+      }),
+    ).rejects.toThrow(
+      'Could not include "worksheets/practice.pdf" in the lesson bundle.',
+    );
+  });
+
+  it("rejects an invalid worksheet data URL before creating the bundle", async () => {
+    const document = createInitialBuilderDocument("2026-09-02T04:00:00.000Z");
+    document.slides = [
+      {
+        id: "worksheet",
+        type: "worksheet",
+        title: "Practice",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 3,
+          dataUrl: "data:application/pdf;base64,",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Blob(["not-empty"])),
+    );
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, {
+        renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+      }),
+    ).rejects.toThrow(
+      'Could not include "worksheets/practice.pdf" in the lesson bundle.',
     );
   });
 
