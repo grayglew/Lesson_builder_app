@@ -183,6 +183,17 @@ describe("saved lesson static bundle", () => {
     expect(html).toContain("static-annotation-svg");
     expect(html).toContain("data:image/png;base64,ZnJlc2gtcXVlc3Rpb24=");
     expect(html).toContain("data:image/png;base64,ZnJlc2gtYW5zd2Vy");
+    expect(html.match(/class="lesson-slide revision-slide/g)).toHaveLength(2);
+    expect(
+      html.match(
+        /data-reveal-key="revision-answer-0" aria-pressed="false"/g,
+      ),
+    ).toHaveLength(1);
+    expect(
+      html.match(
+        /data-reveal-key="revision-answer-0" aria-pressed="true"/g,
+      ),
+    ).toHaveLength(1);
     expect(Object.keys(zip.files)).toEqual(
       expect.arrayContaining([
         "Fractions-ratios.pdf",
@@ -242,7 +253,7 @@ describe("saved lesson static bundle", () => {
         },
       },
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new Blob()));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response());
 
     await expect(
       savedLessonExport.buildLessonBundleZip!(document, {
@@ -278,6 +289,46 @@ describe("saved lesson static bundle", () => {
       }),
     ).rejects.toThrow(
       'Could not include "worksheets/practice.pdf" in the lesson bundle.',
+    );
+  });
+
+  it("reports the collision-resolved ZIP path when default preparation cannot embed a managed answer PDF", async () => {
+    const document = createInitialBuilderDocument("2026-09-02T05:00:00.000Z");
+    document.slides = [
+      {
+        id: "worksheet",
+        type: "worksheet",
+        title: "Practice",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 3,
+          dataUrl: "data:application/pdf;base64,cHJhY3RpY2U=",
+        },
+        answers: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 3,
+          dataUrl: "https://assets.example/practice-answers.pdf",
+          assetId: "managed-answers",
+          storagePath: "owner/practice-answers.pdf",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const source = String(input);
+      if (/^data:/i.test(source)) {
+        return new Response(new Blob(["practice"], { type: "application/pdf" }));
+      }
+      return new Response("forbidden", { status: 403 });
+    });
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, {
+        renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+      }),
+    ).rejects.toThrow(
+      'Could not include "worksheets/practice-2.pdf" in the lesson bundle.',
     );
   });
 

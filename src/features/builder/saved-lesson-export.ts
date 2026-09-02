@@ -156,11 +156,10 @@ export async function buildLessonBundleZip(
   if (!document.slides.length) {
     throw new Error("This saved lesson has no slides to export.");
   }
-  const prepareDocument =
-    dependencies.prepareDocument ?? prepareBuilderDocumentForExport;
-  const embeddedDocument = await prepareDocument(
+  const embeddedDocument = await prepareLessonBundleDocument(
     document,
     dependencies.retrievalItems,
+    dependencies.prepareDocument,
   );
   const staticDocument = createStaticExportDocument(embeddedDocument);
   const html = buildStandaloneLessonHtml(staticDocument, {
@@ -194,6 +193,60 @@ export async function buildLessonBundleZip(
     ].join("\n"),
   );
   return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+}
+
+async function prepareLessonBundleDocument(
+  document: BuilderDocument,
+  retrievalItems: readonly RetrievalItem[] | undefined,
+  prepareDocument?: PrepareExportDocument,
+) {
+  const { documentForPreparation, worksheetAssetsBySlideId } =
+    separateWorksheetAssets(document);
+  const prepare = prepareDocument ?? prepareBuilderDocumentForExport;
+  const prepared = await prepare(documentForPreparation, retrievalItems);
+  return restoreWorksheetAssets(prepared, worksheetAssetsBySlideId);
+}
+
+type WorksheetAssets = {
+  worksheet?: BuilderAsset;
+  answers?: BuilderAsset;
+};
+
+function separateWorksheetAssets(document: BuilderDocument) {
+  const documentForPreparation = structuredCloneSafe(document);
+  const worksheetAssetsBySlideId = new Map<string, WorksheetAssets>();
+  documentForPreparation.slides.forEach((slide) => {
+    if (slide.type !== "worksheet") return;
+    const record = slide as unknown as Record<string, unknown>;
+    const assets: WorksheetAssets = {};
+    if (record.worksheet) assets.worksheet = record.worksheet as BuilderAsset;
+    if (record.answers) assets.answers = record.answers as BuilderAsset;
+    if (!assets.worksheet && !assets.answers) return;
+    worksheetAssetsBySlideId.set(slide.id, assets);
+    delete record.worksheet;
+    delete record.answers;
+  });
+  return { documentForPreparation, worksheetAssetsBySlideId };
+}
+
+function restoreWorksheetAssets(
+  document: BuilderDocument,
+  worksheetAssetsBySlideId: ReadonlyMap<string, WorksheetAssets>,
+) {
+  const restored = structuredCloneSafe(document);
+  restored.slides.forEach((slide) => {
+    if (slide.type !== "worksheet") return;
+    const assets = worksheetAssetsBySlideId.get(slide.id);
+    if (!assets) return;
+    const record = slide as unknown as Record<string, unknown>;
+    if (assets.worksheet) {
+      record.worksheet = structuredCloneSafe(assets.worksheet);
+    }
+    if (assets.answers) {
+      record.answers = structuredCloneSafe(assets.answers);
+    }
+  });
+  return restored;
 }
 
 export function downloadBlob(blob: Blob, fileName: string) {
@@ -544,6 +597,11 @@ function formatPdfNumber(value: number) {
   return Number(value || 0)
     .toFixed(2)
     .replace(/\.?0+$/, "") || "0";
+}
+
+function structuredCloneSafe<T>(value: T): T {
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 async function fetchAssetText(url: string) {
