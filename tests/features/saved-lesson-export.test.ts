@@ -332,6 +332,52 @@ describe("saved lesson static bundle", () => {
     );
   });
 
+  it("keeps distinct worksheet assets when legacy slides share an ID", async () => {
+    const document = createInitialBuilderDocument("2026-09-02T06:00:00.000Z");
+    document.slides = [
+      {
+        id: "duplicate-worksheet",
+        type: "worksheet",
+        title: "First practice",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 5,
+          dataUrl: "data:application/pdf;base64,Zmlyc3Q=",
+        },
+      },
+      {
+        id: "duplicate-worksheet",
+        type: "worksheet",
+        title: "Second practice",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 6,
+          dataUrl: "data:application/pdf;base64,c2Vjb25k",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const source = String(input);
+      return new Response(source.includes("Zmlyc3Q=") ? "first" : "second", {
+        headers: { "Content-Type": "application/pdf" },
+      });
+    });
+
+    const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
+      renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+    });
+    const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
+
+    expect(await zip.file("worksheets/practice.pdf")?.async("string")).toBe(
+      "first",
+    );
+    expect(
+      await zip.file("worksheets/practice-2.pdf")?.async("string"),
+    ).toBe("second");
+  });
+
   it("waits for srcdoc slides instead of accepting the iframe's initial blank document", async () => {
     vi.useFakeTimers();
     try {

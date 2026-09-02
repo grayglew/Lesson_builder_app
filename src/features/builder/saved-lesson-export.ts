@@ -200,11 +200,11 @@ async function prepareLessonBundleDocument(
   retrievalItems: readonly RetrievalItem[] | undefined,
   prepareDocument?: PrepareExportDocument,
 ) {
-  const { documentForPreparation, worksheetAssetsBySlideId } =
+  const { documentForPreparation, worksheetAssetsBySlideIndex } =
     separateWorksheetAssets(document);
   const prepare = prepareDocument ?? prepareBuilderDocumentForExport;
   const prepared = await prepare(documentForPreparation, retrievalItems);
-  return restoreWorksheetAssets(prepared, worksheetAssetsBySlideId);
+  return restoreWorksheetAssets(prepared, worksheetAssetsBySlideIndex);
 }
 
 type WorksheetAssets = {
@@ -214,29 +214,29 @@ type WorksheetAssets = {
 
 function separateWorksheetAssets(document: BuilderDocument) {
   const documentForPreparation = structuredCloneSafe(document);
-  const worksheetAssetsBySlideId = new Map<string, WorksheetAssets>();
-  documentForPreparation.slides.forEach((slide) => {
+  const worksheetAssetsBySlideIndex = new Map<number, WorksheetAssets>();
+  documentForPreparation.slides.forEach((slide, slideIndex) => {
     if (slide.type !== "worksheet") return;
     const record = slide as unknown as Record<string, unknown>;
     const assets: WorksheetAssets = {};
     if (record.worksheet) assets.worksheet = record.worksheet as BuilderAsset;
     if (record.answers) assets.answers = record.answers as BuilderAsset;
     if (!assets.worksheet && !assets.answers) return;
-    worksheetAssetsBySlideId.set(slide.id, assets);
+    worksheetAssetsBySlideIndex.set(slideIndex, assets);
     delete record.worksheet;
     delete record.answers;
   });
-  return { documentForPreparation, worksheetAssetsBySlideId };
+  return { documentForPreparation, worksheetAssetsBySlideIndex };
 }
 
 function restoreWorksheetAssets(
   document: BuilderDocument,
-  worksheetAssetsBySlideId: ReadonlyMap<string, WorksheetAssets>,
+  worksheetAssetsBySlideIndex: ReadonlyMap<number, WorksheetAssets>,
 ) {
   const restored = structuredCloneSafe(document);
-  restored.slides.forEach((slide) => {
+  restored.slides.forEach((slide, slideIndex) => {
     if (slide.type !== "worksheet") return;
-    const assets = worksheetAssetsBySlideId.get(slide.id);
+    const assets = worksheetAssetsBySlideIndex.get(slideIndex);
     if (!assets) return;
     const record = slide as unknown as Record<string, unknown>;
     if (assets.worksheet) {
