@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1418;
+        --surface: #182126;
+        --surface-raised: #202b31;
+        --ink: #edf4f2;
+        --muted: #a7b5b8;
+        --line: #34444a;
+        --accent: #21b8a8;
+        --accent-dark: #159383;
+        --accent-soft: #133f3d;
+        --danger: #ff958a;
+        --danger-soft: #41201f;
+        --warn: #f4c76b;
+        --warn-soft: #392c13;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(920px, calc(100vw - 28px));
+        margin: 0 auto;
+        padding: 24px 0;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+        padding: 22px;
+      }
+
+      h1, p { margin: 0; }
+      h1 { font-size: 28px; line-height: 1.1; }
+      .subtext { margin-top: 7px; color: var(--muted); }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 20px;
+      }
+
+      .full { grid-column: 1 / -1; }
+
+      label, .label {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      input, textarea, select, button {
+        font: inherit;
+      }
+
+      input, textarea, select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 11px;
+        background: #11191d;
+        color: var(--ink);
+      }
+
+      input:focus, textarea:focus, select:focus {
+        outline: 2px solid rgba(33, 184, 168, 0.42);
+        outline-offset: 1px;
+        border-color: var(--accent);
+      }
+
+      textarea {
+        min-height: 86px;
+        resize: vertical;
+      }
+
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .row > * { flex: 1; }
+      .row button { flex: 0 0 auto; }
+
+      .checkbox-row {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        margin-top: 2px;
+        color: var(--ink);
+        font-size: 14px;
+      }
+
+      .checkbox-row input { width: auto; }
+      .hidden { display: none; }
+
+      button {
+        min-height: 38px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 9px 12px;
+        cursor: pointer;
+        font-weight: 750;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.72;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: #061311;
+      }
+
+      .primary:hover { background: var(--accent-dark); }
+
+      .secondary {
+        background: var(--surface-raised);
+        border-color: var(--line);
+        color: var(--ink);
+      }
+
+      .status {
+        min-height: 42px;
+        margin-top: 16px;
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--muted);
+        background: #11191d;
+        overflow-wrap: anywhere;
+      }
+
+      .status.success {
+        background: var(--accent-soft);
+        color: var(--accent-dark);
+      }
+
+      .status.error {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .status.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .file-summary {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .file-drop {
+        width: 100%;
+        min-height: 104px;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        background: #11191d;
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        cursor: pointer;
+        text-align: center;
+      }
+
+      .file-drop:hover,
+      .file-drop:focus,
+      .file-drop.drag-over {
+        border-color: var(--accent);
+        color: var(--ink);
+        background: var(--accent-soft);
+        outline: none;
+      }
+
+      .hidden-file {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      @media (max-width: 720px) {
+        .grid { grid-template-columns: 1fr; }
+        .actions { flex-direction: column; }
+        .row { flex-direction: column; align-items: stretch; }
+        .row button { flex: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>Classroom Lesson Uploader</h1>
+        <p class="subtext">Post Lesson Builder lesson bundles to Google Classroom.</p>
+
+        <div class="grid">
+          <div class="full">
+            <span class="label">Course</span>
+            <div class="row">
+              <select id="course-select" aria-label="Course">
+                <option value="">Loading courses...</option>
+              </select>
+              <button class="secondary" type="button" onclick="loadCourses()">Refresh</button>
+            </div>
+          </div>
+
+          <div>
+            <label for="course-id">Course ID</label>
+            <input id="course-id" type="text" autocomplete="off" placeholder="Paste a course ID if needed">
+          </div>
+
+          <div>
+            <label for="topic-select">Existing topic</label>
+            <select id="topic-select">
+              <option value="">No topic</option>
+            </select>
+          </div>
+
+          <div class="full">
+            <label for="new-topic">New topic</label>
+            <input id="new-topic" type="text" autocomplete="off" placeholder="Leave blank to use the selected topic">
+          </div>
+
+          <div class="full">
+            <label for="post-title">Post title</label>
+            <input id="post-title" type="text" autocomplete="off" placeholder="Lesson title">
+          </div>
+
+          <div class="full">
+            <label for="description">Description</label>
+            <textarea id="description" placeholder="Optional instructions for students"></textarea>
+          </div>
+
+          <div class="full">
+            <label for="bundle-file">Lesson bundle zip</label>
+            <div id="file-drop" class="file-drop" role="button" tabindex="0" aria-controls="bundle-file">Drop bundle zip here or choose file</div>
+            <input id="bundle-file" class="hidden-file" type="file" accept="application/zip,application/x-zip-compressed,.zip">
+            <div id="file-summary" class="file-summary">No bundle selected.</div>
+          </div>
+
+          <div class="full">
+            <label class="checkbox-row">
+              <input id="schedule-enabled" type="checkbox" onchange="toggleSchedule()">
+              <span>Schedule this material for later</span>
+            </label>
+          </div>
+
+          <div id="schedule-wrap" class="full hidden">
+            <div class="grid">
+              <div>
+                <label for="schedule-date">Scheduled date</label>
+                <input id="schedule-date" type="date">
+              </div>
+              <div>
+                <label for="schedule-time">Scheduled time</label>
+                <input id="schedule-time" type="time" value="07:00">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="secondary" type="button" onclick="resetForm()">Reset</button>
+          <button id="post-button" class="primary" type="button" onclick="postMaterial()">Post material</button>
+        </div>
+
+        <div id="status" class="status" role="status" aria-live="polite">Ready.</div>
+      </section>
+    </main>
+
+    <script>
+      const MAX_ZIP_BYTES = 25 * 1024 * 1024;
+      const DEFAULT_SCHEDULE_TIME = '07:00';
+
+      const state = {
+        courses: [],
+        selectedFile: null,
+        topicLoadSequence: 0
+      };
+
+      window.addEventListener('load', function() {
+        wireEvents();
+        setScheduleDefaults(false);
+        loadCourses();
+      });
+
+      function wireEvents() {
+        document.getElementById('course-select').addEventListener('change', function(event) {
+          document.getElementById('course-id').value = event.target.value || '';
+          loadTopics();
+        });
+        document.getElementById('course-id').addEventListener('change', loadTopics);
+        document.getElementById('bundle-file').addEventListener('change', handleFileChange);
+
+        const fileDrop = document.getElementById('file-drop');
+        const fileInput = document.getElementById('bundle-file');
+        fileDrop.addEventListener('click', function() {
+          fileInput.click();
+        });
+        fileDrop.addEventListener('keydown', function(event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            fileInput.click();
+          }
+        });
+        fileDrop.addEventListener('dragover', handleFileDrag);
+        fileDrop.addEventListener('dragenter', handleFileDrag);
+        fileDrop.addEventListener('dragleave', clearFileDrag);
+        fileDrop.addEventListener('drop', handleFileDrop);
+      }
+
+      function loadCourses() {
+        setStatus('Loading courses...', null);
+        google.script.run
+          .withSuccessHandler(function(courses) {
+            state.courses = Array.isArray(courses) ? courses : [];
+            renderCourses();
+            setStatus(state.courses.length ? 'Courses loaded.' : 'No active teaching courses found. Paste a course ID manually.', state.courses.length ? 'success' : 'warn');
+          })
+          .withFailureHandler(function(error) {
+            state.courses = [];
+            renderCourses();
+            setStatus('Could not load courses: ' + errorMessage(error), 'error');
+          })
+          .listTeachingCourses();
+      }
+
+      function renderCourses() {
+        const select = document.getElementById('course-select');
+        select.innerHTML = '';
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = 'Choose a course';
+        select.appendChild(blank);
+
+        state.courses.forEach(function(course) {
+          const option = document.createElement('option');
+          option.value = course.id || '';
+          option.textContent = courseLabel(course);
+          select.appendChild(option);
+        });
+      }
+
+      function loadTopics() {
+        const courseId = document.getElementById('course-id').value.trim();
+        const requestSequence = ++state.topicLoadSequence;
+        renderTopics([]);
+        if (!courseId) return;
+
+        setStatus('Loading topics...', null);
+        google.script.run
+          .withSuccessHandler(function(payload) {
+            if (requestSequence !== state.topicLoadSequence) return;
+            if (document.getElementById('course-id').value.trim() !== courseId) return;
+            renderTopics(payload && payload.topics ? payload.topics : []);
+            setStatus('Topics loaded.', 'success');
+          })
+          .withFailureHandler(function(error) {
+            if (requestSequence !== state.topicLoadSequence) return;
+            if (document.getElementById('course-id').value.trim() !== courseId) return;
+            setStatus('Could not load topics: ' + errorMessage(error), 'error');
+          })
+          .getComposerData(courseId);
+      }
+
+      function renderTopics(topics) {
+        const select = document.getElementById('topic-select');
+        select.innerHTML = '';
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = 'No topic';
+        select.appendChild(blank);
+
+        (Array.isArray(topics) ? topics : []).forEach(function(topic) {
+          const option = document.createElement('option');
+          option.value = topic.topicId || '';
+          option.textContent = topic.name || '(Untitled topic)';
+          select.appendChild(option);
+        });
+      }
+
+      function handleFileChange(event) {
+        const file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+        setSelectedFile(file);
+      }
+
+      function handleFileDrag(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        document.getElementById('file-drop').classList.add('drag-over');
+      }
+
+      function clearFileDrag(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        document.getElementById('file-drop').classList.remove('drag-over');
+      }
+
+      function handleFileDrop(event) {
+        clearFileDrag(event);
+        const files = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files : null;
+        if (files && files.length > 1) {
+          document.getElementById('bundle-file').value = '';
+          setSelectedFile(null);
+          setStatus('Drop one lesson bundle at a time.', 'error');
+          return;
+        }
+
+        const file = files && files[0] ? files[0] : null;
+        if (files && files.length === 1) {
+          try {
+            document.getElementById('bundle-file').files = files;
+          } catch (assignError) {
+            // Application state remains the source of truth if the browser blocks assignment.
+          }
+        }
+        setSelectedFile(file);
+      }
+
+      function setSelectedFile(file) {
+        const summary = document.getElementById('file-summary');
+        const fileDrop = document.getElementById('file-drop');
+
+        if (!file) {
+          state.selectedFile = null;
+          summary.textContent = 'No bundle selected.';
+          fileDrop.textContent = 'Drop bundle zip here or choose file';
+          return;
+        }
+
+        const validationError = validateBundleFile(file);
+        if (validationError) {
+          state.selectedFile = null;
+          document.getElementById('bundle-file').value = '';
+          summary.textContent = file.name + ' (' + formatBytes(file.size || 0) + ')';
+          fileDrop.textContent = 'Drop bundle zip here or choose file';
+          setStatus(validationError, 'error');
+          return;
+        }
+
+        state.selectedFile = file;
+        summary.textContent = file.name + ' (' + formatBytes(file.size || 0) + ')';
+        fileDrop.textContent = file.name;
+        document.getElementById('post-title').value = lessonTitleFromBundleName(file.name);
+        setStatus('Bundle selected. Title updated from the file name.', 'success');
+      }
+
+      function validateBundleFile(file) {
+        if (!file || !/\.zip$/i.test(String(file.name || ''))) {
+          return 'The selected file should be a .zip bundle.';
+        }
+        if (Number(file.size || 0) > MAX_ZIP_BYTES) {
+          return 'The selected bundle is larger than ' + formatBytes(MAX_ZIP_BYTES) + '.';
+        }
+        return '';
+      }
+
+      function lessonTitleFromBundleName(name) {
+        return String(name || 'Lesson')
+          .replace(/-bundle\.zip$/i, '')
+          .replace(/\.zip$/i, '')
+          .replace(/\s*[-_]?\s*powerpoint[-_ ]bundle(?:\s*\(\d+\))?$/i, '')
+          .replace(/\s+/g, ' ')
+          .trim() || 'Lesson';
+      }
+
+      function toggleSchedule() {
+        const enabled = document.getElementById('schedule-enabled').checked;
+        document.getElementById('schedule-wrap').classList.toggle('hidden', !enabled);
+        if (enabled) setScheduleDefaults(false);
+      }
+
+      function setScheduleDefaults(force) {
+        const scheduleDateEl = document.getElementById('schedule-date');
+        const scheduleTimeEl = document.getElementById('schedule-time');
+        if (!scheduleDateEl || !scheduleTimeEl) return;
+
+        if (force || !scheduleTimeEl.value) {
+          scheduleTimeEl.value = DEFAULT_SCHEDULE_TIME;
+        }
+
+        if (force || !scheduleDateEl.value) {
+          scheduleDateEl.value = defaultScheduleDate();
+        }
+      }
+
+      function defaultScheduleDate() {
+        const now = new Date();
+        const candidate = new Date(now);
+        candidate.setHours(7, 0, 0, 0);
+        if (candidate.getTime() <= now.getTime()) {
+          candidate.setDate(candidate.getDate() + 1);
+        }
+        return dateInputValue(candidate);
+      }
+
+      function dateInputValue(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+      }
+
+      async function postMaterial() {
+        const button = document.getElementById('post-button');
+        const courseId = document.getElementById('course-id').value.trim();
+        const title = document.getElementById('post-title').value.trim();
+        const file = state.selectedFile;
+
+        if (!courseId) return setStatus('Choose a course or paste a course ID.', 'error');
+        if (!title) return setStatus('Enter a post title.', 'error');
+        if (!file) return setStatus('Choose a Lesson Builder lesson bundle zip.', 'error');
+        if (!/\.zip$/i.test(file.name)) return setStatus('The selected file should be a .zip bundle.', 'error');
+        if (file.size > MAX_ZIP_BYTES) return setStatus('The selected bundle is larger than ' + formatBytes(MAX_ZIP_BYTES) + '.', 'error');
+
+        let scheduledTimeIso = '';
+        if (document.getElementById('schedule-enabled').checked) {
+          const dateValue = document.getElementById('schedule-date').value;
+          const timeValue = document.getElementById('schedule-time').value || DEFAULT_SCHEDULE_TIME;
+          if (!dateValue) return setStatus('Choose a scheduled date.', 'error');
+          if (!timeValue) return setStatus('Choose a scheduled time.', 'error');
+          const date = new Date(`${dateValue}T${timeValue}`);
+          if (isNaN(date.getTime())) return setStatus('Choose a valid scheduled date and time.', 'error');
+          if (date.getTime() <= Date.now()) return setStatus('Choose a scheduled time in the future.', 'error');
+          scheduledTimeIso = date.toISOString();
+        }
+
+        setBusy(button, true);
+        setStatus('Reading bundle...', null);
+
+        try {
+          const bundlePayload = await readFileAsBase64(file);
+          setStatus(scheduledTimeIso ? 'Uploading files and scheduling Classroom material...' : 'Uploading files and posting to Classroom...', null);
+
+          google.script.run
+            .withSuccessHandler(function(result) {
+              setBusy(button, false);
+              const link = result && result.alternateLink ? result.alternateLink : '';
+              const count = result && result.attachmentCount ? result.attachmentCount : 0;
+              const message = result && result.isScheduled
+                ? 'Material scheduled successfully with ' + count + ' attachment(s).'
+                : 'Material posted successfully with ' + count + ' attachment(s).';
+              setStatus(message + (link ? ' Classroom post: ' + link : ''), 'success');
+            })
+            .withFailureHandler(function(error) {
+              setBusy(button, false);
+              setStatus('Could not post material: ' + errorMessage(error), 'error');
+            })
+            .createBundleLessonMaterial({
+              courseId: courseId,
+              title: title,
+              description: document.getElementById('description').value.trim(),
+              topicId: document.getElementById('topic-select').value,
+              newTopicName: document.getElementById('new-topic').value.trim(),
+              scheduledTimeIso: scheduledTimeIso,
+              bundle: bundlePayload
+            });
+        } catch (error) {
+          setBusy(button, false);
+          setStatus('Could not read bundle: ' + errorMessage(error), 'error');
+        }
+      }
+
+      function readFileAsBase64(file) {
+        return new Promise(function(resolve, reject) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            const dataUrl = event && event.target ? event.target.result : '';
+            const parts = String(dataUrl || '').split(',');
+            resolve({
+              name: file.name,
+              mimeType: file.type || 'application/zip',
+              size: file.size || 0,
+              base64: parts.length > 1 ? parts[1] : ''
+            });
+          };
+          reader.onerror = function() {
+            reject(new Error('Could not read ' + file.name));
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function resetForm() {
+        document.getElementById('post-title').value = '';
+        document.getElementById('description').value = '';
+        document.getElementById('new-topic').value = '';
+        document.getElementById('topic-select').value = '';
+        document.getElementById('bundle-file').value = '';
+        document.getElementById('schedule-enabled').checked = false;
+        setScheduleDefaults(true);
+        state.selectedFile = null;
+        document.getElementById('file-summary').textContent = 'No bundle selected.';
+        document.getElementById('file-drop').textContent = 'Drop bundle zip here or choose file';
+        toggleSchedule();
+        setStatus('Ready.', null);
+      }
+
+      function setBusy(button, isBusy) {
+        button.disabled = isBusy;
+        if (isBusy) {
+          button.dataset.originalText = button.textContent;
+          button.textContent = 'Please wait...';
+        } else {
+          button.textContent = button.dataset.originalText || 'Post material';
+        }
+      }
+
+      function setStatus(message, type) {
+        const status = document.getElementById('status');
+        status.textContent = message || '';
+        status.classList.remove('success', 'error', 'warn');
+        if (type) status.classList.add(type);
+      }
+
+      function courseLabel(course) {
+        const section = course.section ? ' - ' + course.section : '';
+        return (course.name || course.id || 'Untitled course') + section;
+      }
+
+      function formatBytes(bytes) {
+        const num = Number(bytes) || 0;
+        if (num < 1024) return num + ' B';
+        if (num < 1024 * 1024) return (num / 1024).toFixed(1) + ' KB';
+        return (num / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+
+      function errorMessage(error) {
+        return error && error.message ? error.message : String(error || 'Unknown error');
+      }
+    </script>
+  </body>
+</html>
