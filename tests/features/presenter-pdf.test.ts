@@ -1,7 +1,6 @@
 import {
   createPresenterPdfSlideDocuments,
   prepareStaticPresenterSnapshotHtml,
-  preparePowerPointSnapshotHtml,
   preparePresenterPdfSnapshotHtml,
   presenterPdfError,
 } from "@/features/builder/presenter-pdf";
@@ -9,9 +8,7 @@ import {
   BuilderApiError,
   downloadA4BundlePdf,
   downloadPresenterPdf,
-  downloadPresenterSlideImages,
 } from "@/features/builder/api-client";
-import JSZip from "jszip";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("presenter PDF snapshots", () => {
@@ -84,38 +81,6 @@ describe("presenter PDF snapshots", () => {
     expect(snapshot).toContain(question);
     expect(snapshot).toContain(answer);
     expect(snapshot).not.toContain("<script");
-  });
-
-  it("prepares a static PowerPoint layout without interactive controls or generic display overrides", () => {
-    const snapshot = preparePowerPointSnapshotHtml(`<!doctype html>
-      <html><head><style>
-        .worksheet-slide{display:grid}
-        .example-reveal-region.is-hidden{visibility:hidden}
-      </style></head><body>
-        <section class="lesson-slide example-slide">
-          <div class="lo-bar"><span class="lo-bar-text">Test 2</span>
-            <button class="example-reveal-button">Show second image</button>
-          </div>
-          <div class="example-grid">
-            <article class="example-block">First image</article>
-            <article class="example-block example-reveal-region is-hidden">Second image</article>
-          </div>
-        </section>
-      </body></html>`);
-
-    expect(snapshot).toContain('id="powerpoint-bundle-static-css"');
-    expect(snapshot).toContain(
-      ".example-reveal-button{display:none!important;}",
-    );
-    expect(snapshot).toContain(
-      ".example-reveal-region{visibility:visible!important;}",
-    );
-    expect(snapshot).not.toContain(
-      ".lesson-slide{display:block!important",
-    );
-    expect(snapshot).toContain(
-      ".lesson-deck{display:block!important;width:1600px!important;max-width:none!important;place-items:start!important;",
-    );
   });
 
   it("returns actionable, non-sensitive renderer failures", () => {
@@ -279,61 +244,6 @@ describe("presenter PDF snapshots", () => {
     );
   });
 
-  it("uploads a static snapshot and reads server-rendered JPEG slides", async () => {
-    const archive = new JSZip();
-    archive.file(
-      "manifest.json",
-      JSON.stringify({
-        version: 1,
-        slides: [
-          {
-            file: "slides/001.jpg",
-            width: 1600,
-            height: 1000,
-            imageWidth: 1536,
-            imageHeight: 960,
-          },
-        ],
-      }),
-    );
-    archive.file("slides/001.jpg", new Uint8Array([0xff, 0xd8, 0xff, 0xd9]));
-    const zip = await archive.generateAsync({ type: "uint8array" });
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(
-        jsonResponse({
-          ok: true,
-          path: "user/presenter-pdf/lesson/snapshot.html",
-          signedUrl: "https://storage.example.test/upload",
-        }),
-      )
-      .mockResolvedValueOnce(new Response(null, { status: 200 }))
-      .mockResolvedValueOnce(
-        new Response(zip.buffer as ArrayBuffer, {
-          status: 200,
-          headers: { "Content-Type": "application/zip" },
-        }),
-      );
-
-    const slides = await downloadPresenterSlideImages(
-      "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c",
-      '<!doctype html><section class="lesson-slide">Lesson</section>',
-    );
-
-    expect(slides).toEqual([
-      expect.objectContaining({
-        width: 1600,
-        height: 1000,
-        imageWidth: 1536,
-        imageHeight: 960,
-        imageBytes: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]),
-        dataUrl: "data:image/jpeg;base64,/9j/2Q==",
-      }),
-    ]);
-    expect(fetchMock.mock.calls[2]?.[1]?.body).toContain(
-      '"output":"slide-images"',
-    );
-  });
 });
 
 function jsonResponse(value: unknown, status = 200) {

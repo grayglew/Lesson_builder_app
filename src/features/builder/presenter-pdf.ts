@@ -11,13 +11,6 @@ html,body{margin:0!important;padding:0!important;background:#fff!important;}
 `;
 
 const PRINT_STYLE_ID = "presenter-pdf-print-css";
-const POWERPOINT_STYLE_ID = "powerpoint-bundle-static-css";
-const POWERPOINT_BUNDLE_STATIC_CSS = `
-.lesson-deck{display:block!important;width:1600px!important;max-width:none!important;place-items:start!important;margin:0!important;padding:0!important;}
-.lesson-slide{width:1600px!important;height:1000px!important;}
-.example-reveal-button{display:none!important;}
-.example-reveal-region{visibility:visible!important;}
-`;
 
 export function prepareStaticPresenterSnapshotHtml(html: string) {
   return String(html || "").replace(
@@ -35,13 +28,6 @@ export function preparePresenterPdfSnapshotHtml(html: string) {
     return staticHtml.replace(/<\/head>/i, `${printStyle}</head>`);
   }
   return `<!doctype html><html><head>${printStyle}</head><body>${staticHtml}</body></html>`;
-}
-
-export function preparePowerPointSnapshotHtml(html: string) {
-  const snapshot = preparePresenterPdfSnapshotHtml(html);
-  if (snapshot.includes(`id="${POWERPOINT_STYLE_ID}"`)) return snapshot;
-  const style = `<style id="${POWERPOINT_STYLE_ID}">${POWERPOINT_BUNDLE_STATIC_CSS}</style>`;
-  return snapshot.replace(/<\/head>/i, `${style}</head>`);
 }
 
 export function createPresenterPdfSlideDocuments(html: string) {

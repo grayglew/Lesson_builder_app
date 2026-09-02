@@ -9,10 +9,7 @@ import {
   retrievalItemSchema,
   toWorkspaceDocument,
 } from "./schema";
-import {
-  preparePowerPointSnapshotHtml,
-  preparePresenterPdfSnapshotHtml,
-} from "./presenter-pdf";
+import { preparePresenterPdfSnapshotHtml } from "./presenter-pdf";
 
 const syncLatestSchema = z.object({
   ok: z.boolean().optional(),
@@ -381,69 +378,6 @@ export async function downloadA4BundlePdf(lessonId: string, html: string) {
   return response.blob();
 }
 
-export async function downloadPresenterSlideImages(
-  lessonId: string,
-  html: string,
-) {
-  const ticket = await uploadPresenterSnapshot(
-    lessonId,
-    preparePowerPointSnapshotHtml(html),
-  );
-  const response = await requestPresenterSnapshotRender(
-    lessonId,
-    ticket.path,
-    "slide-images",
-  );
-  if (!response.ok) {
-    throw await presenterRenderError(
-      response,
-      `Could not render the PowerPoint slides (${response.status}).`,
-    );
-  }
-
-  const { default: JSZip } = await import("jszip");
-  const archive = await JSZip.loadAsync(await response.arrayBuffer());
-  const manifestFile = archive.file("manifest.json");
-  if (!manifestFile) {
-    throw new BuilderApiError("The slide renderer returned an invalid archive.", 502);
-  }
-  const manifest = z
-    .object({
-      version: z.literal(1),
-      slides: z.array(
-        z.object({
-          file: z.string().min(1),
-          width: z.number().positive(),
-          height: z.number().positive(),
-          imageWidth: z.number().int().positive(),
-          imageHeight: z.number().int().positive(),
-        }),
-      ),
-    })
-    .parse(JSON.parse(await manifestFile.async("string")));
-
-  return Promise.all(
-    manifest.slides.map(async (slide) => {
-      const file = archive.file(slide.file);
-      if (!file) {
-        throw new BuilderApiError(
-          "The slide renderer returned an incomplete archive.",
-          502,
-        );
-      }
-      const base64 = await file.async("base64");
-      return {
-        width: slide.width,
-        height: slide.height,
-        imageWidth: slide.imageWidth,
-        imageHeight: slide.imageHeight,
-        imageBytes: base64ToBytes(base64),
-        dataUrl: `data:image/jpeg;base64,${base64}`,
-      };
-    }),
-  );
-}
-
 async function uploadPresenterSnapshot(lessonId: string, html: string) {
   const snapshotHtml = preparePresenterPdfSnapshotHtml(html);
   const blob = new Blob([snapshotHtml], { type: "text/html" });
@@ -478,7 +412,7 @@ async function uploadPresenterSnapshot(lessonId: string, html: string) {
 function requestPresenterSnapshotRender(
   lessonId: string,
   snapshotPath: string,
-  output: "pdf" | "a4-bundle" | "slide-images" = "pdf",
+  output: "pdf" | "a4-bundle" = "pdf",
 ) {
   return fetch("/api/presenter/pdf", {
     method: "POST",
@@ -495,15 +429,6 @@ async function presenterRenderError(response: Response, fallback: string) {
     typeof data.error === "string" && data.error.trim() ? data.error : fallback,
     response.status,
   );
-}
-
-function base64ToBytes(base64: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
 }
 
 export async function updateSavedLessonMetadata(patch: SavedLessonMetadataPatch) {

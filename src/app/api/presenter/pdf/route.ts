@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium";
-import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
 import puppeteer, { type Page } from "puppeteer-core";
 import { randomUUID } from "node:crypto";
@@ -42,12 +41,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const lessonId = String(body.lessonId || "").trim();
   const snapshotPath = String(body.snapshotPath || "").trim();
-  const output =
-    body.output === "slide-images"
-      ? "slide-images"
-      : body.output === "a4-bundle"
-        ? "a4-bundle"
-        : "pdf";
+  const output = body.output === "a4-bundle" ? "a4-bundle" : "pdf";
 
   if (!isUuid(lessonId) || !isPresenterPdfSnapshotPath(auth.user.id, lessonId, snapshotPath)) {
     return NextResponse.json({ ok: false, error: "Invalid presenter PDF snapshot path." }, { status: 400 });
@@ -92,38 +86,6 @@ export async function POST(request: Request) {
     }
 
     const html = await snapshot.text();
-    if (output === "slide-images") {
-      const images = await renderPresenterSnapshotToSlideImages(html);
-      const archive = new JSZip();
-      const slides = images.map((image, index) => {
-        const file = `slides/${String(index + 1).padStart(3, "0")}.jpg`;
-        archive.file(file, image);
-        return {
-          file,
-          width: 1600,
-          height: 1000,
-          imageWidth: 1600,
-          imageHeight: 1000,
-        };
-      });
-      archive.file("manifest.json", JSON.stringify({ version: 1, slides }));
-      const zip = await archive.generateAsync({
-        type: "uint8array",
-        compression: "DEFLATE",
-      });
-      const zipBody = zip.buffer.slice(
-        zip.byteOffset,
-        zip.byteOffset + zip.byteLength,
-      ) as ArrayBuffer;
-      return new NextResponse(zipBody, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/zip",
-          "Cache-Control": "no-store",
-        },
-      });
-    }
-
     const pdf =
       output === "a4-bundle"
         ? await renderA4BundleSnapshotToPdf(html)
@@ -186,48 +148,6 @@ async function mergeOnePagePdfs(pagePdfs: Uint8Array[]) {
     merged.addPage(copiedPage);
   }
   return merged.save();
-}
-
-export function renderPresenterSnapshotToSlideImages(html: string) {
-  return renderPresenterSnapshotPages(html, async (page) => {
-    await page.emulateMediaType("screen");
-    const geometry = await page.evaluate(() => {
-      const slide = document.querySelector<HTMLElement>(".lesson-slide");
-      if (!slide) return null;
-      const bounds = slide.getBoundingClientRect();
-      return {
-        left: bounds.left,
-        top: bounds.top,
-        right: bounds.right,
-        bottom: bounds.bottom,
-      };
-    });
-    assertSlideFillsExportViewport(geometry);
-    const image = await page.screenshot({
-      type: "jpeg",
-      quality: 90,
-      captureBeyondViewport: false,
-      clip: { x: 0, y: 0, width: 1600, height: 1000 },
-    });
-    return new Uint8Array(image);
-  });
-}
-
-function assertSlideFillsExportViewport(
-  geometry: { left: number; top: number; right: number; bottom: number } | null,
-) {
-  const tolerance = 0.5;
-  if (
-    !geometry ||
-    Math.abs(geometry.left) > tolerance ||
-    Math.abs(geometry.top) > tolerance ||
-    Math.abs(geometry.right - 1600) > tolerance ||
-    Math.abs(geometry.bottom - 1000) > tolerance
-  ) {
-    throw new Error(
-      "The lesson slide does not fill the 1600x1000 export viewport.",
-    );
-  }
 }
 
 async function renderPresenterSnapshotPages<T>(

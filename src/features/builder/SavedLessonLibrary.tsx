@@ -28,7 +28,7 @@ import {
 import {
   deleteSavedLesson,
   createPresenterStudentSession,
-  downloadPresenterSlideImages,
+  downloadA4BundlePdf,
   listSavedLessons,
   openSavedLesson as fetchSavedLesson,
   saveCurrentLesson,
@@ -41,7 +41,7 @@ import { BuilderActionMenu } from "./BuilderActionMenu";
 import styles from "./BuilderShell.module.css";
 import { ConfidenceModal } from "./ConfidenceModal";
 import {
-  buildPowerPointBundleZip,
+  buildLessonBundleZip,
   downloadBlob,
   prepareSavedLessonHtml,
   safeFileName,
@@ -283,22 +283,21 @@ export function SavedLessonLibrary({
     });
   }
 
-  async function downloadPowerPointBundle(lesson: SavedLessonSummary) {
+  async function downloadLessonBundle(lesson: SavedLessonSummary) {
     await mutateLesson(lesson.id, async () => {
       setStatus({
         tone: "working",
-        message: `Building the static PowerPoint bundle for "${lesson.title}"…`,
+        message: `Building the A4 lesson bundle for "${lesson.title}"…`,
       });
       const opened = await fetchSavedLesson(lesson.id);
-      const bundle = await buildPowerPointBundleZip(opened.document, {
+      const bundle = await buildLessonBundleZip(opened.document, {
         retrievalItems: document.retrievalItems,
-        renderSlides: (html) =>
-          downloadPresenterSlideImages(lesson.id, html),
+        renderPdf: (html) => downloadA4BundlePdf(lesson.id, html),
       });
       downloadBlob(bundle, `${safeFileName(lesson.title)}-bundle.zip`);
       setStatus({
         tone: "success",
-        message: `Downloaded the PowerPoint bundle for "${lesson.title}".`,
+        message: `Downloaded the lesson bundle for "${lesson.title}".`,
       });
     });
   }
@@ -583,7 +582,7 @@ export function SavedLessonLibrary({
                             triggerContent={<><MoreHorizontal className="size-4" aria-hidden /><span className="sr-only">More actions for {lesson.title}</span></>}
                           >
                             <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)}><Download className="size-4" aria-hidden /> Download HTML</button>
-                            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadPowerPointBundle(lesson)}><Package className="size-4" aria-hidden /> Download PowerPoint</button>
+                            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)}><Package className="size-4" aria-hidden /> Download lesson bundle</button>
                             <button type="button" disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)}>{lesson.isTaught ? <Archive className="size-4" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />} {lesson.isTaught ? "Mark planned" : "Mark taught"}</button>
                             {confidence ? (
                               <button type="button" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })}><BarChart3 className="size-4" aria-hidden /> View confidence</button>
@@ -595,7 +594,7 @@ export function SavedLessonLibrary({
                         ) : (
                           <>
                             <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
-                            <IconAction label="Download PowerPoint bundle" disabled={Boolean(busyId)} onClick={() => void downloadPowerPointBundle(lesson)} icon={<Package className="size-4" />} />
+                            <IconAction label="Download lesson bundle" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)} icon={<Package className="size-4" />} />
                             <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
                             {confidence ? (
                               <IconAction label="View confidence" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })} icon={<BarChart3 className="size-4" />} />

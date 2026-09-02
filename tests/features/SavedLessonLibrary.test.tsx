@@ -4,13 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SavedLessonLibrary } from "@/features/builder/SavedLessonLibrary";
 import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import {
-  downloadPresenterSlideImages,
+  downloadA4BundlePdf,
   listSavedLessons,
   openSavedLesson,
   updateSavedLessonMetadata,
 } from "@/features/builder/api-client";
 import {
-  buildPowerPointBundleZip,
+  buildLessonBundleZip,
   downloadBlob,
 } from "@/features/builder/saved-lesson-export";
 import { createInitialBuilderDocument } from "@/features/builder/schema";
@@ -21,7 +21,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
     await importOriginal<typeof import("@/features/builder/api-client")>();
   return {
     ...original,
-    downloadPresenterSlideImages: vi.fn(),
+    downloadA4BundlePdf: vi.fn(),
     listSavedLessons: vi.fn(),
     openSavedLesson: vi.fn(),
     updateSavedLessonMetadata: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
 });
 
 vi.mock("@/features/builder/saved-lesson-export", () => ({
-  buildPowerPointBundleZip: vi.fn(),
+  buildLessonBundleZip: vi.fn(),
   downloadBlob: vi.fn(),
   prepareSavedLessonHtml: vi.fn(),
   safeFileName: (value: string) => value,
@@ -106,7 +106,7 @@ describe("SavedLessonLibrary production actions", () => {
     );
     const activeMenu = screen.getByRole("menu", { name: "More actions for Active lesson" });
     expect(within(activeMenu).getByRole("button", { name: "Download HTML" })).toBeInTheDocument();
-    expect(within(activeMenu).getByRole("button", { name: "Download PowerPoint" })).toBeInTheDocument();
+    expect(within(activeMenu).getByRole("button", { name: "Download lesson bundle" })).toBeInTheDocument();
     expect(within(activeMenu).getByRole("button", { name: "Change class" })).toBeInTheDocument();
 
     await user.click(
@@ -160,7 +160,7 @@ describe("SavedLessonLibrary production actions", () => {
     expect((await screen.findAllByText("Year 10")).length).toBeGreaterThan(0);
   });
 
-  it("renders PowerPoint slides on the authenticated server to avoid tainted canvases", async () => {
+  it("renders the A4 lesson bundle on the authenticated server", async () => {
     const user = userEvent.setup();
     const savedDocument = createInitialBuilderDocument(
       "2026-07-19T01:00:00.000Z",
@@ -172,10 +172,13 @@ describe("SavedLessonLibrary production actions", () => {
       document: savedDocument,
       lesson: lesson("active", "Active lesson", "2026-04-02", false),
     });
-    vi.mocked(buildPowerPointBundleZip).mockResolvedValue(
-      new Blob(["bundle"], { type: "application/zip" }),
+    let finishBundle: ((bundle: Blob) => void) | undefined;
+    vi.mocked(buildLessonBundleZip).mockImplementation(
+      () => new Promise((resolve) => { finishBundle = resolve; }),
     );
-    vi.mocked(downloadPresenterSlideImages).mockResolvedValue([]);
+    vi.mocked(downloadA4BundlePdf).mockResolvedValue(
+      new Blob(["%PDF-1.7"], { type: "application/pdf" }),
+    );
     render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
 
     const row = (await screen.findAllByRole("row"))[1];
@@ -184,20 +187,31 @@ describe("SavedLessonLibrary production actions", () => {
     );
     await user.click(
       within(screen.getByRole("menu", { name: "More actions for Active lesson" }))
-        .getByRole("button", { name: "Download PowerPoint" }),
+        .getByRole("button", { name: "Download lesson bundle" }),
     );
 
-    const dependencies = vi.mocked(buildPowerPointBundleZip).mock.calls[0]?.[1];
-    expect(dependencies?.renderSlides).toEqual(expect.any(Function));
-    await dependencies?.renderSlides?.("<!doctype html><p>static slides</p>");
-    expect(downloadPresenterSlideImages).toHaveBeenCalledWith(
+    await waitFor(() => expect(buildLessonBundleZip).toHaveBeenCalledOnce());
+    expect(useBuilderStore.getState().status).toEqual({
+      tone: "working",
+      message: 'Building the A4 lesson bundle for "Active lesson"…',
+    });
+    const dependencies = vi.mocked(buildLessonBundleZip).mock.calls[0]?.[1];
+    expect(dependencies?.renderPdf).toEqual(expect.any(Function));
+    await dependencies?.renderPdf?.("<!doctype html><p>A4 snapshot</p>");
+    expect(downloadA4BundlePdf).toHaveBeenCalledWith(
       "active",
-      "<!doctype html><p>static slides</p>",
+      "<!doctype html><p>A4 snapshot</p>",
     );
+    finishBundle?.(new Blob(["bundle"], { type: "application/zip" }));
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledOnce());
     expect(downloadBlob).toHaveBeenCalledWith(
       expect.any(Blob),
       "Active lesson-bundle.zip",
     );
+    await waitFor(() => expect(useBuilderStore.getState().status).toEqual({
+      tone: "success",
+      message: 'Downloaded the lesson bundle for "Active lesson".',
+    }));
   });
 
   it("clears every saved-lesson filter in one action and restores newest-first order", async () => {
