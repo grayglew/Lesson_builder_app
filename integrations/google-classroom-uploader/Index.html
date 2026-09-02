@@ -490,9 +490,9 @@
 
       function lessonTitleFromBundleName(name) {
         return String(name || 'Lesson')
-          .replace(/-bundle\.zip$/i, '')
           .replace(/\.zip$/i, '')
           .replace(/\s*[-_]?\s*powerpoint[-_ ]bundle(?:\s*\(\d+\))?$/i, '')
+          .replace(/-bundle$/i, '')
           .replace(/\s+/g, ' ')
           .trim() || 'Lesson';
       }

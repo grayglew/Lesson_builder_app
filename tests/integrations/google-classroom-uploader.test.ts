@@ -8,6 +8,10 @@ const uploaderPath = resolve(
   process.cwd(),
   "integrations/google-classroom-uploader/Code.gs",
 );
+const uploaderIndexPath = resolve(
+  process.cwd(),
+  "integrations/google-classroom-uploader/Index.html",
+);
 
 type MockBlob = {
   getBytes: () => number[];
@@ -39,7 +43,40 @@ function extract(entries: MockBlob[]) {
   }).extractLessonBundleFiles_({});
 }
 
+function lessonTitleFromBundleName(name: string) {
+  const source = readFileSync(uploaderIndexPath, "utf8");
+  const script = source.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
+  if (!script) throw new Error("Could not find the uploader script.");
+
+  const sandbox = {
+    window: {
+      addEventListener: () => {},
+    },
+  };
+  vm.runInNewContext(script, sandbox, { filename: uploaderIndexPath });
+
+  return (sandbox as typeof sandbox & {
+    lessonTitleFromBundleName: (bundleName: string) => string;
+  }).lessonTitleFromBundleName(name);
+}
+
 describe("Google Classroom lesson bundle uploader", () => {
+  it("derives a title from the current lesson-bundle filename", () => {
+    expect(lessonTitleFromBundleName("Algebra-bundle.zip")).toBe("Algebra");
+  });
+
+  it("removes complete legacy PowerPoint bundle suffixes", () => {
+    expect(lessonTitleFromBundleName("Algebra-PowerPoint-bundle.zip")).toBe(
+      "Algebra",
+    );
+    expect(lessonTitleFromBundleName("Algebra PowerPoint bundle.zip")).toBe(
+      "Algebra",
+    );
+    expect(lessonTitleFromBundleName("Algebra_PowerPoint_bundle (2).zip")).toBe(
+      "Algebra",
+    );
+  });
+
   it("attaches the root lesson PDF first and worksheet PDFs by filename", () => {
     const attachments = extract([
       zipEntry("worksheets/zebra.pdf"),
