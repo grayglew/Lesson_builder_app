@@ -215,6 +215,99 @@ describe("standalone lesson export", () => {
     );
   });
 
+  it("uses fixed starter overlays and normalized key-skill labels", () => {
+    const document = lessonDocument();
+    const starter = document.slides[0];
+    if (starter?.type !== "starter") throw new Error("Expected starter fixture.");
+    starter.slots = [
+      {
+        lo: "191A: Factorise",
+        image: testImage("starter-1.png", "c3RhcnRlcjE="),
+        answerImage: testImage("starter-1-answer.png", "YW5zd2VyMQ=="),
+      },
+      {
+        lo: "202b Identify",
+        image: testImage("starter-2.png", "c3RhcnRlcjI="),
+        answerImage: null,
+      },
+      {
+        lo: "Not a coded objective",
+        image: testImage("starter-3.png", "c3RhcnRlcjM="),
+        answerImage: null,
+      },
+      {
+        lo: "",
+        image: testImage("starter-4.png", "c3RhcnRlcjQ="),
+        answerImage: null,
+      },
+    ];
+    starter.presentationState = {
+      version: 1,
+      reveals: { "starter-answer-0": true },
+    };
+
+    const dom = new JSDOM(
+      buildStandaloneLessonHtml(document, {
+        liveRetrieval: {
+          enabled: true,
+          endpoint: "/api/presenter/retrieval-log",
+          nextEndpoint: "/api/presenter/retrieval-next",
+          lessonId: "saved-lesson",
+          className: "Year 9",
+          teachingDate: "2026-07-18",
+        },
+      }),
+    );
+    const cells = Array.from(
+      dom.window.document.querySelectorAll(".starter-cell"),
+    ) as HTMLElement[];
+
+    expect(cells).toHaveLength(4);
+    expect(cells.map((cell) => cell.querySelector(".cell-number")?.textContent)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+    ]);
+    expect(cells.map((cell) => cell.querySelector(".starter-key-skill")?.textContent)).toEqual([
+      "191a",
+      "202b",
+      undefined,
+      undefined,
+    ]);
+    cells.forEach((cell) => {
+      const number = cell.querySelector<HTMLElement>(".cell-number");
+      if (!number) throw new Error("Expected starter number.");
+      expect(dom.window.getComputedStyle(number).top).toBe("8px");
+      expect(dom.window.getComputedStyle(number).right).toBe("8px");
+      expect(dom.window.getComputedStyle(number).zIndex).toBe("6");
+      expect(dom.window.getComputedStyle(number).pointerEvents).toBe("none");
+    });
+    cells.slice(0, 3).forEach((cell) => {
+      const controls = cell.querySelector<HTMLElement>(".live-retrieval-controls");
+      if (!controls) throw new Error("Expected live retrieval controls.");
+      expect(dom.window.getComputedStyle(controls).bottom).toBe("8px");
+      expect(dom.window.getComputedStyle(controls).left).toBe("8px");
+    });
+    const toggle = cells[0].querySelector<HTMLElement>("[data-qa-toggle]");
+    const label = cells[0].querySelector<HTMLElement>(".qa-toggle-label");
+    if (!toggle || !label) throw new Error("Expected answer toggle.");
+    expect(toggle.classList.contains("is-showing-answer")).toBe(true);
+    expect(label.textContent).toBe("Answer");
+    expect(dom.window.getComputedStyle(label).top).toBe("8px");
+    expect(dom.window.getComputedStyle(label).left).toBe("50%");
+    expect(dom.window.getComputedStyle(label).pointerEvents).toBe("none");
+    cells.slice(0, 2).forEach((cell) => {
+      const code = cell.querySelector<HTMLElement>(".starter-key-skill");
+      if (!code) throw new Error("Expected starter key-skill code.");
+      expect(dom.window.getComputedStyle(code).bottom).toBe("8px");
+      expect(dom.window.getComputedStyle(code).right).toBe("8px");
+      expect(dom.window.getComputedStyle(code).zIndex).toBe("6");
+      expect(dom.window.getComputedStyle(code).pointerEvents).toBe("none");
+    });
+    dom.window.close();
+  });
+
   it("uses the compact production LO styling without rendering LO text in starter cells", () => {
     const html = buildStandaloneLessonHtml(lessonDocument());
 

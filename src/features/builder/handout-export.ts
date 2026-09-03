@@ -1,5 +1,6 @@
 import { renderLatexDocument } from "./latex";
 import { inlineMarkdownToHtml } from "./markdown";
+import { extractRetrievalLoCode } from "./example";
 import {
   loadPdfDocument,
   renderPdfPageToSlide,
@@ -208,7 +209,8 @@ function starterHtml(starter: BuilderSlide) {
   return `<section class="handout-starter" aria-label="Starter">
 ${Array.from({ length: 4 }, (_, index) => {
   const slot = slots[index] ?? {};
-  return `<div class="handout-starter-cell"><span class="handout-starter-number">${index + 1}</span>${imageHtml(assetOf(slot.image), `Starter question ${index + 1}`)}</div>`;
+  const keySkillCode = extractRetrievalLoCode(String(slot.lo || ""));
+  return `<div class="handout-starter-cell"><span class="handout-starter-number">${index + 1}</span>${keySkillCode ? `<span class="handout-starter-key-skill">${escapeHtml(keySkillCode)}</span>` : ""}${imageHtml(assetOf(slot.image), `Starter question ${index + 1}`)}</div>`;
 }).join("")}
 </section>`;
 }
@@ -262,7 +264,8 @@ function starterCellsHtml(starter: BuilderSlide, start: number, count: number) {
     (_, offset) => {
       const questionNumber = start + offset + 1;
       const slot = slots[offset] ?? {};
-      return `<div class="handout-starter-cell"><span class="handout-starter-number">${questionNumber}</span>${imageHtml(assetOf(slot.image), `Starter question ${questionNumber}`)}</div>`;
+      const keySkillCode = extractRetrievalLoCode(String(slot.lo || ""));
+      return `<div class="handout-starter-cell"><span class="handout-starter-number">${questionNumber}</span>${keySkillCode ? `<span class="handout-starter-key-skill">${escapeHtml(keySkillCode)}</span>` : ""}${imageHtml(assetOf(slot.image), `Starter question ${questionNumber}`)}</div>`;
     },
   ).join("")}</section>`;
 }
@@ -636,7 +639,7 @@ html,body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,
 .handout-heading{display:grid;gap:1.5mm}.handout-lo{margin:0;font-size:20px;font-weight:800;line-height:1.15}.handout-lesson-title{font-size:10px;line-height:1.2;color:#4b5563}.handout-date{font-size:10px;line-height:1.2}
 .handout-starter{height:100%;min-height:0;display:grid;grid-template-rows:repeat(4,minmax(0,1fr));border:1px solid #111827;overflow:hidden}
 .handout-starter-cell,.handout-retrieval-cell{position:relative;min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}
-.handout-starter-number,.handout-retrieval-number{position:absolute;top:2mm;left:2mm;z-index:2;display:grid;place-items:center;width:7mm;height:7mm;border:1px solid rgba(17,24,39,.35);border-radius:999px;background:rgba(255,255,255,.86);color:rgba(17,24,39,.72);font-size:10px;font-weight:800;line-height:1}
+.handout-starter-number,.handout-retrieval-number,.handout-starter-key-skill{position:absolute;z-index:2;display:grid;place-items:center;min-width:7mm;height:7mm;border:1px solid rgba(17,24,39,.35);border-radius:999px;background:rgba(255,255,255,.86);color:rgba(17,24,39,.72);font-size:10px;font-weight:800;line-height:1;pointer-events:none}.handout-starter-number{top:2mm;right:2mm;width:7mm}.handout-starter-key-skill{right:2mm;bottom:2mm;padding:0 1mm}.handout-retrieval-number{top:2mm;left:2mm;width:7mm}
 .handout-example-page{padding:4mm}.handout-example-stack{width:100%;height:100%;display:grid;gap:4mm}.handout-example-stack.is-single{grid-template-rows:minmax(0,1fr)}.handout-example-stack.is-double{grid-template-rows:repeat(2,minmax(0,1fr))}.handout-example-block{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-example-cell{min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.handout-student-space{min-height:0;background:#fff}
 .handout-booklet-side{display:block}.handout-booklet-copies{width:100%;height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr))}.handout-booklet-copy{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-booklet-panel{min-width:0;min-height:0;border:1px solid #111827;padding:3mm;overflow:hidden}.handout-booklet-glue{display:grid;place-items:center;font-size:28px;font-weight:800;letter-spacing:.08em}.handout-booklet-front{display:grid;grid-template-rows:auto minmax(0,1fr);gap:2mm}.handout-booklet-starter{min-height:0;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));overflow:hidden}.handout-booklet-inside-questions{padding:0}.handout-booklet-inside-blank{background:#fff}
 .handout-image{width:100%;height:100%;min-height:0;display:block;object-fit:contain;object-position:top center}.handout-empty{display:grid;place-items:center;width:100%;height:100%;min-height:20mm;color:#6b7280;font-size:11px;text-align:center}

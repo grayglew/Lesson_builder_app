@@ -6,6 +6,7 @@ import { renderLatexDocument } from "./latex";
 import { inlineMarkdownToHtml } from "./markdown";
 import { normalizeBuilderDocument } from "./schema";
 import { renderStaticAnnotationSvg } from "./static-annotations";
+import { extractRetrievalLoCode } from "./example";
 
 export type StandaloneLessonOptions = {
   runtimeCss?: string;
@@ -281,8 +282,11 @@ function renderStandaloneSlide(
         (_, slotIndex) => slots[slotIndex] ?? {},
       )
         .map(
-          (slot, slotIndex) => `<article class="starter-cell">
+          (slot, slotIndex) => {
+            const keySkillCode = extractRetrievalLoCode(String(slot.lo || ""));
+            return `<article class="starter-cell">
             <span class="cell-number">${slotIndex + 1}</span>
+            ${keySkillCode ? `<span class="starter-key-skill">${escapeHtml(keySkillCode)}</span>` : ""}
             <div class="live-starter-image-host" data-live-image-host>
               ${toggleableImage(
                 slot.image,
@@ -294,7 +298,8 @@ function renderStandaloneSlide(
               )}
             </div>
             ${liveRetrievalControl(slot, slotIndex, index, liveRetrieval)}
-          </article>`,
+          </article>`;
+          },
         )
         .join("")}</div>
     </section>`;
@@ -479,9 +484,9 @@ function standaloneLessonCss() {
 .lesson-slide{position:relative;box-sizing:border-box;width:100%;aspect-ratio:var(--slide-aspect,16/10);overflow:hidden;background:#fffefb;border:1px solid #cad7d7;box-shadow:0 16px 34px rgba(19,37,42,.12);padding:24px;touch-action:none;page-break-after:always}
 .static-annotation-svg{position:absolute;inset:0;z-index:8;width:100%;height:100%;pointer-events:none}
 .lesson-slide h4{margin:0 0 14px;font-size:28px;line-height:1.2}.slide-label{position:absolute;right:12px;bottom:10px;font-size:11px;color:#6b7280}.blank-slide{padding:0;background:#fff}.camera-slide{padding:0;background:#fff;display:grid;place-items:center;overflow:hidden}.camera-slide-image{display:block;width:100%;height:100%;object-fit:contain;object-position:center;background:#fff}
-.starter-grid{display:grid;width:100%;height:100%;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:0}.starter-cell{position:relative;min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.cell-number{position:absolute;z-index:6;top:8px;left:8px;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.78);color:rgba(17,24,39,.7);border:1px solid rgba(17,24,39,.28);font-size:13px;font-weight:800;line-height:1;pointer-events:none}.starter-cell:nth-child(2) .cell-number{right:8px;left:auto}.starter-cell:nth-child(3) .cell-number{top:auto;bottom:8px}.starter-cell:nth-child(4) .cell-number{right:8px;bottom:8px;left:auto;top:auto}
-.live-starter-image-host{display:grid;width:100%;height:100%;min-width:0;min-height:0}.live-retrieval-controls{position:absolute;z-index:9;display:grid;grid-template-columns:repeat(3,28px);gap:5px;align-items:center}.starter-cell:nth-child(1) .live-retrieval-controls{left:8px;top:8px}.starter-cell:nth-child(2) .live-retrieval-controls{right:8px;top:8px}.starter-cell:nth-child(3) .live-retrieval-controls{left:8px;bottom:8px}.starter-cell:nth-child(4) .live-retrieval-controls{right:8px;bottom:8px}.live-retrieval-button{width:28px;height:28px;border:1px solid #0f766e;border-radius:7px;background:rgba(255,255,255,.92);color:#0f766e;cursor:pointer;font:inherit;font-size:12px;font-weight:800;line-height:1;padding:0;box-shadow:0 6px 16px rgba(15,118,110,.18);touch-action:manipulation}.live-retrieval-button:hover{background:#ecfdf5}.live-retrieval-button:disabled{cursor:wait;opacity:.78}.live-retrieval-button.is-saved{background:#0f766e;color:#fff}.live-retrieval-button.is-error{border-color:#b91c1c;color:#b91c1c}
-.slide-image-fit{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;min-width:0;min-height:0}.qa-toggle{position:relative;display:block;width:100%;height:100%;min-height:0;border:0;background:transparent;padding:0;cursor:pointer}.qa-toggle-label{position:absolute;right:8px;top:8px;z-index:4;border-radius:7px;background:rgba(255,255,255,.86);color:#111827;font-size:10px;font-weight:750;padding:4px 7px}.qa-image-layer{position:absolute;inset:0;display:grid;min-width:0;min-height:0}.qa-answer-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-question-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-answer-layer{visibility:visible}.qa-toggle-append.is-showing-answer{display:grid;grid-template-rows:1fr 1fr}.qa-toggle-append.is-showing-answer .qa-question-layer{position:relative;visibility:visible;min-height:0}.qa-toggle-append.is-showing-answer .qa-answer-layer{position:relative;visibility:visible;min-height:0}
+.starter-grid{display:grid;width:100%;height:100%;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:0}.starter-cell{position:relative;min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.cell-number,.starter-key-skill{position:absolute;z-index:6;display:grid;place-items:center;min-width:26px;height:26px;border-radius:999px;background:rgba(255,255,255,.78);color:rgba(17,24,39,.7);border:1px solid rgba(17,24,39,.28);font-size:13px;font-weight:800;line-height:1;pointer-events:none}.cell-number{top:8px;right:8px;width:26px}.starter-key-skill{right:8px;bottom:8px;padding:0 6px}
+.live-starter-image-host{display:grid;width:100%;height:100%;min-width:0;min-height:0}.live-retrieval-controls{position:absolute;z-index:9;left:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,28px);gap:5px;align-items:center}.live-retrieval-button{width:28px;height:28px;border:1px solid #0f766e;border-radius:7px;background:rgba(255,255,255,.92);color:#0f766e;cursor:pointer;font:inherit;font-size:12px;font-weight:800;line-height:1;padding:0;box-shadow:0 6px 16px rgba(15,118,110,.18);touch-action:manipulation}.live-retrieval-button:hover{background:#ecfdf5}.live-retrieval-button:disabled{cursor:wait;opacity:.78}.live-retrieval-button.is-saved{background:#0f766e;color:#fff}.live-retrieval-button.is-error{border-color:#b91c1c;color:#b91c1c}
+.slide-image-fit{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;min-width:0;min-height:0}.qa-toggle{position:relative;display:block;width:100%;height:100%;min-height:0;border:0;background:transparent;padding:0;cursor:pointer}.qa-toggle-label{position:absolute;top:8px;left:50%;z-index:4;transform:translateX(-50%);border-radius:7px;background:rgba(255,255,255,.86);color:#111827;font-size:10px;font-weight:750;padding:4px 7px;pointer-events:none}.qa-image-layer{position:absolute;inset:0;display:grid;min-width:0;min-height:0}.qa-answer-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-question-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-answer-layer{visibility:visible}.qa-toggle-append.is-showing-answer{display:grid;grid-template-rows:1fr 1fr}.qa-toggle-append.is-showing-answer .qa-question-layer{position:relative;visibility:visible;min-height:0}.qa-toggle-append.is-showing-answer .qa-answer-layer{position:relative;visibility:visible;min-height:0}
 .lo-bar{display:flex;align-items:center;gap:10px;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:10px;font-size:10px;line-height:1.2}.lo-bar-text{flex:1;min-width:0}.example-grid{display:grid;height:calc(100% - 28px);grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.example-block{min-width:0;min-height:0}.example-reveal-region.is-hidden{visibility:hidden}.example-reveal-button{border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit;font-size:10px;line-height:1;padding:4px 7px;white-space:nowrap}
 .revision-slide{padding:0;background:#fff}.revision-slide::before{content:"";position:absolute;inset:0 auto 0 50%;z-index:3;width:2px;background:#111827;transform:translateX(-1px);pointer-events:none}.revision-slide-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:100%;min-height:0}.revision-question-cell,.revision-working-area{min-width:0;min-height:0;overflow:hidden}.revision-question-cell{display:grid;place-items:center}.revision-working-area{grid-column:1/-1}
 .worksheet-slide{display:grid;place-content:center;gap:28px;text-align:center}.worksheet-links{display:grid;gap:18px}.worksheet-links a{padding:18px 24px;border:2px solid #0f766e;border-radius:10px;color:#0f766e;font-size:24px;font-weight:800;text-decoration:none}

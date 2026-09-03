@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+// jsdom is provided by Vitest's test environment but does not ship declarations here.
+// @ts-expect-error -- test-only transitive dependency without local type declarations
+import { JSDOM } from "jsdom";
 import {
   buildA4Handout,
   selectHandoutDocument,
@@ -229,6 +232,75 @@ describe("production A4 handout export", () => {
     expect(result.html).toContain('<div class="handout-lesson-title">7Ma3 18-08</div>');
     expect(result.html).toContain('<strong class="handout-date">Date: 18/08/2026</strong>');
     expect(result.html).toContain("duplex flip on long edge");
+  });
+
+  it("prints normalized key-skill labels in fixed starter corners", async () => {
+    const document = handoutDocument();
+    const standardStarter = document.slides[0];
+    if (standardStarter?.type !== "starter") {
+      throw new Error("Expected starter fixture.");
+    }
+    standardStarter.slots = [
+      { lo: "191A: Factorise", image: asset("standard-1.png"), answerImage: null },
+      { lo: "202b Identify", image: asset("standard-2.png"), answerImage: null },
+      { lo: "No code", image: asset("standard-3.png"), answerImage: null },
+      { lo: "", image: asset("standard-4.png"), answerImage: null },
+    ];
+
+    const standard = await buildA4Handout(document);
+    const standardDom = new JSDOM(standard.html);
+    const standardCells = Array.from(
+      standardDom.window.document.querySelectorAll(".handout-starter-cell"),
+    ) as HTMLElement[];
+
+    expect(standardCells.map((cell) => cell.querySelector(".handout-starter-key-skill")?.textContent)).toEqual([
+      "191a",
+      "202b",
+      undefined,
+      undefined,
+    ]);
+    standardCells.forEach((cell) => {
+      const number = cell.querySelector<HTMLElement>(".handout-starter-number");
+      if (!number) throw new Error("Expected starter number.");
+      expect(standardDom.window.getComputedStyle(number).top).toBe("2mm");
+      expect(standardDom.window.getComputedStyle(number).right).toBe("2mm");
+      expect(standardDom.window.getComputedStyle(number).pointerEvents).toBe("none");
+    });
+
+    const bookletDocument = handoutDocument();
+    bookletDocument.slides = [bookletStarter()];
+    const bookletStarterSlide = bookletDocument.slides[0];
+    if (bookletStarterSlide?.type !== "starter") {
+      throw new Error("Expected booklet starter fixture.");
+    }
+    bookletStarterSlide.slots = [
+      { lo: "191a: One", image: asset("booklet-1.png"), answerImage: null },
+      { lo: "202B: Two", image: asset("booklet-2.png"), answerImage: null },
+      { lo: "303c: Three", image: asset("booklet-3.png"), answerImage: null },
+      { lo: "404d: Four", image: asset("booklet-4.png"), answerImage: null },
+    ];
+
+    const booklet = await buildA4Handout(bookletDocument);
+    const bookletDom = new JSDOM(booklet.html);
+    const bookletCells = Array.from(
+      bookletDom.window.document.querySelectorAll(
+        ".handout-booklet-starter .handout-starter-cell",
+      ),
+    ) as HTMLElement[];
+    expect(bookletCells).toHaveLength(8);
+    expect(booklet.html.match(/class="handout-starter-key-skill">191a<\/span>/g)).toHaveLength(2);
+    expect(booklet.html.match(/class="handout-starter-key-skill">202b<\/span>/g)).toHaveLength(2);
+    expect(booklet.html.match(/class="handout-starter-key-skill">303c<\/span>/g)).toHaveLength(2);
+    expect(booklet.html.match(/class="handout-starter-key-skill">404d<\/span>/g)).toHaveLength(2);
+    bookletCells.forEach((cell) => {
+      const code = cell.querySelector<HTMLElement>(".handout-starter-key-skill");
+      if (!code) throw new Error("Expected booklet key-skill code.");
+      expect(bookletDom.window.getComputedStyle(code).bottom).toBe("2mm");
+      expect(bookletDom.window.getComputedStyle(code).right).toBe("2mm");
+      expect(bookletDom.window.getComputedStyle(code).pointerEvents).toBe("none");
+    });
+    standardDom.window.close();
+    bookletDom.window.close();
   });
 
   it("builds retrieval-only handouts without requiring a starter or example", async () => {
