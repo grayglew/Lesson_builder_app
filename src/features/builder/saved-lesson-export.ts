@@ -93,19 +93,21 @@ export async function buildLessonBundleZip(
     dependencies.retrievalItems,
     dependencies.prepareDocument,
   );
+  const worksheetEntries = collectWorksheetFilesForBundle(embeddedDocument);
+  worksheetEntries.forEach((entry) =>
+    assertPdfWorksheetAttachment(entry.file, entry.path),
+  );
+  const worksheetFiles: Array<{ path: string; file: Blob }> = [];
+  for (const entry of worksheetEntries) {
+    const file = await builderAssetToBlobStrict(entry.file, entry.path);
+    assertPdfWorksheetAttachment(entry.file, entry.path, file.type);
+    worksheetFiles.push({ path: entry.path, file });
+  }
   const staticDocument = createStaticExportDocument(embeddedDocument);
   const html = buildStandaloneLessonHtml(staticDocument, {
     staticAnnotations: true,
   });
-  const [lessonPdf, worksheetFiles] = await Promise.all([
-    dependencies.renderPdf(html),
-    Promise.all(
-      collectWorksheetFilesForBundle(embeddedDocument).map(async (entry) => ({
-        path: entry.path,
-        file: await builderAssetToBlobStrict(entry.file, entry.path),
-      })),
-    ),
-  ]);
+  const lessonPdf = await dependencies.renderPdf(html);
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   const baseName = safeFileName(embeddedDocument.title);
@@ -227,6 +229,48 @@ async function builderAssetToBlobStrict(
     }
     return fail();
   }
+}
+
+function assertPdfWorksheetAttachment(
+  asset: BuilderAsset,
+  path: string,
+  downloadedMimeType = "",
+) {
+  const source = String(asset.dataUrl || "").trim();
+  const dataUrlMimeType = source.match(/^data:([^;,]*)[;,]/i)?.[1] || "";
+  const mimeTypes = [asset.type, dataUrlMimeType, downloadedMimeType]
+    .map(normalizeMimeType)
+    .filter(Boolean);
+  if (
+    !/\.pdf$/i.test(path) ||
+    mimeTypes.some((mimeType) => !isPdfCompatibleMimeType(mimeType))
+  ) {
+    throw new Error(
+      `Could not include "${path}" in the lesson bundle because worksheet attachments must be PDF files.`,
+    );
+  }
+}
+
+function normalizeMimeType(value: unknown) {
+  return String(value || "")
+    .split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+}
+
+function isPdfCompatibleMimeType(mimeType: string) {
+  return [
+    "application/pdf",
+    "application/x-pdf",
+    "application/acrobat",
+    "applications/vnd.pdf",
+    "text/pdf",
+    "text/x-pdf",
+    "application/octet-stream",
+    "binary/octet-stream",
+    "application/binary",
+    "application/download",
+  ].includes(mimeType);
 }
 
 function structuredCloneSafe<T>(value: T): T {

@@ -230,7 +230,9 @@ describe("saved lesson static bundle", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const source = String(input);
       if (/^data:/i.test(source)) {
-        return new Response(new Blob(["practice"], { type: "application/pdf" }));
+        return new Response("practice", {
+          headers: { "Content-Type": "application/pdf" },
+        });
       }
       return new Response("forbidden", { status: 403 });
     });
@@ -288,6 +290,144 @@ describe("saved lesson static bundle", () => {
     expect(
       await zip.file("worksheets/practice-2.pdf")?.async("string"),
     ).toBe("second");
+  });
+
+  it.each([
+    {
+      name: "notes.docx",
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    },
+    { name: "diagram.png", type: "image/png" },
+  ])("rejects non-PDF worksheet attachment $name before rendering", async (asset) => {
+    const document = createInitialBuilderDocument("2026-09-03T01:00:00.000Z");
+    document.slides = [
+      {
+        id: `worksheet-${asset.name}`,
+        type: "worksheet",
+        title: "Unsupported attachment",
+        worksheet: {
+          ...asset,
+          size: 4,
+          dataUrl: "data:application/octet-stream;base64,ZmlsZQ==",
+        },
+      },
+    ];
+    const renderPdf = vi.fn().mockResolvedValue(new Blob(["%PDF"]));
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
+    ).rejects.toThrow(
+      `Could not include "worksheets/${asset.name}" in the lesson bundle because worksheet attachments must be PDF files.`,
+    );
+    expect(renderPdf).not.toHaveBeenCalled();
+  });
+
+  it("rejects a renamed non-PDF answer using its collision-resolved path", async () => {
+    const document = createInitialBuilderDocument("2026-09-03T02:00:00.000Z");
+    document.slides = [
+      {
+        id: "worksheet-mime-mismatch",
+        type: "worksheet",
+        title: "Mismatched answer",
+        worksheet: {
+          name: "practice.pdf",
+          type: "application/pdf",
+          size: 5,
+          dataUrl: "data:application/pdf;base64,cGRm",
+        },
+        answers: {
+          name: "practice.pdf",
+          type: "image/png",
+          size: 5,
+          dataUrl: "data:image/png;base64,cG5n",
+        },
+      },
+    ];
+    const renderPdf = vi.fn().mockResolvedValue(new Blob(["%PDF"]));
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
+    ).rejects.toThrow(
+      'Could not include "worksheets/practice-2.pdf" in the lesson bundle because worksheet attachments must be PDF files.',
+    );
+    expect(renderPdf).not.toHaveBeenCalled();
+  });
+
+  it("accepts a legacy PDF with a generic MIME type", async () => {
+    const document = createInitialBuilderDocument("2026-09-03T03:00:00.000Z");
+    document.slides = [
+      {
+        id: "legacy-pdf",
+        type: "worksheet",
+        title: "Legacy PDF",
+        worksheet: {
+          name: "legacy.pdf",
+          type: "application/octet-stream",
+          size: 3,
+          dataUrl: "data:application/pdf;base64,cGRm",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("pdf", { headers: { "Content-Type": "application/pdf" } }),
+    );
+
+    const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
+      renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+    });
+    const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
+
+    expect(zip.file("worksheets/legacy.pdf")).not.toBeNull();
+  });
+
+  it("rejects a downloaded non-PDF response before rendering", async () => {
+    const document = createInitialBuilderDocument("2026-09-03T04:00:00.000Z");
+    document.slides = [
+      {
+        id: "disguised-pdf",
+        type: "worksheet",
+        title: "Disguised PDF",
+        worksheet: {
+          name: "disguised.pdf",
+          type: "application/octet-stream",
+          size: 3,
+          dataUrl: "https://assets.example/disguised.pdf",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("png", { headers: { "Content-Type": "image/png" } }),
+    );
+    const renderPdf = vi.fn().mockResolvedValue(new Blob(["%PDF"]));
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
+    ).rejects.toThrow(
+      'Could not include "worksheets/disguised.pdf" in the lesson bundle because worksheet attachments must be PDF files.',
+    );
+    expect(renderPdf).not.toHaveBeenCalled();
+  });
+
+  it("exports every slide regardless of the handout selection", async () => {
+    const document = createInitialBuilderDocument("2026-09-03T05:00:00.000Z");
+    document.slides = ["slide-1", "slide-2", "slide-3"].map((id) => ({
+      id,
+      type: "blank" as const,
+      title: id,
+    }));
+    document.handoutSlideIds = ["slide-2"];
+    let renderedHtml = "";
+
+    await savedLessonExport.buildLessonBundleZip!(document, {
+      renderPdf: vi.fn().mockImplementation(async (html: string) => {
+        renderedHtml = html;
+        return new Blob(["%PDF"]);
+      }),
+    });
+
+    expect(renderedHtml).toContain('data-builder-slide-id="slide-1"');
+    expect(renderedHtml).toContain('data-builder-slide-id="slide-2"');
+    expect(renderedHtml).toContain('data-builder-slide-id="slide-3"');
   });
 
 });
