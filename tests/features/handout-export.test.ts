@@ -116,6 +116,30 @@ describe("production A4 handout export", () => {
     );
   });
 
+  it("keeps a multi-page handout unmodified when glue margins are declined", async () => {
+    const document = handoutDocument();
+    document.slides = [
+      starter("starter"),
+      example("example-1", "one"),
+      example("example-2", "two"),
+      example("example-3", "three"),
+    ];
+    const pageCounts: number[] = [];
+
+    const result = await buildA4Handout(document, {
+      chooseAdditionalSheetGlue: async (pageCount) => {
+        pageCounts.push(pageCount);
+        return false;
+      },
+    });
+    const dom = new JSDOM(result.html);
+
+    expect(pageCounts).toEqual([3]);
+    expect(dom.window.document.body.className).toBe("");
+    expect(dom.window.document.querySelectorAll(".handout-page")).toHaveLength(3);
+    dom.window.close();
+  });
+
   it("offers glue margins once after worksheet pages have been composed", async () => {
     const document = handoutDocument();
     const worksheet = asset("questions.pdf", "application/pdf", "cGRm");

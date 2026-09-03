@@ -85,6 +85,7 @@ test.describe("expired revision images across browser outputs", () => {
     await page
       .getByRole("button", { name: "Open handout from 3 selected slides" })
       .click();
+    await page.getByRole("button", { name: "No margins", exact: true }).click();
     const handout = await popupPromise;
 
     const revisionQuestion = handout.getByRole("img", { name: REVISION_LO });
