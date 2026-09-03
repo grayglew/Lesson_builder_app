@@ -1,7 +1,10 @@
 "use client";
 
 import { useBuilderStore } from "./store";
-import { useAppNotifications } from "./AppNotifications";
+import {
+  type ConfirmDialogOptions,
+  useAppNotifications,
+} from "./AppNotifications";
 import {
   createPresenterStudentSession,
   downloadPresenterPdf,
@@ -25,6 +28,7 @@ type CurrentOutputDependencies = {
     document: BuilderDocument,
     retrievalItems?: readonly RetrievalItem[],
   ) => Promise<BuilderDocument>;
+  chooseAdditionalSheetGlue?: (pageCount: number) => Promise<boolean>;
 };
 
 type CurrentLessonOutputServiceDependencies = CurrentOutputDependencies & {
@@ -58,7 +62,21 @@ export async function prepareCurrentA4Handout(
     selectedDocument,
     document.retrievalItems,
   );
-  return buildA4Handout(preparedDocument);
+  return buildA4Handout(preparedDocument, {
+    chooseAdditionalSheetGlue: dependencies.chooseAdditionalSheetGlue,
+  });
+}
+
+export function createAdditionalSheetGlueChooser(
+  confirmDialog: (options: ConfirmDialogOptions) => Promise<boolean>,
+) {
+  return (pageCount: number) =>
+    confirmDialog({
+      title: "Add glue margins for additional sheets?",
+      description: `This handout has ${pageCount} A4 pages, which uses ${Math.ceil(pageCount / 2)} physical sheets when printed double-sided and flipped on the long edge. Glue margins begin on the second sheet.`,
+      confirmLabel: "Add glue margins",
+      cancelLabel: "No margins",
+    });
 }
 
 function requireOverallLessonLoForHandout(
@@ -365,7 +383,9 @@ export function useLessonExportActions() {
   }
 
   async function prepareA4Handout() {
-    return prepareCurrentA4Handout(document);
+    return prepareCurrentA4Handout(document, {
+      chooseAdditionalSheetGlue: createAdditionalSheetGlueChooser(confirmDialog),
+    });
   }
 
   return {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createAdditionalSheetGlueChooser,
   createCurrentLessonOutputService,
   prepareCurrentA4Handout,
 } from "@/features/builder/useLessonExportActions";
@@ -91,6 +92,67 @@ describe("current lesson output preparation wiring", () => {
     ).rejects.toThrow("Add an overall lesson LO before creating a handout.");
 
     expect(prepareDocument).not.toHaveBeenCalled();
+  });
+
+  it("describes the exact duplex sheet count when offering additional-sheet glue margins", async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const chooseAdditionalSheetGlue = createAdditionalSheetGlueChooser(
+      async (request) => {
+        requests.push(request);
+        return true;
+      },
+    );
+
+    await expect(chooseAdditionalSheetGlue(3)).resolves.toBe(true);
+
+    expect(requests).toEqual([
+      {
+        title: "Add glue margins for additional sheets?",
+        description:
+          "This handout has 3 A4 pages, which uses 2 physical sheets when printed double-sided and flipped on the long edge. Glue margins begin on the second sheet.",
+        confirmLabel: "Add glue margins",
+        cancelLabel: "No margins",
+      },
+    ]);
+  });
+
+  it("forwards the optional glue-margin chooser after preparing selected handout slides", async () => {
+    const document = currentHandoutDocument();
+    document.slides.push(
+      {
+        id: "example-2",
+        type: "example",
+        title: "Example 2",
+        lo: "102a: Factorise",
+        image1: null,
+        image2: null,
+        answerImage1: null,
+        answerImage2: null,
+      },
+      {
+        id: "example-3",
+        type: "example",
+        title: "Example 3",
+        lo: "103a: Expand",
+        image1: null,
+        image2: null,
+        answerImage1: null,
+        answerImage2: null,
+      },
+    );
+    document.handoutSlideIds = ["starter", "example", "example-2", "example-3"];
+    const pageCounts: number[] = [];
+
+    const result = await prepareCurrentA4Handout(document, {
+      prepareDocument: async (prepared) => prepared,
+      chooseAdditionalSheetGlue: async (pageCount) => {
+        pageCounts.push(pageCount);
+        return true;
+      },
+    });
+
+    expect(pageCounts).toEqual([3]);
+    expect(result.html).toContain("handout-with-additional-sheet-glue");
   });
 });
 

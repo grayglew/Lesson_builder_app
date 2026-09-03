@@ -81,6 +81,89 @@ describe("production A4 handout export", () => {
     expect(result.html.match(/class="handout-page/g)).toHaveLength(2);
     expect(result.html).not.toContain("presenter-tools");
     expect(result.html).not.toContain("lesson-deck");
+    expect(result.html).toContain("<body>");
+  });
+
+  it("adds binding insets only to later pages after accepting glue margins", async () => {
+    const document = handoutDocument();
+    document.slides = [
+      starter("starter"),
+      example("example-1", "one"),
+      example("example-2", "two"),
+      example("example-3", "three"),
+    ];
+    const pageCounts: number[] = [];
+
+    const result = await buildA4Handout(document, {
+      chooseAdditionalSheetGlue: async (pageCount) => {
+        pageCounts.push(pageCount);
+        return true;
+      },
+    });
+
+    expect(pageCounts).toEqual([3]);
+    expect(result.html).toContain(
+      '<body class="handout-with-additional-sheet-glue">',
+    );
+    expect(result.html).toContain(
+      ".handout-with-additional-sheet-glue .handout-page:nth-child(n+3):nth-child(odd){padding-left:17mm}",
+    );
+    expect(result.html).toContain(
+      ".handout-with-additional-sheet-glue .handout-page:nth-child(n+3):nth-child(even){padding-right:17mm}",
+    );
+  });
+
+  it("offers glue margins once after worksheet pages have been composed", async () => {
+    const document = handoutDocument();
+    const worksheet = asset("questions.pdf", "application/pdf", "cGRm");
+    document.slides = [
+      example("example-1", "one"),
+      {
+        id: "worksheet",
+        type: "worksheet",
+        title: "Worksheet",
+        worksheet,
+        answers: null,
+      },
+    ];
+    let worksheetPagesRendered = false;
+    const pageCounts: number[] = [];
+
+    const result = await buildA4Handout(document, {
+      renderWorksheetPages: async () => {
+        worksheetPagesRendered = true;
+        return [
+          { image: asset("worksheet-1.png"), label: "Worksheet page 1", rotateLandscape: false },
+          { image: asset("worksheet-2.png"), label: "Worksheet page 2", rotateLandscape: true },
+        ];
+      },
+      chooseAdditionalSheetGlue: async (pageCount) => {
+        expect(worksheetPagesRendered).toBe(true);
+        pageCounts.push(pageCount);
+        return true;
+      },
+    });
+
+    expect(pageCounts).toEqual([3]);
+    expect(result.html).toContain(
+      '<body class="handout-with-additional-sheet-glue">',
+    );
+    expect(result.html).toContain(
+      ".handout-with-additional-sheet-glue .handout-page:nth-child(n+3) .handout-pdf-page-image.is-rotated-landscape{width:281mm;height:177mm}",
+    );
+  });
+
+  it("does not offer glue margins for one physical duplex sheet", async () => {
+    const pageCounts: number[] = [];
+
+    await buildA4Handout(handoutDocument(), {
+      chooseAdditionalSheetGlue: async (pageCount) => {
+        pageCounts.push(pageCount);
+        return true;
+      },
+    });
+
+    expect(pageCounts).toEqual([]);
   });
 
   it("keeps each worked example's questions and first answer together", async () => {

@@ -22,10 +22,11 @@ export type HandoutBuildResult = {
   warnings: string[];
 };
 
-type HandoutOptions = {
+export type HandoutOptions = {
   renderWorksheetPages?: (
     worksheet: BuilderAsset,
   ) => Promise<HandoutWorksheetPage[]>;
+  chooseAdditionalSheetGlue?: (pageCount: number) => Promise<boolean>;
 };
 
 type HandoutSection =
@@ -165,6 +166,10 @@ export async function buildA4Handout(
       "The selected slides did not produce any printable handout pages.",
     );
   }
+  const hasAdditionalSheetGlue =
+    pages.length > 2 && options.chooseAdditionalSheetGlue
+      ? await options.chooseAdditionalSheetGlue(pages.length)
+      : false;
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -173,7 +178,7 @@ export async function buildA4Handout(
 <title>${escapeHtml(title)} handout</title>
 <style>${a4HandoutCss()}</style>
 </head>
-<body>
+<body${hasAdditionalSheetGlue ? ' class="handout-with-additional-sheet-glue"' : ""}>
 <main class="handout-document">
 ${pages.join("\n")}
 </main>
@@ -638,6 +643,7 @@ html,body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,
 .handout-page-full{display:block;padding:0}.handout-full-page-content{width:100%;height:100%;display:grid;place-items:center;overflow:hidden}.handout-pdf-page-image{width:100%;height:100%;object-fit:contain;object-position:center}.handout-pdf-page-image.is-rotated-landscape{width:281mm;height:194mm;max-width:none;max-height:none;transform:rotate(90deg);transform-origin:center}
 .handout-retrieval-grid{width:100%;height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:3mm;padding:4mm}.handout-retrieval-text{align-self:center;justify-self:stretch;padding:8mm 5mm 5mm;font-size:13px;line-height:1.35}
 .handout-half-page-stack{width:100%;height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));gap:4mm;padding:4mm}.handout-half-panel{min-height:0;border:1px solid #111827;padding:4mm;overflow:hidden}.handout-text-panel{width:100%;height:100%;overflow:hidden;font-size:15px;line-height:1.35}.handout-text-panel h2{margin:0 0 4mm;font-size:18px;line-height:1.2}.handout-text-panel p{margin:0;white-space:pre-wrap}.handout-text-panel ul{margin:0;padding-left:6mm}.handout-math-panel .latex-rendered{font-size:16px}.latex-rendered p{margin:0 0 .8em}.latex-display{display:flex;justify-content:center;margin:.6em 0}.latex-frac{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center;line-height:1.1}.latex-frac-num{border-bottom:.06em solid currentColor;padding:0 .15em}.latex-root{display:inline-flex;align-items:flex-start}.latex-root-body{border-top:.06em solid currentColor}.latex-script{display:inline-flex;align-items:flex-start}.latex-script sup,.latex-script sub{font-size:.65em}.latex-var,.latex-italic{font-style:italic}.latex-bold{font-weight:800}.latex-list{margin:.5em 0}
+.handout-with-additional-sheet-glue .handout-page:nth-child(n+3):nth-child(odd){padding-left:17mm}.handout-with-additional-sheet-glue .handout-page:nth-child(n+3):nth-child(even){padding-right:17mm}.handout-with-additional-sheet-glue .handout-page:nth-child(n+3) .handout-pdf-page-image.is-rotated-landscape{width:281mm;height:177mm}
 @media print{html,body{background:#fff}.handout-document{display:block;padding:0}.handout-page{margin:0;width:calc(210mm - 16mm);min-width:calc(210mm - 16mm);max-width:calc(210mm - 16mm);height:calc(297mm - 16mm);min-height:calc(297mm - 16mm);max-height:calc(297mm - 16mm)}}
 `;
 }
