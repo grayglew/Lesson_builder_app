@@ -314,6 +314,96 @@ describe("production A4 handout export", () => {
     expect(result.html).toContain("Retrieval 1");
   });
 
+  it("prints retrieval key-skill labels and reserves the lesson title on the first retrieval page", async () => {
+    const document = handoutDocument();
+    document.title = "Retrieval label handout";
+    document.slides = [
+      example("example-1", "one"),
+      example("example-2", "two"),
+      example("example-3", "three"),
+      {
+        id: "retrieval-starter",
+        type: "starter",
+        title: "Retrieval",
+        slots: [
+          { lo: "101A: starter", image: asset("starter-1.png"), answerImage: null },
+          { lo: "Starter without a code", image: asset("starter-2.png"), answerImage: null },
+          { lo: "202b retrieve", image: asset("starter-3.png"), answerImage: null },
+        ],
+      },
+      {
+        id: "between-retrievals",
+        type: "placeholder",
+        title: "Separated content",
+        text: "Keep the retrieval title unique.",
+      },
+      {
+        id: "revision",
+        type: "revision",
+        title: "Revision",
+        items: [
+          { lo: "303C: revision", image: asset("revision-1.png") },
+          { lo: "Revision without a code", image: asset("revision-2.png") },
+        ],
+      },
+      {
+        id: "retrieval-text",
+        type: "retrieval",
+        title: "Text retrieval",
+        los: ["404D: text retrieval", "Text without a code"],
+      },
+    ];
+
+    const result = await buildA4Handout(document, {
+      chooseAdditionalSheetGlue: async () => true,
+    });
+    const dom = new JSDOM(result.html);
+    const retrievalPages = Array.from(
+      dom.window.document.querySelectorAll('[aria-label="Retrieval handout page"]'),
+    ) as HTMLElement[];
+    const retrievalCells = Array.from(
+      dom.window.document.querySelectorAll(".handout-retrieval-cell"),
+    ) as HTMLElement[];
+
+    expect(retrievalPages).toHaveLength(2);
+    expect(dom.window.document.body.className).toBe(
+      "handout-with-additional-sheet-glue",
+    );
+    expect(
+      retrievalCells
+        .filter((cell) => cell.querySelector(".handout-retrieval-number"))
+        .map(
+          (cell) =>
+            cell.querySelector(".handout-retrieval-key-skill")?.textContent,
+        ),
+    ).toEqual(["101a", undefined, "202b", "303c", undefined, "404d", undefined]);
+    expect(
+      dom.window.document.querySelectorAll(".handout-retrieval-heading"),
+    ).toHaveLength(1);
+    expect(
+      dom.window.document.querySelector(".handout-retrieval-lesson-title")
+        ?.textContent,
+    ).toBe("Retrieval label handout");
+    expect(retrievalPages[0]?.querySelector(".handout-retrieval-heading")).not.toBeNull();
+    expect(retrievalPages[1]?.querySelector(".handout-retrieval-heading")).toBeNull();
+    expect(
+      retrievalPages[1]?.querySelector(".handout-retrieval-number")?.textContent,
+    ).toBe("1");
+    const firstPageContent = retrievalPages[0]?.querySelector<HTMLElement>(
+      ".handout-retrieval-page-content",
+    );
+    const firstLabel = retrievalCells[0]?.querySelector<HTMLElement>(
+      ".handout-retrieval-key-skill",
+    );
+    expect(firstPageContent).not.toBeNull();
+    expect(dom.window.getComputedStyle(firstPageContent!).display).toBe("grid");
+    expect(dom.window.getComputedStyle(retrievalPages[0]!).paddingLeft).toBe("17mm");
+    expect(dom.window.getComputedStyle(firstLabel!).bottom).toBe("2mm");
+    expect(dom.window.getComputedStyle(firstLabel!).right).toBe("2mm");
+    expect(dom.window.getComputedStyle(firstLabel!).pointerEvents).toBe("none");
+    dom.window.close();
+  });
+
   it("preserves selected deck order across different printable slide types", async () => {
     const document = handoutDocument();
     document.slides = [

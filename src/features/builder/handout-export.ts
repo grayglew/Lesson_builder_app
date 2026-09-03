@@ -47,6 +47,7 @@ type RetrievalQuestion = {
   image: BuilderAsset | null;
   text: string;
   label: string;
+  keySkillCode: string;
 };
 
 export function selectHandoutDocument(
@@ -306,6 +307,7 @@ async function buildStandardPages(
   ) => Promise<HandoutWorksheetPage[]>,
 ) {
   const pages: string[] = [];
+  let hasPrintedRetrievalTitle = false;
 
   for (const section of sections) {
     if (section.kind === "starter") {
@@ -324,7 +326,12 @@ async function buildStandardPages(
       continue;
     }
     if (section.kind === "retrieval") {
-      pages.push(...retrievalPages(section.slides));
+      const retrieval = retrievalPages(
+        section.slides,
+        hasPrintedRetrievalTitle ? "" : title,
+      );
+      pages.push(...retrieval);
+      hasPrintedRetrievalTitle ||= retrieval.length > 0;
       continue;
     }
     if (section.kind === "worksheet") {
@@ -380,13 +387,12 @@ async function buildStandardPages(
   return pages;
 }
 
-function retrievalPages(slides: BuilderSlide[]) {
+function retrievalPages(slides: BuilderSlide[], title: string) {
   const questions = slides.flatMap(retrievalQuestions);
   const pages: string[] = [];
   for (let index = 0; index < questions.length; index += 8) {
     const pageQuestions = questions.slice(index, index + 8);
-    pages.push(`<section class="handout-page handout-page-full" aria-label="Retrieval handout page">
-  <div class="handout-retrieval-grid">
+    const grid = `<div class="handout-retrieval-grid">
     ${Array.from({ length: 8 }, (_, offset) => {
       const item = pageQuestions[offset];
       if (!item) {
@@ -395,9 +401,20 @@ function retrievalPages(slides: BuilderSlide[]) {
       const content = item.image
         ? imageHtml(item.image, item.label)
         : `<div class="handout-retrieval-text">${escapeHtml(item.text)}</div>`;
-      return `<div class="handout-retrieval-cell"><span class="handout-retrieval-number">${index + offset + 1}</span>${content}</div>`;
+      const keySkill = item.keySkillCode
+        ? `<span class="handout-retrieval-key-skill">${escapeHtml(item.keySkillCode)}</span>`
+        : "";
+      return `<div class="handout-retrieval-cell"><span class="handout-retrieval-number">${index + offset + 1}</span>${keySkill}${content}</div>`;
     }).join("")}
-  </div>
+  </div>`;
+    const content = index === 0 && title
+      ? `<div class="handout-retrieval-page-content">
+  <header class="handout-retrieval-heading"><div class="handout-retrieval-lesson-title">${escapeHtml(title)}</div></header>
+  ${grid}
+</div>`
+      : grid;
+    pages.push(`<section class="handout-page handout-page-full" aria-label="Retrieval handout page">
+  ${content}
 </section>`);
   }
   return pages;
@@ -412,6 +429,7 @@ function retrievalQuestions(slide: BuilderSlide): RetrievalQuestion[] {
         image: assetOf(slot.image),
         text: String(slot.lo || ""),
         label: String(slot.lo || "Retrieval question"),
+        keySkillCode: extractRetrievalLoCode(String(slot.lo || "")),
       }));
   }
   if (slide.type === "revision") {
@@ -421,6 +439,7 @@ function retrievalQuestions(slide: BuilderSlide): RetrievalQuestion[] {
         image: assetOf(item.image),
         text: String(item.lo || ""),
         label: String(item.lo || "Revision question"),
+        keySkillCode: extractRetrievalLoCode(String(item.lo || "")),
       }));
   }
   if (slide.type === "retrieval") {
@@ -428,6 +447,7 @@ function retrievalQuestions(slide: BuilderSlide): RetrievalQuestion[] {
       image: null,
       text: lo,
       label: lo,
+      keySkillCode: extractRetrievalLoCode(lo),
     }));
   }
   return [];
@@ -639,12 +659,12 @@ html,body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,
 .handout-heading{display:grid;gap:1.5mm}.handout-lo{margin:0;font-size:20px;font-weight:800;line-height:1.15}.handout-lesson-title{font-size:10px;line-height:1.2;color:#4b5563}.handout-date{font-size:10px;line-height:1.2}
 .handout-starter{height:100%;min-height:0;display:grid;grid-template-rows:repeat(4,minmax(0,1fr));border:1px solid #111827;overflow:hidden}
 .handout-starter-cell,.handout-retrieval-cell{position:relative;min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}
-.handout-starter-number,.handout-retrieval-number,.handout-starter-key-skill{position:absolute;z-index:2;display:grid;place-items:center;min-width:7mm;height:7mm;border:1px solid rgba(17,24,39,.35);border-radius:999px;background:rgba(255,255,255,.86);color:rgba(17,24,39,.72);font-size:10px;font-weight:800;line-height:1;pointer-events:none}.handout-starter-number{top:2mm;right:2mm;width:7mm}.handout-starter-key-skill{right:2mm;bottom:2mm;padding:0 1mm}.handout-retrieval-number{top:2mm;left:2mm;width:7mm}
+.handout-starter-number,.handout-retrieval-number,.handout-starter-key-skill,.handout-retrieval-key-skill{position:absolute;z-index:2;display:grid;place-items:center;min-width:7mm;height:7mm;border:1px solid rgba(17,24,39,.35);border-radius:999px;background:rgba(255,255,255,.86);color:rgba(17,24,39,.72);font-size:10px;font-weight:800;line-height:1;pointer-events:none}.handout-starter-number{top:2mm;right:2mm;width:7mm}.handout-starter-key-skill,.handout-retrieval-key-skill{right:2mm;bottom:2mm;padding:0 1mm}.handout-retrieval-number{top:2mm;left:2mm;width:7mm}
 .handout-example-page{padding:4mm}.handout-example-stack{width:100%;height:100%;display:grid;gap:4mm}.handout-example-stack.is-single{grid-template-rows:minmax(0,1fr)}.handout-example-stack.is-double{grid-template-rows:repeat(2,minmax(0,1fr))}.handout-example-block{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-example-cell{min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.handout-student-space{min-height:0;background:#fff}
 .handout-booklet-side{display:block}.handout-booklet-copies{width:100%;height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr))}.handout-booklet-copy{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-booklet-panel{min-width:0;min-height:0;border:1px solid #111827;padding:3mm;overflow:hidden}.handout-booklet-glue{display:grid;place-items:center;font-size:28px;font-weight:800;letter-spacing:.08em}.handout-booklet-front{display:grid;grid-template-rows:auto minmax(0,1fr);gap:2mm}.handout-booklet-starter{min-height:0;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));overflow:hidden}.handout-booklet-inside-questions{padding:0}.handout-booklet-inside-blank{background:#fff}
 .handout-image{width:100%;height:100%;min-height:0;display:block;object-fit:contain;object-position:top center}.handout-empty{display:grid;place-items:center;width:100%;height:100%;min-height:20mm;color:#6b7280;font-size:11px;text-align:center}
 .handout-page-full{display:block;padding:0}.handout-full-page-content{width:100%;height:100%;display:grid;place-items:center;overflow:hidden}.handout-pdf-page-image{width:100%;height:100%;object-fit:contain;object-position:center}.handout-pdf-page-image.is-rotated-landscape{width:281mm;height:194mm;max-width:none;max-height:none;transform:rotate(90deg);transform-origin:center}
-.handout-retrieval-grid{width:100%;height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:3mm;padding:4mm}.handout-retrieval-text{align-self:center;justify-self:stretch;padding:8mm 5mm 5mm;font-size:13px;line-height:1.35}
+.handout-retrieval-page-content{width:100%;height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr)}.handout-retrieval-heading{min-width:0;padding:3mm 4mm 0;overflow:hidden}.handout-retrieval-lesson-title{overflow:hidden;color:#4b5563;font-size:10px;font-weight:700;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}.handout-retrieval-grid{width:100%;height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:3mm;padding:4mm}.handout-retrieval-page-content .handout-retrieval-grid{height:auto;min-height:0}.handout-retrieval-text{align-self:center;justify-self:stretch;padding:8mm 5mm 5mm;font-size:13px;line-height:1.35}
 .handout-half-page-stack{width:100%;height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));gap:4mm;padding:4mm}.handout-half-panel{min-height:0;border:1px solid #111827;padding:4mm;overflow:hidden}.handout-text-panel{width:100%;height:100%;overflow:hidden;font-size:15px;line-height:1.35}.handout-text-panel h2{margin:0 0 4mm;font-size:18px;line-height:1.2}.handout-text-panel p{margin:0;white-space:pre-wrap}.handout-text-panel ul{margin:0;padding-left:6mm}.handout-math-panel .latex-rendered{font-size:16px}.latex-rendered p{margin:0 0 .8em}.latex-display{display:flex;justify-content:center;margin:.6em 0}.latex-frac{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center;line-height:1.1}.latex-frac-num{border-bottom:.06em solid currentColor;padding:0 .15em}.latex-root{display:inline-flex;align-items:flex-start}.latex-root-body{border-top:.06em solid currentColor}.latex-script{display:inline-flex;align-items:flex-start}.latex-script sup,.latex-script sub{font-size:.65em}.latex-var,.latex-italic{font-style:italic}.latex-bold{font-weight:800}.latex-list{margin:.5em 0}
 .handout-with-additional-sheet-glue .handout-page:nth-child(n+3):nth-child(odd){padding-left:17mm}.handout-with-additional-sheet-glue .handout-page:nth-child(n+3):nth-child(even){padding-right:17mm}.handout-with-additional-sheet-glue .handout-page:nth-child(n+3) .handout-pdf-page-image.is-rotated-landscape{width:281mm;height:177mm}
 @media print{html,body{background:#fff}.handout-document{display:block;padding:0}.handout-page{margin:0;width:calc(210mm - 16mm);min-width:calc(210mm - 16mm);max-width:calc(210mm - 16mm);height:calc(297mm - 16mm);min-height:calc(297mm - 16mm);max-height:calc(297mm - 16mm)}}
