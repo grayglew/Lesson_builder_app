@@ -43,14 +43,14 @@ describe("saved lesson static bundle", () => {
         worksheet: {
           name: "practice.pdf",
           type: "application/pdf",
-          size: 3,
-          dataUrl: "data:application/pdf;base64,cWRm",
+          size: 8,
+          dataUrl: "data:application/pdf;base64,JVBERi0xLjc=",
         },
         answers: {
           name: "practice.pdf",
           type: "application/pdf",
-          size: 3,
-          dataUrl: "data:application/pdf;base64,YW5z",
+          size: 8,
+          dataUrl: "data:application/pdf;base64,JVBERi0xLjY=",
         },
       },
       {
@@ -230,7 +230,7 @@ describe("saved lesson static bundle", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const source = String(input);
       if (/^data:/i.test(source)) {
-        return new Response("practice", {
+        return new Response("%PDF-practice", {
           headers: { "Content-Type": "application/pdf" },
         });
       }
@@ -274,9 +274,10 @@ describe("saved lesson static bundle", () => {
     ];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const source = String(input);
-      return new Response(source.includes("Zmlyc3Q=") ? "first" : "second", {
-        headers: { "Content-Type": "application/pdf" },
-      });
+      return new Response(
+        source.includes("Zmlyc3Q=") ? "%PDF-first" : "%PDF-second",
+        { headers: { "Content-Type": "application/pdf" } },
+      );
     });
 
     const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
@@ -285,11 +286,11 @@ describe("saved lesson static bundle", () => {
     const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
 
     expect(await zip.file("worksheets/practice.pdf")?.async("string")).toBe(
-      "first",
+      "%PDF-first",
     );
     expect(
       await zip.file("worksheets/practice-2.pdf")?.async("string"),
-    ).toBe("second");
+    ).toBe("%PDF-second");
   });
 
   it.each([
@@ -369,7 +370,9 @@ describe("saved lesson static bundle", () => {
       },
     ];
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("pdf", { headers: { "Content-Type": "application/pdf" } }),
+      new Response("legacy prefix\n%PDF-1.7\n", {
+        headers: { "Content-Type": "application/octet-stream" },
+      }),
     );
 
     const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
@@ -378,6 +381,39 @@ describe("saved lesson static bundle", () => {
     const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
 
     expect(zip.file("worksheets/legacy.pdf")).not.toBeNull();
+  });
+
+  it.each([
+    { label: "PNG", payload: "\u0089PNG\r\n\u001a\nimage" },
+    { label: "HTML", payload: "<!doctype html><p>not a PDF</p>" },
+  ])("rejects a generic-MIME .pdf containing $label bytes", async ({ payload }) => {
+    const document = createInitialBuilderDocument("2026-09-03T03:30:00.000Z");
+    document.slides = [
+      {
+        id: "renamed-payload",
+        type: "worksheet",
+        title: "Renamed payload",
+        worksheet: {
+          name: "renamed.pdf",
+          type: "application/octet-stream",
+          size: payload.length,
+          dataUrl: "https://assets.example/renamed.pdf",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(payload, {
+        headers: { "Content-Type": "application/octet-stream" },
+      }),
+    );
+    const renderPdf = vi.fn().mockResolvedValue(new Blob(["%PDF"]));
+
+    await expect(
+      savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
+    ).rejects.toThrow(
+      'Could not include "worksheets/renamed.pdf" in the lesson bundle because worksheet attachments must be PDF files.',
+    );
+    expect(renderPdf).not.toHaveBeenCalled();
   });
 
   it("rejects a downloaded non-PDF response before rendering", async () => {

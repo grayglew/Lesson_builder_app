@@ -101,6 +101,9 @@ export async function buildLessonBundleZip(
   for (const entry of worksheetEntries) {
     const file = await builderAssetToBlobStrict(entry.file, entry.path);
     assertPdfWorksheetAttachment(entry.file, entry.path, file.type);
+    if (!(await blobHasPdfHeader(file))) {
+      throwNonPdfWorksheetAttachment(entry.path);
+    }
     worksheetFiles.push({ path: entry.path, file });
   }
   const staticDocument = createStaticExportDocument(embeddedDocument);
@@ -245,10 +248,43 @@ function assertPdfWorksheetAttachment(
     !/\.pdf$/i.test(path) ||
     mimeTypes.some((mimeType) => !isPdfCompatibleMimeType(mimeType))
   ) {
-    throw new Error(
-      `Could not include "${path}" in the lesson bundle because worksheet attachments must be PDF files.`,
-    );
+    throwNonPdfWorksheetAttachment(path);
   }
+}
+
+async function blobHasPdfHeader(blob: Blob) {
+  const signature = [0x25, 0x50, 0x44, 0x46, 0x2d];
+  const maximumHeaderOffset = 1_024;
+  const prefix = blob.slice(0, maximumHeaderOffset + signature.length);
+  const buffer = await blobArrayBuffer(prefix);
+  const bytes = new Uint8Array(buffer);
+  for (
+    let offset = 0;
+    offset < maximumHeaderOffset && offset + signature.length <= bytes.length;
+    offset += 1
+  ) {
+    if (signature.every((byte, index) => bytes[offset + index] === byte)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function blobArrayBuffer(blob: Blob) {
+  if (typeof blob.arrayBuffer === "function") return blob.arrayBuffer();
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () =>
+      reject(reader.error || new Error("Could not read worksheet attachment."));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+function throwNonPdfWorksheetAttachment(path: string): never {
+  throw new Error(
+    `Could not include "${path}" in the lesson bundle because worksheet attachments must be PDF files.`,
+  );
 }
 
 function normalizeMimeType(value: unknown) {
