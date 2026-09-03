@@ -125,6 +125,7 @@ describe("production A4 handout export", () => {
       example("example-3", "three"),
     ];
     const pageCounts: number[] = [];
+    const baseline = await buildA4Handout(document);
 
     const result = await buildA4Handout(document, {
       chooseAdditionalSheetGlue: async (pageCount) => {
@@ -135,6 +136,8 @@ describe("production A4 handout export", () => {
     const dom = new JSDOM(result.html);
 
     expect(pageCounts).toEqual([3]);
+    expect(result.html).toBe(baseline.html);
+    expect(result.warnings).toEqual(baseline.warnings);
     expect(dom.window.document.body.className).toBe("");
     expect(dom.window.document.querySelectorAll(".handout-page")).toHaveLength(3);
     dom.window.close();
