@@ -79,6 +79,102 @@ export function createAdditionalSheetGlueChooser(
     });
 }
 
+export function createAdditionalSheetGlueWindowChooser(
+  previewWindow: Window,
+) {
+  return createAdditionalSheetGlueChooser((options) =>
+    showConfirmDialogInWindow(previewWindow, options),
+  );
+}
+
+function showConfirmDialogInWindow(
+  previewWindow: Window,
+  options: ConfirmDialogOptions,
+) {
+  return new Promise<boolean>((resolve) => {
+    const previewDocument = previewWindow.document;
+    previewDocument.open();
+    previewDocument.write(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Choose handout margins</title>
+<style>
+*{box-sizing:border-box}
+html,body{min-height:100%;margin:0}
+body{display:grid;place-items:center;padding:24px;background:#f4f4f5;color:#18181b;font-family:Arial,Helvetica,sans-serif}
+.dialog{position:relative;width:min(100%,560px);border:1px solid #d4d4d8;border-radius:16px;background:#fff;padding:28px;box-shadow:0 20px 45px rgba(24,24,27,.14)}
+h1{margin:0 36px 10px 0;font-size:24px;line-height:1.2}
+p{margin:0;color:#52525b;font-size:15px;line-height:1.55}
+.close{position:absolute;top:16px;right:16px;width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:#52525b;font-size:24px;line-height:1;cursor:pointer}
+.close:hover,.close:focus-visible{background:#f4f4f5;outline:2px solid #18181b;outline-offset:2px}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+button{min-height:42px;border:1px solid #a1a1aa;border-radius:10px;padding:9px 16px;background:#fff;color:#18181b;font:inherit;font-weight:700;cursor:pointer}
+button:hover,button:focus-visible{outline:2px solid #18181b;outline-offset:2px}
+.primary{border-color:#18181b;background:#18181b;color:#fff}
+</style>
+</head>
+<body>
+<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="glue-dialog-title" aria-describedby="glue-dialog-description" tabindex="-1">
+  <button class="close" type="button" aria-label="Close notification">&times;</button>
+  <h1 id="glue-dialog-title"></h1>
+  <p id="glue-dialog-description"></p>
+  <div class="actions">
+    <button type="button" data-handout-glue-choice="cancel"></button>
+    <button class="primary" type="button" data-handout-glue-choice="confirm"></button>
+  </div>
+</section>
+</body>
+</html>`);
+    previewDocument.close();
+
+    const title = previewDocument.getElementById("glue-dialog-title");
+    const description = previewDocument.getElementById(
+      "glue-dialog-description",
+    );
+    const closeButton = previewDocument.querySelector<HTMLButtonElement>(
+      'button[aria-label="Close notification"]',
+    );
+    const cancelButton = previewDocument.querySelector<HTMLButtonElement>(
+      '[data-handout-glue-choice="cancel"]',
+    );
+    const confirmButton = previewDocument.querySelector<HTMLButtonElement>(
+      '[data-handout-glue-choice="confirm"]',
+    );
+    if (title) title.textContent = options.title;
+    if (description) description.textContent = options.description;
+    if (cancelButton) cancelButton.textContent = options.cancelLabel ?? "Cancel";
+    if (confirmButton) {
+      confirmButton.textContent = options.confirmLabel ?? "Continue";
+    }
+
+    let settled = false;
+    const settle = (choice: boolean) => {
+      if (settled) return;
+      settled = true;
+      previewDocument.removeEventListener("keydown", handleKeydown);
+      previewWindow.removeEventListener("beforeunload", handleDismissal);
+      resolve(choice);
+    };
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      settle(false);
+    };
+    const handleDismissal = () => settle(false);
+
+    closeButton?.addEventListener("click", () => settle(false), { once: true });
+    cancelButton?.addEventListener("click", () => settle(false), { once: true });
+    confirmButton?.addEventListener("click", () => settle(true), { once: true });
+    previewDocument.addEventListener("keydown", handleKeydown);
+    previewWindow.addEventListener("beforeunload", handleDismissal, {
+      once: true,
+    });
+    cancelButton?.focus();
+  });
+}
+
 function requireOverallLessonLoForHandout(
   document: Pick<BuilderDocument, "overallLessonLo">,
 ) {
@@ -237,7 +333,7 @@ export function useLessonExportActions() {
         });
       }
       const output = handout
-        ? await prepareA4Handout()
+        ? await prepareA4Handout(previewWindow)
         : {
             html: await outputService.preparePresenterHtml(
               presenterLessonId,
@@ -382,9 +478,10 @@ export function useLessonExportActions() {
     return true;
   }
 
-  async function prepareA4Handout() {
+  async function prepareA4Handout(previewWindow: Window) {
     return prepareCurrentA4Handout(document, {
-      chooseAdditionalSheetGlue: createAdditionalSheetGlueChooser(confirmDialog),
+      chooseAdditionalSheetGlue:
+        createAdditionalSheetGlueWindowChooser(previewWindow),
     });
   }
 

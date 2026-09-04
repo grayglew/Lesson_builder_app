@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { PDFDocument } from "pdf-lib";
 
 test.skip(
   Boolean(process.env.PLAYWRIGHT_BASE_URL) &&
@@ -86,6 +87,152 @@ test.describe("flexible A4 handout print layout", () => {
     expect(Math.abs(copyHeights[0] - copyHeights[1])).toBeLessThan(1);
     await expectNoPageOverflow(handout);
   });
+
+  test("adds alternating 17 mm insets after the first sheet without clipping landscape or retrieval content", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const prototype = Map.prototype as Map<unknown, unknown> & {
+        getOrInsertComputed?: (
+          key: unknown,
+          callback: (key: unknown) => unknown,
+        ) => unknown;
+      };
+      if (prototype.getOrInsertComputed) return;
+      Object.defineProperty(prototype, "getOrInsertComputed", {
+        configurable: true,
+        value(this: Map<unknown, unknown>, key: unknown, callback: (key: unknown) => unknown) {
+          if (!this.has(key)) this.set(key, callback(key));
+          return this.get(key);
+        },
+        writable: true,
+      });
+    });
+    const slides = [
+      starterSlide(),
+      exampleSlide("example-one"),
+      exampleSlide("example-two"),
+      retrievalSlide(),
+      await landscapeWorksheetSlide(),
+    ];
+    await stubHandoutBuilder(
+      page,
+      slides,
+      slides.map((slide) => slide.id),
+    );
+    await page.goto("/builder?visual=1");
+
+    const popupPromise = page.waitForEvent("popup");
+    await page
+      .getByRole("button", { name: "Open handout from 5 selected slides" })
+      .click();
+    const handout = await popupPromise;
+    await expect(
+      handout.getByRole("dialog", {
+        name: "Add glue margins for additional sheets?",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Add glue margins", exact: true }),
+    ).toHaveCount(0);
+    await handout
+      .getByRole("button", { name: "Add glue margins", exact: true })
+      .click();
+
+    const pages = handout.locator(".handout-page");
+    await expect(pages).toHaveCount(4);
+    const geometry = await pages.evaluateAll((elements) => {
+      const ruler = document.createElement("div");
+      ruler.style.width = "100mm";
+      ruler.style.position = "absolute";
+      document.body.append(ruler);
+      const pixelsPerMm = ruler.getBoundingClientRect().width / 100;
+      ruler.remove();
+      const pageRule = Array.from(document.styleSheets)
+        .flatMap((sheet) => Array.from(sheet.cssRules))
+        .find((rule) => rule.cssText.startsWith("@page"));
+      const pageMarginMm = Number(
+        pageRule?.cssText.match(/margin:\s*([\d.]+)mm/)?.[1],
+      );
+      return {
+        pageMarginMm,
+        pages: elements.map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            paddingLeftMm: parseFloat(style.paddingLeft) / pixelsPerMm,
+            paddingRightMm: parseFloat(style.paddingRight) / pixelsPerMm,
+          };
+        }),
+      };
+    });
+    expect(geometry.pageMarginMm).toBe(8);
+    expect(geometry.pages[0]).toEqual({
+      paddingLeftMm: 0,
+      paddingRightMm: 0,
+    });
+    expect(geometry.pages[1]).toEqual({
+      paddingLeftMm: 0,
+      paddingRightMm: 0,
+    });
+    expect(geometry.pages[2].paddingLeftMm).toBeCloseTo(17, 1);
+    expect(geometry.pages[2].paddingRightMm).toBe(0);
+    expect(geometry.pageMarginMm + geometry.pages[2].paddingLeftMm).toBeCloseTo(
+      25,
+      1,
+    );
+    expect(geometry.pages[3].paddingLeftMm).toBe(0);
+    expect(geometry.pages[3].paddingRightMm).toBeCloseTo(17, 1);
+    expect(geometry.pageMarginMm + geometry.pages[3].paddingRightMm).toBeCloseTo(
+      25,
+      1,
+    );
+
+    const retrievalPage = pages.nth(2);
+    await expect(
+      retrievalPage.getByText("7Ma3 18-08 - taught 2026-08-18 1401", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      retrievalPage.getByText("191a", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      retrievalPage.locator(".handout-retrieval-key-skill"),
+    ).toHaveText(["191a", "192a", "193a", "194a", "195a", "196a", "197a", "198a"]);
+
+    const landscapeImage = pages
+      .nth(3)
+      .locator(".handout-pdf-page-image.is-rotated-landscape");
+    await expect(landscapeImage).toHaveCount(1);
+    await expect
+      .poll(() =>
+        landscapeImage.evaluate(
+          (image) =>
+            (image as HTMLImageElement).complete &&
+            (image as HTMLImageElement).naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+    const containment = await landscapeImage.evaluate((image) => {
+      const imageRect = image.getBoundingClientRect();
+      const pageRect = image.closest(".handout-page")?.getBoundingClientRect();
+      return pageRect
+        ? {
+            left: imageRect.left >= pageRect.left - 1,
+            top: imageRect.top >= pageRect.top - 1,
+            right: imageRect.right <= pageRect.right + 1,
+            bottom: imageRect.bottom <= pageRect.bottom + 1,
+          }
+        : null;
+    });
+    expect(containment).toEqual({
+      left: true,
+      top: true,
+      right: true,
+      bottom: true,
+    });
+    await expectNoPageOverflow(handout);
+  });
 });
 
 async function stubHandoutBuilder(
@@ -165,6 +312,37 @@ function exampleSlide(id: string) {
     answerImage1: image(`${id}-answer-1`),
     image2: image(`${id}-question-2`),
     answerImage2: image(`${id}-answer-2`),
+  };
+}
+
+function retrievalSlide() {
+  return {
+    id: "retrieval-slide",
+    type: "starter",
+    title: "Retrieval",
+    slots: Array.from({ length: 8 }, (_, index) => ({
+      lo: `${191 + index}a: Retrieval skill ${index + 1}`,
+      image: image(`retrieval-${index + 1}`),
+      answerImage: null,
+    })),
+  };
+}
+
+async function landscapeWorksheetSlide() {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([842, 595]);
+  page.drawText("Landscape worksheet", { x: 48, y: 520, size: 28 });
+  const bytes = await pdf.save();
+  return {
+    id: "landscape-worksheet",
+    type: "worksheet",
+    title: "Landscape worksheet",
+    worksheet: {
+      name: "landscape-worksheet.pdf",
+      type: "application/pdf",
+      size: bytes.length,
+      dataUrl: `data:application/pdf;base64,${Buffer.from(bytes).toString("base64")}`,
+    },
   };
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createAdditionalSheetGlueChooser,
+  createAdditionalSheetGlueWindowChooser,
   createCurrentLessonOutputService,
   prepareCurrentA4Handout,
 } from "@/features/builder/useLessonExportActions";
@@ -115,6 +116,67 @@ describe("current lesson output preparation wiring", () => {
       },
     ]);
   });
+
+  it("renders the glue-margin choice in the reserved handout window", async () => {
+    const frame = document.createElement("iframe");
+    document.body.append(frame);
+    const previewWindow = frame.contentWindow;
+    expect(previewWindow).not.toBeNull();
+    if (!previewWindow) return;
+
+    try {
+      const decision = createAdditionalSheetGlueWindowChooser(previewWindow)(4);
+      const dialog = previewWindow.document.querySelector<HTMLElement>(
+        '[role="dialog"]',
+      );
+
+      expect(dialog).toHaveAccessibleName(
+        "Add glue margins for additional sheets?",
+      );
+      expect(dialog).toHaveTextContent(
+        "This handout has 4 A4 pages, which uses 2 physical sheets when printed double-sided and flipped on the long edge. Glue margins begin on the second sheet.",
+      );
+      const addButton = Array.from(
+        previewWindow.document.querySelectorAll("button"),
+      ).find((button) => button.textContent === "Add glue margins");
+      expect(addButton?.tagName).toBe("BUTTON");
+      addButton?.click();
+      await expect(decision).resolves.toBe(true);
+    } finally {
+      frame.remove();
+    }
+  });
+
+  it.each(["Escape", "close button"])(
+    "treats %s dismissal in the reserved handout window as No margins",
+    async (dismissal) => {
+      const frame = document.createElement("iframe");
+      document.body.append(frame);
+      const previewWindow = frame.contentWindow;
+      expect(previewWindow).not.toBeNull();
+      if (!previewWindow) return;
+
+      try {
+        const decision = createAdditionalSheetGlueWindowChooser(previewWindow)(
+          3,
+        );
+        if (dismissal === "Escape") {
+          previewWindow.document.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape" }),
+          );
+        } else {
+          previewWindow.document
+            .querySelector<HTMLButtonElement>(
+              'button[aria-label="Close notification"]',
+            )
+            ?.click();
+        }
+        await expect(decision).resolves.toBe(false);
+      } finally {
+        frame.remove();
+      }
+    },
+  );
 
   it("forwards the optional glue-margin chooser after preparing selected handout slides", async () => {
     const document = currentHandoutDocument();
