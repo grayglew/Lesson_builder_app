@@ -161,10 +161,15 @@ function extractLessonBundleFiles_(zipBlob) {
   const rootPptx = [];
   const rootPdf = [];
   const worksheetPdfs = [];
+  const readmeEntries = [];
 
   entries.forEach(function(blob) {
     const entryName = normalizeZipEntryName_(blob.getName());
-    if (!entryName || entryName.toLowerCase() === README_ENTRY_NAME.toLowerCase()) return;
+    if (!entryName) return;
+    if (entryName.toLowerCase() === README_ENTRY_NAME.toLowerCase()) {
+      readmeEntries.push({ name: entryName, blob: blob });
+      return;
+    }
 
     if (/^[^/]+\.pptx$/i.test(entryName)) {
       rootPptx.push({ name: entryName, blob: blob });
@@ -181,10 +186,6 @@ function extractLessonBundleFiles_(zipBlob) {
     }
   });
 
-  if (rootPdf.length !== 1) {
-    throw new Error('The lesson bundle must contain exactly one root PDF file (.pdf). Found ' + rootPdf.length + '.');
-  }
-
   if (rootPptx.length > 1) {
     throw new Error('The legacy lesson bundle may contain at most one root PowerPoint file (.pptx). Found ' + rootPptx.length + '.');
   }
@@ -193,7 +194,34 @@ function extractLessonBundleFiles_(zipBlob) {
     return a.name.localeCompare(b.name);
   });
 
-  return [rootPdf[0]].concat(worksheetPdfs).map(toDriveAttachment_);
+  const isFormat2 = readmeEntries.some(function(entry) {
+    return entry.blob.getDataAsString().indexOf('Lesson Builder bundle format: 2') >= 0;
+  });
+
+  if (!isFormat2 && rootPdf.length === 1) {
+    return [rootPdf[0]].concat(worksheetPdfs).map(toDriveAttachment_);
+  }
+
+  if (rootPdf.length !== 2) {
+    throw new Error('A current lesson bundle must contain one saved-state PDF and one matching -answers PDF. Found ' + rootPdf.length + ' root PDFs.');
+  }
+
+  const pairs = rootPdf.map(function(candidate) {
+    const base = candidate.name.replace(/\.pdf$/i, '');
+    const expectedAnswer = (base + '-answers.pdf').toLowerCase();
+    const answer = rootPdf.find(function(item) {
+      return item !== candidate && item.name.toLowerCase() === expectedAnswer;
+    });
+    return answer ? { lesson: candidate, answers: answer } : null;
+  }).filter(Boolean);
+
+  if (pairs.length !== 1) {
+    throw new Error('The two root PDFs must be named <lesson>.pdf and <lesson>-answers.pdf.');
+  }
+
+  return [pairs[0].lesson, pairs[0].answers]
+    .concat(worksheetPdfs)
+    .map(toDriveAttachment_);
 }
 
 function toDriveAttachment_(entry) {

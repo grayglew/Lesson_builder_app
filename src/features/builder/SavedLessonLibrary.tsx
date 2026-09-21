@@ -287,7 +287,7 @@ export function SavedLessonLibrary({
     await mutateLesson(lesson.id, async () => {
       setStatus({
         tone: "working",
-        message: `Building the A4 lesson bundle for "${lesson.title}"…`,
+        message: `Building the saved-state and answer PDFs for "${lesson.title}"…`,
       });
       const opened = await fetchSavedLesson(lesson.id);
       const bundle = await buildLessonBundleZip(opened.document, {

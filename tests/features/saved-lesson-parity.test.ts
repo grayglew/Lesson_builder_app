@@ -128,9 +128,9 @@ describe("saved lesson production parity", () => {
 
   it("preserves saved reveal maps that contain only rendered controls", () => {
     const document = fixtureDocument();
-    const starter = document.slides[0];
+    const starter = document.slides[0] as Extract<BuilderSlide, { type: "starter" }>;
     const example = document.slides[1];
-    const revision = document.slides[2];
+    const revision = document.slides[2] as Extract<BuilderSlide, { type: "revision" }>;
     if (
       starter.type !== "starter" ||
       example.type !== "example" ||

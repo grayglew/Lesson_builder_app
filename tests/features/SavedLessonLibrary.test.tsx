@@ -193,15 +193,24 @@ describe("SavedLessonLibrary production actions", () => {
     await waitFor(() => expect(buildLessonBundleZip).toHaveBeenCalledOnce());
     expect(useBuilderStore.getState().status).toEqual({
       tone: "working",
-      message: 'Building the A4 lesson bundle for "Active lesson"…',
+      message: 'Building the saved-state and answer PDFs for "Active lesson"…',
     });
     const dependencies = vi.mocked(buildLessonBundleZip).mock.calls[0]?.[1];
     expect(dependencies?.renderPdf).toEqual(expect.any(Function));
-    await dependencies?.renderPdf?.("<!doctype html><p>A4 snapshot</p>");
-    expect(downloadA4BundlePdf).toHaveBeenCalledWith(
+    await dependencies?.renderPdf?.("<!doctype html><p>Saved state</p>");
+    await dependencies?.renderPdf?.("<!doctype html><p>All answers</p>");
+    expect(downloadA4BundlePdf).toHaveBeenNthCalledWith(
+      1,
       "active",
-      "<!doctype html><p>A4 snapshot</p>",
+      "<!doctype html><p>Saved state</p>",
     );
+    expect(downloadA4BundlePdf).toHaveBeenNthCalledWith(
+      2,
+      "active",
+      "<!doctype html><p>All answers</p>",
+    );
+    expect(downloadA4BundlePdf).toHaveBeenCalledTimes(2);
+    expect(downloadBlob).not.toHaveBeenCalled();
     finishBundle?.(new Blob(["bundle"], { type: "application/zip" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledOnce());
     expect(downloadBlob).toHaveBeenCalledWith(
