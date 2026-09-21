@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildStandaloneLessonHtml } from "@/features/builder/lesson-export";
 import {
   confidenceAverageColors,
-  createStaticExportDocument,
-  expandSlidesForStaticExport,
+  createAnswerKeyExportDocument,
+  createSavedStateExportDocument,
   isLessonDirty,
   sortSavedLessons,
   usableConfidenceSummary,
@@ -77,43 +77,95 @@ describe("saved lesson production parity", () => {
     });
   });
 
-  it("preserves saved reveal state and creates hidden/shown variants otherwise", () => {
+  it("preserves valid saved state and defaults missing or malformed state to question-first", () => {
     const document = fixtureDocument();
-    const variants = expandSlidesForStaticExport(document.slides);
-    expect(variants.map((variant) => variant.answerMode)).toEqual([
-      "saved",
-      "hidden",
-      "shown",
-    ]);
+    const saved = createSavedStateExportDocument(document);
 
-    const staticDocument = createStaticExportDocument(document);
-    expect(staticDocument.slides).toHaveLength(3);
-    expect(staticDocument.slides[0].presentationState).toEqual(
+    expect(saved.slides.map((slide) => slide.id)).toEqual(
+      document.slides.map((slide) => slide.id),
+    );
+    expect(saved.slides).toHaveLength(document.slides.length);
+    expect(saved.slides[0].presentationState).toEqual(
       document.slides[0].presentationState,
     );
-    expect(staticDocument.slides[1].presentationState).toMatchObject({
+    expect(saved.slides[1].presentationState).toMatchObject({
       reveals: {
         "example-answer-0": false,
         "example-answer-1": false,
-        "example-second-image": true,
+        "example-second-image": false,
       },
     });
-    expect(staticDocument.slides[2].presentationState).toMatchObject({
-      reveals: {
-        "example-answer-0": true,
-        "example-answer-1": true,
-        "example-second-image": true,
-      },
+    expect(saved.slides[2].presentationState).toMatchObject({
+      reveals: { "revision-answer-0": false },
     });
+    expect(saved.slides.every((slide) => slide.annotations?.length === 1)).toBe(
+      true,
+    );
   });
 
-  it("renders saved reveal state into standalone HTML", () => {
-    const html = buildStandaloneLessonHtml(fixtureDocument());
-    expect(html).toContain(
+  it("creates an all-answers key without mutating the source document", () => {
+    const document = fixtureDocument();
+    const before = structuredClone(document);
+    const answers = createAnswerKeyExportDocument(document);
+
+    expect(answers.slides).toHaveLength(document.slides.length);
+    expect(presentationReveals(answers.slides[0])["starter-answer-0"]).toBe(
+      true,
+    );
+    expect(presentationReveals(answers.slides[1])).toMatchObject({
+      "example-answer-0": true,
+      "example-answer-1": true,
+      "example-second-image": true,
+    });
+    expect(presentationReveals(answers.slides[2])["revision-answer-0"]).toBe(
+      true,
+    );
+    expect(answers.slides.every((slide) => !slide.annotations?.length)).toBe(
+      true,
+    );
+    expect(document).toEqual(before);
+  });
+
+  it("renders the saved and answer-key documents with their distinct PDF states", () => {
+    const document = fixtureDocument();
+    const savedHtml = buildStandaloneLessonHtml(
+      createSavedStateExportDocument(document),
+      { staticAnnotations: true },
+    );
+    const answerHtml = buildStandaloneLessonHtml(
+      createAnswerKeyExportDocument(document),
+      { staticAnnotations: true },
+    );
+
+    expect(savedHtml.match(/data-builder-slide-id=/g)).toHaveLength(
+      document.slides.length,
+    );
+    expect(
+      savedHtml.match(/<svg class="annotation-svg static-annotation-svg"/g),
+    ).toHaveLength(document.slides.length);
+    expect(savedHtml).toContain(
+      'data-example-reveal-region data-reveal-key="example-second-image" aria-hidden="true"',
+    );
+    expect(savedHtml).toContain(
+      'data-reveal-key="example-answer-0" aria-pressed="false"',
+    );
+    expect(answerHtml.match(/data-builder-slide-id=/g)).toHaveLength(
+      document.slides.length,
+    );
+    expect(answerHtml).toContain(
       'data-reveal-key="starter-answer-0" aria-pressed="true"',
     );
-    expect(html).toContain(
-      'data-example-reveal-region data-reveal-key="example-second-image"',
+    expect(answerHtml).toContain(
+      'data-reveal-key="example-answer-1" aria-pressed="true"',
+    );
+    expect(answerHtml).toContain(
+      'data-reveal-key="revision-answer-0" aria-pressed="true"',
+    );
+    expect(answerHtml).toContain(
+      'data-example-reveal-region data-reveal-key="example-second-image" aria-hidden="false"',
+    );
+    expect(answerHtml).not.toContain(
+      '<svg class="annotation-svg static-annotation-svg"',
     );
   });
 });
@@ -138,6 +190,7 @@ function fixtureDocument(): BuilderDocument {
       type: "starter",
       title: "Starter",
       slots: [{ lo: "LO", image, answerImage: answer }],
+      annotations: [annotation("starter")],
       presentationState: {
         version: 1,
         reveals: { "starter-answer-0": true },
@@ -152,9 +205,44 @@ function fixtureDocument(): BuilderDocument {
       answerImage1: answer,
       image2: image,
       answerImage2: answer,
+      annotations: [annotation("example")],
+    },
+    {
+      id: "revision",
+      type: "revision",
+      title: "Revision",
+      items: [{ lo: "LO", image, answerImage: answer }],
+      annotations: [annotation("revision")],
+      presentationState: { version: 1, reveals: [] },
+    },
+    {
+      id: "blank",
+      type: "blank",
+      title: "Blank",
+      annotations: [annotation("blank")],
     },
   ] as BuilderSlide[];
   return document;
+}
+
+function annotation(id: string) {
+  return {
+    id: `annotation-${id}`,
+    mode: "pen" as const,
+    color: "#dc2626",
+    width: 6,
+    points: [
+      { x: 10, y: 20 },
+      { x: 30, y: 40 },
+    ],
+  };
+}
+
+function presentationReveals(slide: BuilderSlide): Record<string, boolean> {
+  const state = slide.presentationState as
+    | { reveals?: Record<string, boolean> }
+    | undefined;
+  return state?.reveals ?? {};
 }
 
 function lessonSummary(
