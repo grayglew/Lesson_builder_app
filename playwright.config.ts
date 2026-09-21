@@ -27,6 +27,11 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "firefox-image-paste",
+      testMatch: /builder-image-paste\.spec\.ts/,
+      use: { ...devices["Desktop Firefox"] },
+    },
   ],
   webServer: externalBaseUrl
     ? undefined

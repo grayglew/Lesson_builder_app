@@ -233,6 +233,59 @@ test.describe("flexible A4 handout print layout", () => {
     });
     await expectNoPageOverflow(handout);
   });
+
+  test("contains a direct landscape PDF page with and without glue margins", async ({
+    page,
+  }) => {
+    const slides = [
+      starterSlide(),
+      exampleSlide("example-one"),
+      exampleSlide("example-two"),
+      retrievalSlide(),
+      directLandscapePdfSlide(),
+    ];
+    await stubHandoutBuilder(
+      page,
+      slides,
+      slides.map((slide) => slide.id),
+    );
+    await page.goto("/builder?visual=1");
+
+    const openHandout = async () => {
+      const popupPromise = page.waitForEvent("popup");
+      await page
+        .getByRole("button", { name: "Open handout from 5 selected slides" })
+        .click();
+      return popupPromise;
+    };
+
+    const withoutGlue = await openHandout();
+    await withoutGlue
+      .getByRole("dialog", {
+        name: "Add glue margins for additional sheets?",
+      })
+      .getByRole("button", { name: "No margins", exact: true })
+      .click();
+    await expect(
+      withoutGlue.locator(".handout-pdf-page-image.is-rotated-landscape"),
+    ).toHaveCount(1);
+    await expectContained(withoutGlue);
+    await withoutGlue.close();
+
+    const withGlue = await openHandout();
+    await withGlue
+      .getByRole("dialog", {
+        name: "Add glue margins for additional sheets?",
+      })
+      .getByRole("button", { name: "Add glue margins", exact: true })
+      .click();
+    await expect(
+      withGlue.locator(".handout-pdf-page-image.is-rotated-landscape"),
+    ).toHaveCount(1);
+    await expectContained(withGlue);
+    await expectNoPageOverflow(withGlue);
+    await withGlue.close();
+  });
 });
 
 async function stubHandoutBuilder(
@@ -346,6 +399,16 @@ async function landscapeWorksheetSlide() {
   };
 }
 
+function directLandscapePdfSlide() {
+  return {
+    id: "direct-landscape-pdf",
+    type: "pdf-page",
+    title: "Direct landscape PDF",
+    orientation: "landscape",
+    image: image("direct-landscape-pdf"),
+  };
+}
+
 function image(label: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="120"><rect width="320" height="120" fill="white"/><text x="16" y="64" font-size="18">${label}</text></svg>`;
   return {
@@ -369,6 +432,22 @@ async function expectNoPageOverflow(page: Page) {
     expect(metric.scrollWidth).toBeLessThanOrEqual(metric.width);
     expect(metric.scrollHeight).toBeLessThanOrEqual(metric.height);
   }
+}
+
+async function expectContained(page: Page) {
+  const image = page.locator(".handout-pdf-page-image.is-rotated-landscape").first();
+  const imageBox = await image.boundingBox();
+  const pageBox = await page.locator(".handout-page").last().boundingBox();
+  expect(imageBox).not.toBeNull();
+  expect(pageBox).not.toBeNull();
+  expect(imageBox!.x).toBeGreaterThanOrEqual(pageBox!.x - 1);
+  expect(imageBox!.y).toBeGreaterThanOrEqual(pageBox!.y - 1);
+  expect(imageBox!.x + imageBox!.width).toBeLessThanOrEqual(
+    pageBox!.x + pageBox!.width + 1,
+  );
+  expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(
+    pageBox!.y + pageBox!.height + 1,
+  );
 }
 
 function json(route: Route, body: unknown) {
