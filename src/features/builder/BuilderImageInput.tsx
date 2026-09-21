@@ -1,12 +1,15 @@
 "use client";
 
 import { ImagePlus, Pencil, Trash2 } from "lucide-react";
-import { type ClipboardEvent, useRef, useState } from "react";
+import { type ClipboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import localStyles from "./BuilderImageInput.module.css";
 import styles from "./BuilderShell.module.css";
+import { firstClipboardImage } from "./clipboard-image";
 import { ImageDrawingEditor } from "./ImageDrawingEditor";
 import type { BuilderAsset } from "./schema";
 import { fileToBuilderAsset } from "./starter";
+
+let activePasteTarget: symbol | null = null;
 
 type BuilderImageInputProps = {
   asset: BuilderAsset | null | undefined;
@@ -25,8 +28,11 @@ export function BuilderImageInput({
 }: BuilderImageInputProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropButtonRef = useRef<HTMLButtonElement>(null);
+  const hoveredRef = useRef(false);
+  const pasteTargetRef = useRef(Symbol(label));
 
-  async function acceptFile(file: File | null | undefined) {
+  const acceptFile = useCallback(async (file: File | null | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       onError(`${label} must be an image file.`);
@@ -37,12 +43,46 @@ export function BuilderImageInput({
     } catch {
       onError(`Could not read the ${label.toLowerCase()}.`);
     }
+  }, [label, onChange, onError]);
+
+  function claimPasteTarget() {
+    activePasteTarget = pasteTargetRef.current;
   }
 
+  function releasePasteTargetIfInactive() {
+    const focused = document.activeElement === dropButtonRef.current;
+    if (
+      !focused &&
+      !hoveredRef.current &&
+      activePasteTarget === pasteTargetRef.current
+    ) {
+      activePasteTarget = null;
+    }
+  }
+
+  useEffect(() => {
+    const pasteTarget = pasteTargetRef.current;
+
+    function pasteIntoActiveInput(event: globalThis.ClipboardEvent) {
+      if (event.defaultPrevented) return;
+      if (activePasteTarget !== pasteTarget) return;
+      const file = firstClipboardImage(event.clipboardData);
+      if (!file) return;
+      event.preventDefault();
+      void acceptFile(file);
+    }
+
+    document.addEventListener("paste", pasteIntoActiveInput);
+    return () => {
+      document.removeEventListener("paste", pasteIntoActiveInput);
+      if (activePasteTarget === pasteTarget) {
+        activePasteTarget = null;
+      }
+    };
+  }, [acceptFile]);
+
   function pastedImage(event: ClipboardEvent<HTMLButtonElement>) {
-    const file = Array.from(event.clipboardData.items)
-      .find((item) => item.type.startsWith("image/"))
-      ?.getAsFile();
+    const file = firstClipboardImage(event.clipboardData);
     if (!file) return;
     event.preventDefault();
     void acceptFile(file);
@@ -59,13 +99,22 @@ export function BuilderImageInput({
     <div className={styles.assetEditor}>
       <span className={styles.assetLabel}>{label}</span>
       <button
+        ref={dropButtonRef}
         className={`${styles.imageDrop} ${sizeClass}`}
         type="button"
         aria-label={`Choose or paste ${label}`}
         onClick={() => inputRef.current?.click()}
-        onMouseEnter={(event) => {
+        onFocus={claimPasteTarget}
+        onPointerEnter={(event) => {
+          hoveredRef.current = true;
+          claimPasteTarget();
           event.currentTarget.focus({ preventScroll: true });
         }}
+        onPointerLeave={() => {
+          hoveredRef.current = false;
+          releasePasteTargetIfInactive();
+        }}
+        onBlur={releasePasteTargetIfInactive}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
