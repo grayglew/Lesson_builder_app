@@ -75,11 +75,18 @@ export function BuilderImageInput({
     document.addEventListener("paste", pasteIntoActiveInput);
     return () => {
       document.removeEventListener("paste", pasteIntoActiveInput);
+    };
+  }, [acceptFile]);
+
+  useEffect(() => {
+    const pasteTarget = pasteTargetRef.current;
+
+    return () => {
       if (activePasteTarget === pasteTarget) {
         activePasteTarget = null;
       }
     };
-  }, [acceptFile]);
+  }, []);
 
   function pastedImage(event: ClipboardEvent<HTMLButtonElement>) {
     const file = firstClipboardImage(event.clipboardData);

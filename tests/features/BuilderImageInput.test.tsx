@@ -157,6 +157,41 @@ describe("BuilderImageInput", () => {
     expect(secondChange).toHaveBeenCalledOnce();
   });
 
+  it("keeps a focused image box active when callback props change", async () => {
+    const firstChange = vi.fn();
+    const secondChange = vi.fn();
+    const { rerender } = render(
+      <BuilderImageInput
+        asset={null}
+        label="Question image"
+        onChange={firstChange}
+        onError={vi.fn()}
+      />,
+    );
+    const target = screen.getByRole("button", {
+      name: "Choose or paste Question image",
+    });
+    const image = new File(["question"], "question.png", {
+      type: "image/png",
+    });
+
+    target.focus();
+    rerender(
+      <BuilderImageInput
+        asset={null}
+        label="Question image"
+        onChange={secondChange}
+        onError={vi.fn()}
+      />,
+    );
+    expect(document.activeElement).toBe(target);
+
+    document.dispatchEvent(clipboardEventWithFiles(image));
+
+    await waitFor(() => expect(secondChange).toHaveBeenCalledOnce());
+    expect(firstChange).not.toHaveBeenCalled();
+  });
+
   it("handles a local Chromium-style items paste exactly once", async () => {
     const onChange = vi.fn();
     render(
