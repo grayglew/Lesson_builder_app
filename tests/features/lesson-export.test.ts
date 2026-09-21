@@ -88,6 +88,94 @@ describe("standalone lesson export", () => {
     dom.window.close();
   });
 
+  it("reserves hidden answer space for Example images without an empty toggle", () => {
+    const document = lessonDocument();
+    document.slides = [
+      {
+        id: "example-layout",
+        type: "example",
+        title: "Example layout",
+        lo: "101a: Expand brackets",
+        image1: testImage("question-1.png", "cXVlc3Rpb24tMQ=="),
+        answerImage1: testImage("answer-1.png", "YW5zd2VyLTE="),
+        image2: testImage("question-2.png", "cXVlc3Rpb24tMg=="),
+        answerImage2: null,
+      },
+    ];
+
+    const dom = new JSDOM(buildStandaloneLessonHtml(document));
+    const answered = dom.window.document.querySelector<HTMLElement>(
+      '[data-reveal-key="example-answer-0"]',
+    );
+    const unanswered = dom.window.document.querySelectorAll(".example-block")[1];
+    if (!answered || !unanswered) {
+      throw new Error("Expected Example image blocks.");
+    }
+    const unansweredLayout = unanswered.querySelector<HTMLElement>(
+      ".qa-static-append",
+    );
+    if (!unansweredLayout) {
+      throw new Error("Expected a non-interactive unanswered Example layout.");
+    }
+    const questionLayer = answered.querySelector<HTMLElement>(
+      ".qa-question-layer",
+    );
+    const answerLayer = answered.querySelector<HTMLElement>(".qa-answer-layer");
+    const unansweredQuestionLayer = unansweredLayout.querySelector<HTMLElement>(
+      ".qa-question-layer",
+    );
+    const unansweredAnswerLayer = unansweredLayout.querySelector<HTMLElement>(
+      ".qa-answer-layer",
+    );
+    if (
+      !questionLayer ||
+      !answerLayer ||
+      !unansweredQuestionLayer ||
+      !unansweredAnswerLayer
+    ) {
+      throw new Error("Expected image layers.");
+    }
+
+    expect(dom.window.getComputedStyle(answered).display).toBe("grid");
+    expect(dom.window.getComputedStyle(answered).gridTemplateRows).toContain(
+      "1fr",
+    );
+    expect(dom.window.getComputedStyle(questionLayer).position).toBe(
+      "relative",
+    );
+    expect(dom.window.getComputedStyle(answerLayer).visibility).toBe("hidden");
+    expect(dom.window.getComputedStyle(questionLayer).minWidth).toBe("0");
+    expect(dom.window.getComputedStyle(questionLayer).minHeight).toBe("0");
+    expect(dom.window.getComputedStyle(questionLayer).overflow).toBe("hidden");
+    expect(dom.window.getComputedStyle(answerLayer).minWidth).toBe("0");
+    expect(dom.window.getComputedStyle(answerLayer).minHeight).toBe("0");
+    expect(dom.window.getComputedStyle(answerLayer).overflow).toBe("hidden");
+    expect(
+      dom.window.getComputedStyle(answerLayer.querySelector("img")!)
+        .objectPosition,
+    ).toBe("top center");
+    expect(dom.window.getComputedStyle(unansweredLayout).display).toBe("grid");
+    expect(
+      dom.window.getComputedStyle(unansweredLayout).gridTemplateRows,
+    ).toContain("1fr");
+    expect(dom.window.getComputedStyle(unansweredQuestionLayer).position).toBe(
+      "relative",
+    );
+    expect(dom.window.getComputedStyle(unansweredQuestionLayer).gridRow).toBe(
+      "1",
+    );
+    expect(dom.window.getComputedStyle(unansweredAnswerLayer).gridRow).toBe(
+      "2",
+    );
+    expect(dom.window.getComputedStyle(unansweredAnswerLayer).visibility).toBe(
+      "hidden",
+    );
+    expect(unanswered.querySelector("[data-qa-toggle]")).toBeNull();
+    expect(unanswered.querySelector("button")).toBeNull();
+    expect(unanswered.querySelector("img")).not.toBeNull();
+    dom.window.close();
+  });
+
   it("keeps the production scroll presenter toolbar and printable slides", () => {
     const html = buildStandaloneLessonHtml(lessonDocument());
 

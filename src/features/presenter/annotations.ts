@@ -7,6 +7,23 @@ import type {
 
 const DEFAULT_COLOR = "#2563eb";
 
+export function presenterStrokeWidth(
+  size: number,
+  layoutWidth: number,
+  viewBoxWidth: number,
+  mode: PresenterStrokeMode,
+): number {
+  const safeSize = Number.isFinite(size) ? Math.max(0.5, size) : 2;
+  const safeViewBoxWidth =
+    Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : 1600;
+  const safeLayoutWidth =
+    Number.isFinite(layoutWidth) && layoutWidth > 0
+      ? layoutWidth
+      : safeViewBoxWidth;
+  const penWidth = Math.max(0.5, (safeSize / safeLayoutWidth) * safeViewBoxWidth);
+  return mode === "highlighter" ? Math.max(18, penWidth * 4) : penWidth;
+}
+
 function finiteNumber(value: unknown, fallback: number): number {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;

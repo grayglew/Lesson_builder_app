@@ -3,6 +3,7 @@ import {
   normalizePresenterAnnotations,
   presenterPathFromPoints,
   presenterStrokeIntersectsPoint,
+  presenterStrokeWidth,
 } from "./annotations";
 import {
   PRESENTER_RUNTIME_VERSION,
@@ -322,14 +323,9 @@ export function mountPresenterRuntime(
   }
 
   function strokeWidth(overlay: SVGSVGElement, strokeMode: PresenterStrokeMode): number {
-    const rect = overlay.getBoundingClientRect();
-    const baseWidth = Math.max(
-      0.5,
-      (size / Math.max(1, rect.width)) * viewBox.width,
-    );
-    return strokeMode === "highlighter"
-      ? Math.max(18, baseWidth * 4)
-      : baseWidth;
+    const layoutWidth =
+      overlay.clientWidth || overlay.parentElement?.clientWidth || viewBox.width;
+    return presenterStrokeWidth(size, layoutWidth, viewBox.width, strokeMode);
   }
 
   function pointerMode(event: PointerEvent): PresenterStrokeMode | "eraser" | null {

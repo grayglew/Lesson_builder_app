@@ -567,6 +567,52 @@ describe("production A4 handout export", () => {
     ]);
   });
 
+  it("uses explicit PDF orientation before legacy dimensions and aspect", async () => {
+    const cases = [
+      {
+        id: "explicit-landscape",
+        orientation: "landscape",
+        width: 800,
+        height: 1200,
+        aspect: 0.67,
+        rotated: true,
+      },
+      {
+        id: "explicit-portrait",
+        orientation: "portrait",
+        width: 1600,
+        height: 900,
+        aspect: 1.78,
+        rotated: false,
+      },
+      {
+        id: "legacy-dimensions",
+        width: "1600",
+        height: "900",
+        rotated: true,
+      },
+      { id: "legacy-aspect", aspect: "1.6", rotated: true },
+    ] as const;
+
+    for (const item of cases) {
+      const { id: caseId, rotated: expectedRotation, ...slideData } = item;
+      const document = handoutDocument();
+      document.slides = [
+        {
+          id: caseId,
+          type: "pdf-page",
+          title: caseId,
+          image: asset(`${caseId}.png`),
+          ...slideData,
+        },
+      ];
+      const { html } = await buildA4Handout(document);
+      const imageTag =
+        html.match(/<img[^>]+handout-pdf-page-image[^>]*>/)?.[0] || "";
+      expect(imageTag.includes("is-rotated-landscape")).toBe(expectedRotation);
+    }
+  });
+
   it("warns and skips a worksheet attachment that is not a PDF", async () => {
     const document = handoutDocument();
     document.slides.push({
