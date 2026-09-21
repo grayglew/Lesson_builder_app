@@ -249,10 +249,11 @@ export default function StudentViewer({ initialCode = "" }: { initialCode?: stri
 
         {snapshotHtml ? (
           <iframe
+            key={`${activeCode}:${version}`}
             className="min-h-[72vh] flex-1 rounded-lg border border-slate-300 bg-white shadow-sm"
             title={snapshotTitle || "Shared lesson"}
             srcDoc={snapshotHtml}
-            sandbox=""
+            sandbox="allow-scripts"
             referrerPolicy="no-referrer"
           />
         ) : (

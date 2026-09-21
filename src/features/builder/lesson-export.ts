@@ -7,6 +7,7 @@ import { inlineMarkdownToHtml } from "./markdown";
 import { normalizeBuilderDocument } from "./schema";
 import { renderStaticAnnotationSvg } from "./static-annotations";
 import { extractRetrievalLoCode } from "./example";
+import { studentSnapshotRuntimeSource } from "./student-snapshot-runtime";
 
 export type StandaloneLessonOptions = {
   runtimeCss?: string;
@@ -509,6 +510,7 @@ body.focus-mode .lesson-header,body.fullscreen-mode .lesson-header{display:none}
 function standaloneInteractionScript() {
   return String.raw`
 (() => {
+  ${studentSnapshotRuntimeSource()}
   let slides = [];
   let zoomScale = 1;
   let activePinchZoom = null;
@@ -1544,77 +1546,6 @@ function standaloneInteractionScript() {
         presenterConfig.studentSessionUploadEndpoint &&
         presenterConfig.studentSessionCompleteEndpoint,
     );
-  }
-
-  function buildStudentSnapshotHtml() {
-    const snapshot = document.implementation.createHTMLDocument(
-      document.title || "Lesson",
-    );
-    const viewport = snapshot.createElement("meta");
-    viewport.setAttribute("name", "viewport");
-    viewport.setAttribute("content", "width=device-width, initial-scale=1");
-    snapshot.head.appendChild(viewport);
-    const contentSecurityPolicy = snapshot.createElement("meta");
-    contentSecurityPolicy.setAttribute("http-equiv", "Content-Security-Policy");
-    contentSecurityPolicy.setAttribute(
-      "content",
-      "default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline'; font-src data:; media-src data: blob: https:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
-    );
-    snapshot.head.appendChild(contentSecurityPolicy);
-    document.querySelectorAll("style").forEach((sourceStyle) => {
-      const style = snapshot.createElement("style");
-      style.textContent = sourceStyle.textContent || "";
-      snapshot.head.appendChild(style);
-    });
-    const studentStyle = snapshot.createElement("style");
-    studentStyle.textContent =
-      "html,body{margin:0;padding:0;min-height:100%;background:#eef5f3;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;touch-action:pan-y pinch-zoom;overscroll-behavior-y:auto;-webkit-overflow-scrolling:touch}" +
-      "body.student-shared-view .lesson-header{position:static;display:flex;justify-content:space-between;gap:18px;max-width:1120px;margin:12px auto 0;padding:10px 14px;box-sizing:border-box;background:#fff;border:1px solid #cad7d7;border-radius:8px;box-shadow:0 4px 14px rgba(19,37,42,.08)}" +
-      "body.student-shared-view .lesson-deck{display:grid;gap:16px;place-items:center;margin:0;padding:16px;box-sizing:border-box;touch-action:pan-y pinch-zoom}" +
-      "body.student-shared-view .lesson-slide{display:block;width:min(1120px,calc(100vw - 32px));height:auto;max-height:none;aspect-ratio:var(--slide-aspect,1.6);margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);zoom:1!important}" +
-      "body.student-shared-view .lesson-slide,body.student-shared-view .lesson-slide *{touch-action:pan-y pinch-zoom!important}" +
-      "body.student-shared-view .annotation-svg{pointer-events:none!important}" +
-      "@media(max-width:760px){body.student-shared-view .lesson-header{margin:8px 8px 0}body.student-shared-view .lesson-deck{padding:8px}body.student-shared-view .lesson-slide{width:calc(100vw - 16px)}}";
-    snapshot.head.appendChild(studentStyle);
-
-    const header = document.querySelector(".lesson-header");
-    const lessonDeck = document.querySelector(".lesson-deck");
-    if (header) snapshot.body.appendChild(header.cloneNode(true));
-    if (lessonDeck) snapshot.body.appendChild(lessonDeck.cloneNode(true));
-
-    snapshot.querySelectorAll("[data-qa-toggle]").forEach((toggle) => {
-      const showingAnswer = toggle.classList.contains("is-showing-answer");
-      const visibleLayer = toggle.querySelector(
-        showingAnswer ? ".qa-answer-layer" : ".qa-question-layer",
-      );
-      if (visibleLayer) {
-        toggle.replaceWith(...Array.from(visibleLayer.childNodes));
-      }
-    });
-    snapshot
-      .querySelectorAll(
-        ".presenter-tools,script,input,.live-retrieval-controls,[data-ignore-annotation],button,iframe,object,embed,form,base,link,meta[http-equiv='refresh']",
-      )
-      .forEach((node) => node.remove());
-    snapshot.querySelectorAll("*").forEach((node) => {
-      Array.from(node.attributes).forEach((attribute) => {
-        if (attribute.name.toLowerCase().startsWith("on")) {
-          node.removeAttribute(attribute.name);
-        }
-      });
-    });
-    snapshot
-      .querySelectorAll("[data-bound],[data-pointer-input-bound],[contenteditable]")
-      .forEach((node) => {
-        node.removeAttribute("data-bound");
-        node.removeAttribute("data-pointer-input-bound");
-        node.removeAttribute("contenteditable");
-      });
-    snapshot
-      .querySelectorAll(".annotation-svg")
-      .forEach((svg) => svg.setAttribute("pointer-events", "none"));
-    snapshot.body.className = "student-shared-view";
-    return "<!doctype html>\n" + snapshot.documentElement.outerHTML;
   }
 
   function studentSnapshotDocument() {

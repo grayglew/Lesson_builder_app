@@ -52,7 +52,7 @@ describe("StudentViewer", () => {
 
     expect(await screen.findByTitle("Shared algebra")).toHaveAttribute(
       "sandbox",
-      "",
+      "allow-scripts",
     );
     expect(screen.getByTitle("Shared algebra").getAttribute("srcdoc")).toContain(
       '.lesson-deck,.lesson-slide,.lesson-slide *{touch-action:pan-y pinch-zoom!important}',
@@ -80,7 +80,7 @@ describe("StudentViewer", () => {
           version: 1,
         }),
       )
-      .mockResolvedValueOnce(jsonResponse(snapshot("Version one")))
+      .mockResolvedValueOnce(jsonResponse(snapshot("Shared algebra")))
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
@@ -88,15 +88,18 @@ describe("StudentViewer", () => {
           version: 2,
         }),
       )
-      .mockResolvedValueOnce(jsonResponse(snapshot("Version two")));
+      .mockResolvedValueOnce(jsonResponse(snapshot("Shared algebra")));
 
     render(<StudentViewer initialCode="ABC-123" />);
-    expect(await screen.findByTitle("Version one")).toBeInTheDocument();
+    const firstFrame = await screen.findByTitle("Shared algebra");
 
     await waitFor(
-      () => expect(screen.getByTitle("Version two")).toBeInTheDocument(),
+      () => expect(screen.getByText(/version 2/)).toBeInTheDocument(),
       { timeout: 7_000 },
     );
+    const secondFrame = screen.getByTitle("Shared algebra");
+    expect(secondFrame).not.toBe(firstFrame);
+    expect(secondFrame).toHaveAttribute("sandbox", "allow-scripts");
     expect(
       screen.getByText("Lesson updated automatically."),
     ).toBeInTheDocument();
