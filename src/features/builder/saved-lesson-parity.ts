@@ -118,11 +118,11 @@ export function createAnswerKeyExportDocument(
 function hasPresentationState(slide: BuilderSlide) {
   const state = asRecord(slide.presentationState);
   const reveals = asRecord(state.reveals);
-  const expectedReveals = revealStateForSlide(slide, false);
+  const capturedRevealKeys = capturedRevealKeysForSlide(slide);
   return (
-    Number(state.version) === 1 &&
+    state.version === 1 &&
     isRecord(state.reveals) &&
-    Object.keys(expectedReveals).every(
+    capturedRevealKeys.every(
       (key) => typeof reveals[key] === "boolean",
     )
   );
@@ -158,7 +158,7 @@ function revealStateForSlide(
 ): Record<string, boolean> {
   const data = asRecord(slide);
   if (slide.type === "starter") {
-    const slots = Array.isArray(data.slots) ? data.slots : [];
+    const slots = arrayOfRecords(data.slots).slice(0, 4);
     return Object.fromEntries(
       slots.map((_, index) => [`starter-answer-${index}`, showAnswers]),
     );
@@ -171,12 +171,52 @@ function revealStateForSlide(
     };
   }
   if (slide.type === "revision") {
-    const items = Array.isArray(data.items) ? data.items : [];
+    const items = arrayOfRecords(data.items).slice(0, 2);
     return Object.fromEntries(
       items.map((_, index) => [`revision-answer-${index}`, showAnswers]),
     );
   }
   return {};
+}
+
+function capturedRevealKeysForSlide(slide: BuilderSlide): string[] {
+  const data = asRecord(slide);
+  if (slide.type === "starter") {
+    return arrayOfRecords(data.slots)
+      .slice(0, 4)
+      .flatMap((slot, index) =>
+        hasAssetSource(slot.answerImage) ? [`starter-answer-${index}`] : [],
+      );
+  }
+  if (slide.type === "example") {
+    const pairs = [
+      [data.image1, data.answerImage1],
+      [data.image2, data.answerImage2],
+    ].filter(([question]) => hasAssetSource(question));
+    return [
+      ...pairs.flatMap(([, answer], index) =>
+        hasAssetSource(answer) ? [`example-answer-${index}`] : [],
+      ),
+      ...(pairs.length > 1 ? ["example-second-image"] : []),
+    ];
+  }
+  if (slide.type === "revision") {
+    return arrayOfRecords(data.items)
+      .slice(0, 2)
+      .flatMap((item, index) =>
+        hasAssetSource(item.answerImage) ? [`revision-answer-${index}`] : [],
+      );
+  }
+  return [];
+}
+
+function arrayOfRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+function hasAssetSource(value: unknown) {
+  const asset = asRecord(value);
+  return Boolean(asset.dataUrl || asset.url || asset.path);
 }
 
 function validTeachingDate(value: string) {

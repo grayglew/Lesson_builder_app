@@ -126,6 +126,116 @@ describe("saved lesson production parity", () => {
     expect(document).toEqual(before);
   });
 
+  it("preserves saved reveal maps that contain only rendered controls", () => {
+    const document = fixtureDocument();
+    const starter = document.slides[0];
+    const example = document.slides[1];
+    const revision = document.slides[2];
+    if (
+      starter.type !== "starter" ||
+      example.type !== "example" ||
+      revision.type !== "revision"
+    ) {
+      throw new Error("Expected the reveal fixture slides.");
+    }
+
+    starter.slots.push({
+      lo: "No answer",
+      image: starter.slots[0]?.image,
+      answerImage: null,
+    });
+    starter.presentationState = {
+      version: 1,
+      reveals: { "starter-answer-0": true },
+    };
+    example.image2 = null;
+    example.answerImage2 = null;
+    example.presentationState = {
+      version: 1,
+      reveals: { "example-answer-0": true },
+    };
+    revision.items.push({
+      lo: "No answer",
+      image: revision.items[0]?.image,
+      answerImage: null,
+    });
+    revision.presentationState = {
+      version: 1,
+      reveals: { "revision-answer-0": true },
+    };
+
+    const saved = createSavedStateExportDocument(document);
+
+    expect(saved.slides[0].presentationState).toEqual(
+      starter.presentationState,
+    );
+    expect(saved.slides[1].presentationState).toEqual(
+      example.presentationState,
+    );
+    expect(saved.slides[2].presentationState).toEqual(
+      revision.presentationState,
+    );
+  });
+
+  it("resets a partial reveal map when a rendered control is missing", () => {
+    const document = fixtureDocument();
+    const example = document.slides[1];
+    if (example.type !== "example") throw new Error("Expected Example slide.");
+    example.presentationState = {
+      version: 1,
+      reveals: { "example-answer-0": true },
+    };
+
+    const saved = createSavedStateExportDocument(document);
+
+    expect(saved.slides[1].presentationState).toEqual({
+      version: 1,
+      reveals: {
+        "example-answer-0": false,
+        "example-answer-1": false,
+        "example-second-image": false,
+      },
+    });
+  });
+
+  it.each([
+    ["boolean true", true],
+    ["array [1]", [1]],
+  ])(
+    "resets a %s presentation-state version to question-first",
+    (_label, version) => {
+      const document = fixtureDocument();
+      const example = document.slides[1];
+      if (example.type !== "example") throw new Error("Expected Example slide.");
+      example.presentationState = {
+        version,
+        reveals: {
+          "example-answer-0": true,
+          "example-answer-1": true,
+          "example-second-image": true,
+        },
+      };
+
+      const saved = createSavedStateExportDocument(document);
+      const html = buildStandaloneLessonHtml(saved);
+
+      expect(saved.slides[1].presentationState).toEqual({
+        version: 1,
+        reveals: {
+          "example-answer-0": false,
+          "example-answer-1": false,
+          "example-second-image": false,
+        },
+      });
+      expect(html).toContain(
+        'data-example-reveal-region data-reveal-key="example-second-image" aria-hidden="true"',
+      );
+      expect(html).toContain(
+        'data-reveal-key="example-answer-0" aria-pressed="false"',
+      );
+    },
+  );
+
   it("renders the saved and answer-key documents with their distinct PDF states", () => {
     const document = fixtureDocument();
     const savedHtml = buildStandaloneLessonHtml(
