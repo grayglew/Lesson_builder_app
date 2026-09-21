@@ -16,15 +16,28 @@ test("pastes a clipboard image into only the focused image box", async ({ page }
   await target.evaluate((element) => {
     const transfer = new DataTransfer();
     transfer.items.add(
-      new File([new Uint8Array([137, 80, 78, 71])], "firefox.png", {
-        type: "image/png",
-      }),
+      new File(
+        [
+          Uint8Array.from(
+            atob(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0mQAAAAASUVORK5CYII=",
+            ),
+            (character) => character.charCodeAt(0),
+          ),
+        ],
+        "firefox.png",
+        { type: "image/png" },
+      ),
     );
     const event = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(event, "clipboardData", { value: transfer });
     element.dispatchEvent(event);
   });
 
-  await expect(target.locator('img[alt$="preview"]')).toBeVisible();
+  const preview = target.locator('img[alt$="preview"]');
+  await expect(preview).toBeVisible();
+  await expect
+    .poll(() => preview.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
   await expect(other.locator('img[alt$="preview"]')).toHaveCount(0);
 });
