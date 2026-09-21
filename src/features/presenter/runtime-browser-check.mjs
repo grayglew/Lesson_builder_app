@@ -327,6 +327,37 @@ try {
     clearResult.remainingStrokes === 0,
     "Accepted asynchronous confirmation must clear annotations.",
   );
+  const zoomResult = await page.evaluate(() => {
+    const controller = window.__lessonPresenterRuntimeController;
+    const slide = document.querySelector(".lesson-slide");
+    const overlay = slide.querySelector(".annotation-svg");
+    Object.defineProperty(overlay, "clientWidth", { configurable: true, value: 500 });
+    const draw = (mode, zoom) => {
+      slide.style.zoom = String(zoom);
+      controller.setMode(mode);
+      const rect = overlay.getBoundingClientRect();
+      for (const type of ["pointerdown", "pointerup"]) {
+        (type === "pointerdown" ? slide : document).dispatchEvent(new PointerEvent(type, {
+          bubbles: true, pointerId: 20, pointerType: "mouse", button: 0,
+          clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
+        }));
+      }
+      return Object.values(controller.getAnnotations()).flat().at(-1)?.width;
+    };
+    const penWidths = [draw("pen", 1), draw("pen", 1.6)];
+    const highlighterWidths = [draw("highlighter", 1), draw("highlighter", 1.6)];
+    draw("eraser", 1.6);
+    const remainingAfterErase = Object.values(controller.getAnnotations()).flat().length;
+    Object.defineProperty(overlay, "clientWidth", { value: 0 });
+    Object.defineProperty(slide, "clientWidth", { value: 0 });
+    const zeroWidthFallback = draw("pen", 1.6);
+    return { penWidths, highlighterWidths, remainingAfterErase, zeroWidthFallback };
+  });
+  assert(zoomResult.penWidths.every((width) => width === 6.4), "Pen logical width must remain 6.4 at fit and 1.6 zoom.");
+  assert(zoomResult.highlighterWidths.every((width) => width === 25.6), "Highlighter logical width must remain 25.6 at fit and 1.6 zoom.");
+  assert(zoomResult.remainingAfterErase === 0, "Eraser must remove overlapping strokes at zoom.");
+  assert(zoomResult.zeroWidthFallback === 2, "A zero-width overlay must use a sane one-to-one width fallback.");
+  console.log("Zoom width evidence:", JSON.stringify(zoomResult));
   console.log("Extracted presenter runtime browser checks passed.");
 } finally {
   await browser.close();
