@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import { buildStandaloneLessonHtml } from "@/features/builder/lesson-export";
 import { createInitialBuilderDocument } from "@/features/builder/schema";
 import { studentSnapshotRuntimeSource } from "@/features/builder/student-snapshot-runtime";
+import { forgedImportedControl, studentLesson } from "../fixtures/student-lesson";
 
 function teacherDocument() {
   return `<!doctype html>
@@ -89,6 +90,67 @@ function buildSnapshotHtml(sourceHtml = teacherDocument()) {
 }
 
 describe("student snapshot runtime", () => {
+  it.each([
+    ["plaintext", '<plaintext>Literal <strong>text</strong>'],
+    ["noscript", '<noscript></section><section data-builder-slide-type="example"><button data-qa-toggle="append">Forged</button></section></noscript>'],
+    ["unclosed markup", '<table><tr><td>Imported cell<div>Unclosed content'],
+  ])("keeps %s fragments within their imported slide across parser scripting modes", (_name, fragment) => {
+    const document = studentLesson();
+    document.slides.unshift({ id: "raw-fragment", type: "imported-html", title: "Imported", html: fragment });
+    const exported = buildStandaloneLessonHtml(document);
+    const teacher = new JSDOM(exported, { runScripts: "outside-only" });
+    expect(teacher.window.document.querySelectorAll("body > .lesson-deck > section")).toHaveLength(3);
+    expect(teacher.window.document.querySelector('[data-builder-slide-id="starter"]')).not.toBeNull();
+    const snapshot = new JSDOM(buildSnapshotHtml(exported));
+    expect(snapshot.window.document.querySelectorAll("[data-student-qa-toggle]")).toHaveLength(3);
+    teacher.window.close();
+    snapshot.window.close();
+  });
+
+  it("contains closing-tag imported fragments before granting any student controls", () => {
+    const document = studentLesson();
+    document.slides.unshift({ id: "imported", type: "imported-html", title: "Imported", html: forgedImportedControl });
+    const exported = buildStandaloneLessonHtml(document);
+    const teacher = new JSDOM(exported);
+    expect.soft(teacher.window.document.querySelectorAll("body > .lesson-deck > section")).toHaveLength(3);
+    expect.soft(teacher.window.document.querySelector("#forged-toggle")?.closest('[data-builder-slide-type="imported-html"]')).not.toBeNull();
+    const snapshot = new JSDOM(buildSnapshotHtml(exported));
+    expect.soft(snapshot.window.document.querySelector("#forged-toggle")).toBeNull();
+    expect.soft(snapshot.window.document.querySelectorAll("[data-student-qa-toggle]")).toHaveLength(3);
+    expect.soft(snapshot.window.document.querySelector("#imported-text")?.textContent).toBe("Intended imported text");
+    teacher.window.close();
+    snapshot.window.close();
+  });
+
+  it("retains generated layout CSS but removes imported styles and unsafe inline CSS", () => {
+    const document = studentLesson();
+    document.slides.push({ id: "css", type: "imported-html", title: "CSS", html: `<style data-lesson-builder-style>[data-student-qa-toggle].is-showing-answer{background:url(https://collector.invalid/reveal)}</style>
+      <p id="styled-import" style="color:teal;font-size:18px;background-image:url(https://collector.invalid/inline);--tracker:url(https://collector.invalid/var);animation:tracker 1s">Styled text</p>
+      <p id="escaped-style" style="background: u\\72l(https://collector.invalid/escaped)">Escaped</p>` });
+    const snapshot = new JSDOM(buildSnapshotHtml(buildStandaloneLessonHtml(document)));
+    const imported = snapshot.window.document.querySelector('[data-builder-slide-id="css"]');
+    expect.soft(imported.querySelector("style")).toBeNull();
+    expect.soft(snapshot.window.document.head.textContent).not.toContain("collector.invalid");
+    expect.soft(snapshot.window.document.head.textContent).toContain(".qa-toggle-append");
+    const style = snapshot.window.document.querySelector("#styled-import").style;
+    expect.soft(style.color).toBe("teal");
+    expect.soft(style.fontSize).toBe("18px");
+    expect.soft(style.backgroundImage).toBe("");
+    expect.soft(style.getPropertyValue("--tracker")).toBe("");
+    expect.soft(style.animation).toBe("");
+    expect.soft(snapshot.window.document.querySelector("#escaped-style").style.cssText).toBe("");
+    snapshot.window.close();
+  });
+
+  it("removes image-map navigation while retaining the mapped image", () => {
+    const document = studentLesson();
+    document.slides.push({ id: "map", type: "imported-html", title: "Map", html: '<img id="mapped" src="data:image/png;base64,AA==" usemap="#dest"><map name="dest"><area shape="default" href="https://collector.invalid/navigate"></map>' });
+    const snapshot = new JSDOM(buildSnapshotHtml(buildStandaloneLessonHtml(document)));
+    expect.soft(snapshot.window.document.querySelector("map,area,[usemap]")).toBeNull();
+    expect.soft(snapshot.window.document.querySelector("#mapped")).not.toBeNull();
+    snapshot.window.close();
+  });
+
   it("preserves the real exported starter Q/A button and both image layers", () => {
     const document = createInitialBuilderDocument("2026-09-21T00:00:00.000Z");
     document.slides = [

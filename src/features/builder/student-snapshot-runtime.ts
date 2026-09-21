@@ -32,6 +32,33 @@ function isUnsafeStudentUrl(name, value) {
   return name === "src" && normalized.startsWith("data:text/html");
 }
 
+function sanitizeImportedStudentStyle(node) {
+  if (!node.hasAttribute("style")) return;
+  // Keep only inert presentation primitives. In particular, no custom
+  // properties, functions, escapes, URLs, selectors, or animation can survive.
+  const allowed = new Set([
+    "color", "background-color", "font-family", "font-size", "font-weight",
+    "font-style", "line-height", "text-align", "text-decoration", "white-space",
+    "display", "width", "height", "min-width", "min-height", "max-width", "max-height",
+    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+    "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+    "border", "border-width", "border-style", "border-color", "border-radius",
+    "vertical-align", "object-fit", "object-position",
+  ]);
+  const source = node.style;
+  const safe = document.createElement("span").style;
+  if (source) {
+    Array.from(source).forEach(name => {
+      const value = source.getPropertyValue(name);
+      if (allowed.has(name) && /^[a-zA-Z0-9#.,%+\-/\s]+$/.test(value)) {
+        safe.setProperty(name, value);
+      }
+    });
+  }
+  node.removeAttribute("style");
+  if (safe.cssText) node.setAttribute("style", safe.cssText);
+}
+
 function buildStudentSnapshotHtml() {
   const snapshot = document.implementation.createHTMLDocument(
     document.title || "Lesson",
@@ -56,7 +83,9 @@ function buildStudentSnapshotHtml() {
     "base-uri 'none'; form-action 'none'";
   snapshot.head.appendChild(policy);
 
-  document.querySelectorAll("style").forEach(source => {
+  // Only exporter-owned head styles are trusted. Imported fragments are
+  // normalized inside their slide by the exporter, never into this head.
+  document.head.querySelectorAll(":scope > style[data-lesson-builder-style]").forEach(source => {
     const style = snapshot.createElement("style");
     style.textContent = source.textContent || "";
     snapshot.head.appendChild(style);
@@ -71,6 +100,12 @@ function buildStudentSnapshotHtml() {
   if (header) snapshot.body.appendChild(header.cloneNode(true));
   const studentDeck = deck ? deck.cloneNode(true) : null;
   if (studentDeck) snapshot.body.appendChild(studentDeck);
+
+  snapshot.body.querySelectorAll("style").forEach(node => node.remove());
+  snapshot.body.querySelectorAll('[data-builder-slide-type="imported-html"]').forEach(imported => {
+    sanitizeImportedStudentStyle(imported);
+    imported.querySelectorAll("[style]").forEach(sanitizeImportedStudentStyle);
+  });
 
   snapshot.querySelectorAll("[data-student-qa-toggle]").forEach(node =>
     node.removeAttribute("data-student-qa-toggle"),
@@ -93,7 +128,7 @@ function buildStudentSnapshotHtml() {
   snapshot.querySelectorAll(
     ".presenter-tools,script,input,.live-retrieval-controls," +
     "[data-ignore-annotation],iframe,object,embed,form,select,textarea," +
-    "base,link,meta[http-equiv='refresh']",
+    "base,link,map,area,meta[http-equiv='refresh']",
   ).forEach(node => node.remove());
 
   snapshot.querySelectorAll("a,details,summary").forEach(node =>
@@ -118,6 +153,8 @@ function buildStudentSnapshotHtml() {
     node.removeAttribute("controls");
     node.removeAttribute("autoplay");
     node.removeAttribute("draggable");
+    node.removeAttribute("usemap");
+    node.removeAttribute("ismap");
     if (!node.hasAttribute("data-student-qa-toggle")) {
       node.removeAttribute("tabindex");
       if (node.getAttribute("role") === "button") node.removeAttribute("role");

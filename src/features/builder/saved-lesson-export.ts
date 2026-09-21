@@ -117,10 +117,12 @@ export async function buildLessonBundleZip(
   const answerHtml = buildStandaloneLessonHtml(answerDocument, {
     staticAnnotations: false,
   });
-  const savedPdf = await dependencies.renderPdf(savedHtml);
-  await assertRenderedLessonPdf(savedPdf, savedPdfPath);
-  const answerPdf = await dependencies.renderPdf(answerHtml);
-  await assertRenderedLessonPdf(answerPdf, answerPdfPath);
+  const savedPdf = await renderLessonPdf(
+    dependencies.renderPdf, savedHtml, savedPdfPath,
+  );
+  const answerPdf = await renderLessonPdf(
+    dependencies.renderPdf, answerHtml, answerPdfPath,
+  );
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
 
@@ -263,9 +265,19 @@ function assertPdfWorksheetAttachment(
   }
 }
 
-async function assertRenderedLessonPdf(blob: Blob, path: string) {
-  if (!blob.size || !(await blobHasPdfHeader(blob))) {
-    throw new Error(`Could not create "${path}" for the lesson bundle.`);
+async function renderLessonPdf(
+  renderPdf: BundleDependencies["renderPdf"], html: string, path: string,
+) {
+  const message = `Could not create "${path}" for the lesson bundle.`;
+  try {
+    const blob = await renderPdf(html);
+    if (!blob.size || !(await blobHasPdfHeader(blob))) {
+      throw new Error("The renderer returned an empty or invalid PDF.");
+    }
+    return blob;
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`${message} ${detail}`, { cause });
   }
 }
 

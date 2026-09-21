@@ -181,6 +181,28 @@ describe("saved lesson static bundle", () => {
     expect(renderPdf).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    { calls: 1, path: "Lesson.pdf" },
+    { calls: 2, path: "Lesson-answers.pdf" },
+  ])("names $path when render $calls rejects and never assembles a partial ZIP", async ({ calls, path }) => {
+    const document = createInitialBuilderDocument("2026-09-21T00:00:00.000Z");
+    document.title = "Lesson";
+    document.slides = [{ id: "slide", type: "blank", title: "Slide" }];
+    const cause = new Error("Snapshot upload expired; reopen the lesson.");
+    const renderPdf = vi.fn();
+    if (calls === 2) renderPdf.mockResolvedValueOnce(new Blob(["%PDF-1.7 saved"]));
+    renderPdf.mockRejectedValueOnce(cause);
+    const generateZip = vi.spyOn(JSZip.prototype, "generateAsync");
+
+    const error = await savedLessonExport.buildLessonBundleZip(document, { renderPdf }).catch((reason: unknown) => reason);
+    expect.soft(error).toBeInstanceOf(Error);
+    expect.soft((error as Error).message).toContain(`Could not create "${path}" for the lesson bundle.`);
+    expect.soft((error as Error).message).toContain(cause.message);
+    expect.soft((error as Error).cause).toBe(cause);
+    expect(renderPdf).toHaveBeenCalledTimes(calls);
+    expect(generateZip).not.toHaveBeenCalled();
+  });
+
   it("rejects when a worksheet cannot be downloaded", async () => {
     const document = createInitialBuilderDocument("2026-09-02T02:00:00.000Z");
     document.slides = [

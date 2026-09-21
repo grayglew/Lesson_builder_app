@@ -1,3 +1,10 @@
+import {
+  defaultTreeAdapter,
+  html,
+  parseFragment,
+  serialize,
+  type DefaultTreeAdapterTypes,
+} from "parse5";
 import type {
   BuilderDocument,
   BuilderSlide,
@@ -84,7 +91,7 @@ export function buildStandaloneLessonHtml(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
-<style>${standaloneLessonCss()}${options.runtimeCss || ""}</style>
+<style data-lesson-builder-style>${standaloneLessonCss()}${options.runtimeCss || ""}</style>
 </head>
 <body class="annotation-pan${handoutClass}">
 <header class="lesson-header">
@@ -396,10 +403,33 @@ function renderStandaloneSlide(
       /class="[^"]*"/,
       `class="${escapeAttr(className)}"`,
     );
-    return `<section ${importedAttrs}>${String(data.html || '<div class="empty-state">Imported slide</div>')}</section>`;
+    // Parse in the slide's own context before outer-document parsing. Imported
+    // closing tags cannot manufacture sibling slides or trusted Q/A ancestry.
+    const context = defaultTreeAdapter.createElement("section", html.NS.HTML, []);
+    const fragment = parseFragment(
+      context,
+      String(data.html || '<div class="empty-state">Imported slide</div>'),
+      { scriptingEnabled: true },
+    );
+    boundImportedRawText(fragment);
+    return `<section ${importedAttrs}>${serialize(fragment, { scriptingEnabled: false })}</section>`;
   }
 
   return `<section ${attrs}><h2>${title}</h2></section>`;
+}
+
+function boundImportedRawText(parent: DefaultTreeAdapterTypes.ParentNode) {
+  for (const child of parent.childNodes) {
+    if (!("tagName" in child)) continue;
+    // Unlike other raw-text elements, plaintext never recognizes its closing
+    // tag. Render its text as preformatted content so later slides stay outside.
+    if (child.namespaceURI === html.NS.HTML && child.tagName === "plaintext") {
+      child.tagName = "pre";
+      child.nodeName = "pre";
+    }
+    boundImportedRawText(child);
+    if ("content" in child) boundImportedRawText(child.content);
+  }
 }
 
 function toggleableImage(
@@ -496,7 +526,7 @@ function standaloneLessonCss() {
 .starter-grid{display:grid;width:100%;height:100%;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:0}.starter-cell{position:relative;min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.cell-number,.starter-key-skill{position:absolute;z-index:6;display:grid;place-items:center;min-width:26px;height:26px;border-radius:999px;background:rgba(255,255,255,.78);color:rgba(17,24,39,.7);border:1px solid rgba(17,24,39,.28);font-size:13px;font-weight:800;line-height:1;pointer-events:none}.cell-number{top:8px;right:8px;width:26px}.starter-key-skill{right:8px;bottom:8px;padding:0 6px}
 .live-starter-image-host{display:grid;width:100%;height:100%;min-width:0;min-height:0}.live-retrieval-controls{position:absolute;z-index:9;left:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,28px);gap:5px;align-items:center}.live-retrieval-button{width:28px;height:28px;border:1px solid #0f766e;border-radius:7px;background:rgba(255,255,255,.92);color:#0f766e;cursor:pointer;font:inherit;font-size:12px;font-weight:800;line-height:1;padding:0;box-shadow:0 6px 16px rgba(15,118,110,.18);touch-action:manipulation}.live-retrieval-button:hover{background:#ecfdf5}.live-retrieval-button:disabled{cursor:wait;opacity:.78}.live-retrieval-button.is-saved{background:#0f766e;color:#fff}.live-retrieval-button.is-error{border-color:#b91c1c;color:#b91c1c}
 .slide-image-fit{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;min-width:0;min-height:0}.qa-toggle,.qa-static-append{position:relative;display:block;width:100%;height:100%;min-height:0;border:0;background:transparent;padding:0}.qa-toggle{cursor:pointer}.qa-toggle-label{position:absolute;top:8px;left:50%;z-index:4;transform:translateX(-50%);border-radius:7px;background:rgba(255,255,255,.86);color:#111827;font-size:10px;font-weight:750;padding:4px 7px;pointer-events:none}.qa-image-layer{position:absolute;inset:0;display:grid;min-width:0;min-height:0}.qa-answer-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-question-layer{visibility:hidden}.qa-toggle.is-showing-answer .qa-answer-layer{visibility:visible}.qa-toggle-append{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr);overflow:hidden}.qa-toggle-append .qa-image-layer{position:relative;inset:auto;min-width:0;min-height:0;overflow:hidden}.qa-toggle-append .qa-question-layer{visibility:visible;grid-row:1}.qa-toggle-append .qa-answer-layer{visibility:hidden;grid-row:2}.qa-toggle-append.is-showing-answer .qa-question-layer,.qa-toggle-append.is-showing-answer .qa-answer-layer{visibility:visible}.qa-toggle-append .slide-image-fit{width:100%;height:100%;max-width:100%;max-height:100%;min-width:0;min-height:0;object-fit:contain;object-position:top center}
-.lo-bar{display:flex;align-items:center;gap:10px;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:10px;font-size:10px;line-height:1.2}.lo-bar-text{flex:1;min-width:0}.example-grid{display:grid;height:calc(100% - 28px);grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.example-block{min-width:0;min-height:0}.example-reveal-region.is-hidden{visibility:hidden}.example-reveal-button{border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit;font-size:10px;line-height:1;padding:4px 7px;white-space:nowrap}
+.lo-bar{display:flex;align-items:center;gap:10px;border-bottom:2px solid #111827;padding-bottom:4px;margin-bottom:10px;font-size:10px;line-height:1.2}.lo-bar-text{flex:1;min-width:0}.example-grid{display:grid;height:calc(100% - 28px);grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.example-block{min-width:0;min-height:0}.example-reveal-region.is-hidden,.example-reveal-region.is-hidden *{visibility:hidden!important}.example-reveal-button{border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit;font-size:10px;line-height:1;padding:4px 7px;white-space:nowrap}
 .revision-slide{padding:0;background:#fff}.revision-slide::before{content:"";position:absolute;inset:0 auto 0 50%;z-index:3;width:2px;background:#111827;transform:translateX(-1px);pointer-events:none}.revision-slide-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:100%;min-height:0}.revision-question-cell,.revision-working-area{min-width:0;min-height:0;overflow:hidden}.revision-question-cell{display:grid;place-items:center}.revision-working-area{grid-column:1/-1}
 .worksheet-slide{display:grid;place-content:center;gap:28px;text-align:center}.worksheet-links{display:grid;gap:18px}.worksheet-links a{padding:18px 24px;border:2px solid #0f766e;border-radius:10px;color:#0f766e;font-size:24px;font-weight:800;text-decoration:none}
 .pdf-page-slide,.drawing-slide,.cfu-slide{padding:0;background:#fff}.pdf-page-slide .slide-image-fit{object-position:top center}.cfu-image-wrap{width:100%;height:100%;display:grid}.cfu-image-wrap.top-left{width:62%;height:62%;place-self:start}.cfu-image-wrap.top-center{width:62%;height:62%;place-self:start center}
