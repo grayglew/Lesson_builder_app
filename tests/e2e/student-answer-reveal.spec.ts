@@ -19,11 +19,13 @@ const teacherHtml = `<!doctype html>
         <section class="lesson-slide" data-builder-slide-type="starter">
           <div class="starter-grid">
             <div class="starter-cell">
-              <button class="qa-toggle qa-toggle-replace" type="button" data-qa-toggle="replace" aria-pressed="false">
-                <span data-qa-toggle-label>Question</span>
-                <span class="qa-question-layer">Replace question</span>
-                <span class="qa-answer-layer">Replace answer</span>
-              </button>
+              <div class="live-starter-image-host">
+                <button class="qa-toggle qa-toggle-replace" type="button" data-qa-toggle="replace" aria-pressed="false">
+                  <span data-qa-toggle-label>Question</span>
+                  <span class="qa-question-layer">Replace question</span>
+                  <span class="qa-answer-layer">Replace answer</span>
+                </button>
+              </div>
               <div class="live-retrieval-controls"><button type="button">Retrieve</button></div>
             </div>
           </div>
@@ -41,6 +43,15 @@ const teacherHtml = `<!doctype html>
         </section>
         <section class="lesson-slide" data-builder-slide-type="imported-html">
           <button type="button" data-qa-toggle="replace">Fake imported toggle</button>
+          <main class="lesson-deck">
+            <section class="lesson-slide" data-builder-slide-type="example">
+              <div class="example-grid">
+                <div class="example-block">
+                  <button type="button" data-qa-toggle="replace">Spoofed nested toggle</button>
+                </div>
+              </div>
+            </section>
+          </main>
           <button type="button">Unrelated</button>
         </section>
       </main>
@@ -85,6 +96,9 @@ test("student pointer and keyboard reveals stay local and reset on reload", asyn
   await expect(page.locator(".presenter-tools")).toHaveCount(0);
   await expect(page.locator(".live-retrieval-controls")).toHaveCount(0);
   await expect(page.locator("button:not([data-student-qa-toggle])")).toHaveCount(0);
+  await expect(
+    page.locator('[data-builder-slide-type="imported-html"] button'),
+  ).toHaveCount(0);
   expect(requests).toEqual([]);
 
   await page.setContent(snapshotHtml);

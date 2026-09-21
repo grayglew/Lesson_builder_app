@@ -67,21 +67,25 @@ function buildStudentSnapshotHtml() {
   snapshot.head.appendChild(studentStyle);
 
   const header = document.querySelector(".lesson-header");
-  const deck = document.querySelector(".lesson-deck");
+  const deck = document.querySelector("body > .lesson-deck");
   if (header) snapshot.body.appendChild(header.cloneNode(true));
-  if (deck) snapshot.body.appendChild(deck.cloneNode(true));
+  const studentDeck = deck ? deck.cloneNode(true) : null;
+  if (studentDeck) snapshot.body.appendChild(studentDeck);
 
   snapshot.querySelectorAll("[data-student-qa-toggle]").forEach(node =>
     node.removeAttribute("data-student-qa-toggle"),
   );
   const allowedToggleSelector = [
-    '.lesson-deck > [data-builder-slide-type="starter"] > .starter-grid > .starter-cell > button[data-qa-toggle]',
-    '.lesson-deck > [data-builder-slide-type="example"] > .example-grid > .example-block > button[data-qa-toggle]',
-    '.lesson-deck > [data-builder-slide-type="revision"] > .revision-slide-grid > .revision-question-cell > button[data-qa-toggle]',
+    ':scope > [data-builder-slide-type="starter"] > .starter-grid > .starter-cell > .live-starter-image-host > button[data-qa-toggle]',
+    ':scope > [data-builder-slide-type="example"] > .example-grid > .example-block > button[data-qa-toggle]',
+    ':scope > [data-builder-slide-type="revision"] > .revision-slide-grid > .revision-question-cell > button[data-qa-toggle]',
   ].join(",");
-  snapshot.querySelectorAll(allowedToggleSelector).forEach(button =>
-    button.setAttribute("data-student-qa-toggle", ""),
-  );
+  if (studentDeck) {
+    studentDeck.querySelectorAll(allowedToggleSelector).forEach(button => {
+      if (button.closest('[data-builder-slide-type="imported-html"]')) return;
+      button.setAttribute("data-student-qa-toggle", "");
+    });
+  }
   snapshot.querySelectorAll("button:not([data-student-qa-toggle])").forEach(
     button => button.remove(),
   );
