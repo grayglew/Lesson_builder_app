@@ -111,11 +111,28 @@ describe("standalone lesson export", () => {
     if (!answered || !unanswered) {
       throw new Error("Expected Example image blocks.");
     }
+    const unansweredLayout = unanswered.querySelector<HTMLElement>(
+      ".qa-static-append",
+    );
+    if (!unansweredLayout) {
+      throw new Error("Expected a non-interactive unanswered Example layout.");
+    }
     const questionLayer = answered.querySelector<HTMLElement>(
       ".qa-question-layer",
     );
     const answerLayer = answered.querySelector<HTMLElement>(".qa-answer-layer");
-    if (!questionLayer || !answerLayer) {
+    const unansweredQuestionLayer = unansweredLayout.querySelector<HTMLElement>(
+      ".qa-question-layer",
+    );
+    const unansweredAnswerLayer = unansweredLayout.querySelector<HTMLElement>(
+      ".qa-answer-layer",
+    );
+    if (
+      !questionLayer ||
+      !answerLayer ||
+      !unansweredQuestionLayer ||
+      !unansweredAnswerLayer
+    ) {
       throw new Error("Expected image layers.");
     }
 
@@ -137,7 +154,24 @@ describe("standalone lesson export", () => {
       dom.window.getComputedStyle(answerLayer.querySelector("img")!)
         .objectPosition,
     ).toBe("top center");
+    expect(dom.window.getComputedStyle(unansweredLayout).display).toBe("grid");
+    expect(
+      dom.window.getComputedStyle(unansweredLayout).gridTemplateRows,
+    ).toContain("1fr");
+    expect(dom.window.getComputedStyle(unansweredQuestionLayer).position).toBe(
+      "relative",
+    );
+    expect(dom.window.getComputedStyle(unansweredQuestionLayer).gridRow).toBe(
+      "1",
+    );
+    expect(dom.window.getComputedStyle(unansweredAnswerLayer).gridRow).toBe(
+      "2",
+    );
+    expect(dom.window.getComputedStyle(unansweredAnswerLayer).visibility).toBe(
+      "hidden",
+    );
     expect(unanswered.querySelector("[data-qa-toggle]")).toBeNull();
+    expect(unanswered.querySelector("button")).toBeNull();
     expect(unanswered.querySelector("img")).not.toBeNull();
     dom.window.close();
   });

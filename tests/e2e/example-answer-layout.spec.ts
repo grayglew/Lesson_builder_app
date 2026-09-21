@@ -34,7 +34,12 @@ for (const viewport of [
           size: tallAnswer.length,
           dataUrl: tallAnswer,
         },
-        image2: null,
+        image2: {
+          name: "question-without-answer.svg",
+          type: "image/svg+xml",
+          size: question.length,
+          dataUrl: question,
+        },
         answerImage2: null,
       },
     ];
@@ -45,8 +50,28 @@ for (const viewport of [
     const toggle = page.locator('[data-reveal-key="example-answer-0"]');
     const questionImage = toggle.locator(".qa-question-layer img");
     const answerImage = toggle.locator(".qa-answer-layer img");
+    const unanswered = page.locator(".qa-static-append");
+    const unansweredQuestion = unanswered.locator(".qa-question-layer img");
+    const unansweredAnswerLayer = unanswered.locator(".qa-answer-layer");
     const before = await questionImage.boundingBox();
+    const unansweredQuestionBox = await unansweredQuestion.boundingBox();
+    const unansweredAnswerBox = await unansweredAnswerLayer.boundingBox();
+    const unansweredBox = await unanswered.boundingBox();
     expect(before).not.toBeNull();
+    expect(unansweredQuestionBox).not.toBeNull();
+    expect(unansweredAnswerBox).not.toBeNull();
+    expect(unansweredBox).not.toBeNull();
+    await expect(unanswered.locator("button")).toHaveCount(0);
+    await expect(unanswered.locator("[data-qa-toggle]")).toHaveCount(0);
+    expect(unansweredQuestionBox!.y).toBeCloseTo(unansweredBox!.y, 0);
+    expect(unansweredQuestionBox!.height).toBeCloseTo(
+      unansweredAnswerBox!.height,
+      0,
+    );
+    expect(unansweredAnswerBox!.y).toBeCloseTo(
+      unansweredQuestionBox!.y + unansweredQuestionBox!.height,
+      0,
+    );
 
     await toggle.click();
     const after = await questionImage.boundingBox();
