@@ -370,7 +370,7 @@ async function buildStandardPages(
         fullImagePage(
           assetOf(data.image),
           slide.title || String(data.sourceName || "PDF page"),
-          false,
+          shouldRotateHandoutPdfPage(slide),
         ),
       );
       continue;
@@ -570,6 +570,28 @@ function isHalfPageSlide(slide: BuilderSlide) {
   return ["drawing", "template", "placeholder", "blank", "math"].includes(
     slide.type,
   );
+}
+
+function shouldRotateHandoutPdfPage(slide: BuilderSlide) {
+  const data = recordOf(slide);
+  const orientation = String(data.orientation || "").toLowerCase();
+  if (orientation === "landscape" || orientation === "portrait") {
+    return orientation === "landscape";
+  }
+
+  const width = Number(data.width);
+  const height = Number(data.height);
+  if (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > 0 &&
+    height > 0
+  ) {
+    return width > height;
+  }
+
+  const aspect = Number(data.aspect);
+  return Number.isFinite(aspect) && aspect > 1;
 }
 
 function isPdfAsset(asset: BuilderAsset) {
