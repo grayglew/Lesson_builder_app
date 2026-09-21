@@ -595,14 +595,14 @@ describe("production A4 handout export", () => {
     ] as const;
 
     for (const item of cases) {
-      const { rotated: expectedRotation, ...slideData } = item;
+      const { id: caseId, rotated: expectedRotation, ...slideData } = item;
       const document = handoutDocument();
       document.slides = [
         {
-          id: item.id,
+          id: caseId,
           type: "pdf-page",
-          title: item.id,
-          image: asset(`${item.id}.png`),
+          title: caseId,
+          image: asset(`${caseId}.png`),
           ...slideData,
         },
       ];
