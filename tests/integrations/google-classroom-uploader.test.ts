@@ -16,12 +16,14 @@ const uploaderIndexPath = resolve(
 type MockBlob = {
   getBytes: () => number[];
   getName: () => string;
+  getDataAsString: () => string;
 };
 
-function zipEntry(name: string): MockBlob {
+function zipEntry(name: string, text = ""): MockBlob {
   return {
     getName: () => name,
     getBytes: () => [1, 2, 3],
+    getDataAsString: () => text,
   };
 }
 
@@ -77,11 +79,37 @@ describe("Google Classroom lesson bundle uploader", () => {
     );
   });
 
-  it("attaches the root lesson PDF first and worksheet PDFs by filename", () => {
+  it.each(["first", "last"])("attaches saved then answers then sorted worksheets with README %s", (readmeOrder) => {
+    const readme = zipEntry("README.txt", "Lesson Builder bundle format: 2");
+    const attachments = extract([
+      ...(readmeOrder === "first" ? [readme] : []),
+      zipEntry("worksheets/zebra.pdf"),
+      zipEntry("Lesson-answers.pdf"),
+      zipEntry("Lesson.pdf"),
+      zipEntry("worksheets/alpha.pdf"),
+      ...(readmeOrder === "last" ? [readme] : []),
+    ]);
+
+    expect(attachments.map((attachment) => attachment.fileName)).toEqual([
+      "Lesson.pdf",
+      "Lesson-answers.pdf",
+      "alpha.pdf",
+      "zebra.pdf",
+    ]);
+    expect(attachments.map((attachment) => attachment.mimeType)).toEqual([
+      "application/pdf",
+      "application/pdf",
+      "application/pdf",
+      "application/pdf",
+    ]);
+  });
+
+  it.each([false, true])("accepts a legacy one-PDF bundle with optional ignored PowerPoint (%s)", (includePowerPoint) => {
     const attachments = extract([
       zipEntry("worksheets/zebra.pdf"),
       zipEntry("Lesson.pdf"),
-      zipEntry("README.txt"),
+      ...(includePowerPoint ? [zipEntry("Lesson - PowerPoint bundle.pptx")] : []),
+      zipEntry("README.txt", "Legacy lesson bundle"),
       zipEntry("worksheets/alpha.pdf"),
     ]);
 
@@ -90,36 +118,59 @@ describe("Google Classroom lesson bundle uploader", () => {
       "alpha.pdf",
       "zebra.pdf",
     ]);
-    expect(attachments.map((attachment) => attachment.mimeType)).toEqual([
-      "application/pdf",
-      "application/pdf",
-      "application/pdf",
-    ]);
-  });
-
-  it("accepts one legacy root PowerPoint file but does not attach it", () => {
-    const attachments = extract([
-      zipEntry("Lesson.pdf"),
-      zipEntry("Lesson - PowerPoint bundle.pptx"),
-    ]);
-
-    expect(attachments.map((attachment) => attachment.fileName)).toEqual([
-      "Lesson.pdf",
-    ]);
   });
 
   it("rejects a bundle without a root lesson PDF", () => {
     expect(() => extract([zipEntry("worksheets/practice.pdf")])).toThrow(
-      "The lesson bundle must contain exactly one root PDF file (.pdf). Found 0.",
+      "A current lesson bundle must contain one saved-state PDF and one matching -answers PDF. Found 0 root PDFs.",
     );
   });
 
-  it("rejects a bundle with duplicate root lesson PDFs", () => {
+  it("rejects two unrelated root PDFs", () => {
     expect(() =>
       extract([zipEntry("Lesson.pdf"), zipEntry("Lesson copy.pdf")]),
     ).toThrow(
-      "The lesson bundle must contain exactly one root PDF file (.pdf). Found 2.",
+      "The two root PDFs must be named <lesson>.pdf and <lesson>-answers.pdf.",
     );
+  });
+
+  it.each(["first", "last"])("rejects format 2 without answers even when README is %s", (readmeOrder) => {
+    const readme = zipEntry("README.txt", "Lesson Builder bundle format: 2\nLesson export");
+    expect(() => extract([
+      ...(readmeOrder === "first" ? [readme] : []),
+      zipEntry("Lesson.pdf"),
+      ...(readmeOrder === "last" ? [readme] : []),
+    ])).toThrow("A current lesson bundle must contain one saved-state PDF and one matching -answers PDF. Found 1 root PDFs.");
+  });
+
+  it("rejects three root PDFs even when two form a valid pair", () => {
+    expect(() => extract([
+      zipEntry("Lesson.pdf"),
+      zipEntry("Lesson-answers.pdf"),
+      zipEntry("Other.pdf"),
+    ])).toThrow("A current lesson bundle must contain one saved-state PDF and one matching -answers PDF. Found 3 root PDFs.");
+  });
+
+  it("pairs a lesson whose title already ends in -answers", () => {
+    const attachments = extract([
+      zipEntry("Title-answers-answers.pdf"),
+      zipEntry("Title-answers.pdf"),
+      zipEntry("README.txt", "Lesson Builder bundle format: 2"),
+    ]);
+    expect(attachments.map((attachment) => attachment.fileName)).toEqual([
+      "Title-answers.pdf", "Title-answers-answers.pdf",
+    ]);
+  });
+
+  it("pairs case-insensitively while preserving original filenames", () => {
+    const attachments = extract([
+      zipEntry("LESSON-ANSWERS.PDF"),
+      zipEntry("Lesson.pdf"),
+      zipEntry("readme.TXT", "Lesson Builder bundle format: 2"),
+    ]);
+    expect(attachments.map((attachment) => attachment.fileName)).toEqual([
+      "Lesson.pdf", "LESSON-ANSWERS.PDF",
+    ]);
   });
 
   it("rejects ambiguous legacy root PowerPoint files", () => {

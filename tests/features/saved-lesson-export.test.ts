@@ -32,7 +32,7 @@ describe("saved lesson static bundle", () => {
     expect(html).not.toContain("expired.test");
   });
 
-  it("creates a PDF-led ZIP with static annotations, hydrated assets, and answer variants", async () => {
+  it.each([false, true])("creates both PDFs from one hydrated document with saved answer state %s", async (savedAnswer) => {
     const document = createInitialBuilderDocument("2026-09-02T01:00:00.000Z");
     document.title = "Fractions & ratios";
     document.slides = [
@@ -55,6 +55,10 @@ describe("saved lesson static bundle", () => {
       },
       {
         ...revision("https://expired.test/question.png"),
+        presentationState: {
+          version: 1,
+          reveals: { "revision-answer-0": savedAnswer },
+        },
         annotations: [
           {
             id: "saved-pen",
@@ -78,9 +82,14 @@ describe("saved lesson static bundle", () => {
     preparedItems[0].answerImage!.dataUrl =
       "data:image/png;base64,ZnJlc2gtYW5zd2Vy";
     const prepareDocument = vi.fn().mockResolvedValue(prepared);
-    const renderPdf = vi.fn().mockResolvedValue(
-      new Blob(["%PDF-1.7\nlesson"], { type: "application/pdf" }),
-    );
+    const originalDocument = structuredClone(document);
+    const renderPdf = vi.fn()
+      .mockResolvedValueOnce(
+        new Blob(["%PDF-1.7\nsaved"], { type: "application/pdf" }),
+      )
+      .mockResolvedValueOnce(
+        new Blob(["%PDF-1.7\nanswers"], { type: "application/pdf" }),
+      );
 
     expect(typeof savedLessonExport.buildLessonBundleZip).toBe("function");
     const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
@@ -90,34 +99,108 @@ describe("saved lesson static bundle", () => {
     const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
 
     expect(prepareDocument).toHaveBeenCalledOnce();
-    expect(renderPdf).toHaveBeenCalledOnce();
-    const html = String(renderPdf.mock.calls[0]?.[0]);
-    expect(html).toContain("static-annotation-svg");
-    expect(html).toContain("data:image/png;base64,ZnJlc2gtcXVlc3Rpb24=");
-    expect(html).toContain("data:image/png;base64,ZnJlc2gtYW5zd2Vy");
-    expect(html.match(/class="lesson-slide revision-slide/g)).toHaveLength(2);
-    expect(
-      html.match(
-        /data-reveal-key="revision-answer-0" aria-pressed="false"/g,
-      ),
-    ).toHaveLength(1);
-    expect(
-      html.match(
-        /data-reveal-key="revision-answer-0" aria-pressed="true"/g,
-      ),
-    ).toHaveLength(1);
+    expect(renderPdf).toHaveBeenCalledTimes(2);
+    const savedHtml = String(renderPdf.mock.calls[0]?.[0]);
+    const answersHtml = String(renderPdf.mock.calls[1]?.[0]);
+    const savedDom = new DOMParser().parseFromString(savedHtml, "text/html");
+    const answersDom = new DOMParser().parseFromString(answersHtml, "text/html");
+    expect(savedDom.querySelectorAll("svg.static-annotation-svg")).toHaveLength(1);
+    expect(answersDom.querySelectorAll("svg.static-annotation-svg")).toHaveLength(0);
+    expect(JSON.parse(
+      answersDom.getElementById("lesson-annotations-data")!.textContent!,
+    )).toEqual({});
+    expect(savedDom.querySelector('[data-reveal-key="revision-answer-0"]')
+      ?.getAttribute("aria-pressed")).toBe(String(savedAnswer));
+    expect(answersDom.querySelector('[data-reveal-key="revision-answer-0"]')
+      ?.getAttribute("aria-pressed")).toBe("true");
+    for (const html of [savedHtml, answersHtml]) {
+      expect(html.match(/class="lesson-slide/g)).toHaveLength(document.slides.length);
+      expect(html).toContain("data:image/png;base64,ZnJlc2gtcXVlc3Rpb24=");
+      expect(html).toContain("data:image/png;base64,ZnJlc2gtYW5zd2Vy");
+      expect(html).not.toContain("expired.test");
+    }
+    expect(document).toEqual(originalDocument);
     expect(Object.keys(zip.files)).toEqual(
       expect.arrayContaining([
         "Fractions-ratios.pdf",
+        "Fractions-ratios-answers.pdf",
         "worksheets/practice.pdf",
         "worksheets/practice-2.pdf",
         "README.txt",
       ]),
     );
     expect(Object.keys(zip.files).some((name) => /\.pptx$/i.test(name))).toBe(false);
-    expect(await zip.file("README.txt")?.async("string")).toContain(
-      "Ordinary lesson slides are arranged two per page",
-    );
+    expect(Object.keys(zip.files).slice(0, 2)).toEqual([
+      "Fractions-ratios.pdf", "Fractions-ratios-answers.pdf",
+    ]);
+    expect(await zip.file("Fractions-ratios.pdf")?.async("string")).toBe("%PDF-1.7\nsaved");
+    expect(await zip.file("Fractions-ratios-answers.pdf")?.async("string")).toBe("%PDF-1.7\nanswers");
+    const readme = await zip.file("README.txt")?.async("string");
+    expect(readme).toMatch(/^Lesson Builder bundle format: 2\n/);
+    expect(readme).toContain('"Fractions-ratios.pdf" preserves the saved lesson state, including saved reveals and annotations.');
+    expect(readme).toContain('"Fractions-ratios-answers.pdf" shows all answers without annotations.');
+    expect(readme).toContain("Ordinary lesson slides are arranged two per page");
+  });
+
+  it.each([
+    { label: "empty saved-state", payload: "", path: "Lesson.pdf", calls: 1 },
+    { label: "invalid saved-state", payload: "<!doctype html>failure", path: "Lesson.pdf", calls: 1 },
+    { label: "empty answer", payload: "", path: "Lesson-answers.pdf", calls: 2 },
+    { label: "invalid answer", payload: "<!doctype html>failure", path: "Lesson-answers.pdf", calls: 2 },
+  ])("rejects an $label PDF and names $path", async ({ payload, path, calls }) => {
+    const document = createInitialBuilderDocument("2026-09-02T01:00:00.000Z");
+    document.title = "Lesson";
+    document.slides = [{ id: "slide", type: "blank", title: "Slide" }];
+    const renderPdf = vi.fn();
+    if (calls === 2) {
+      renderPdf.mockResolvedValueOnce(new Blob(["%PDF-1.7 saved"], { type: "application/pdf" }));
+    }
+    renderPdf.mockResolvedValueOnce(new Blob([payload], { type: "application/pdf" }));
+
+    await expect(savedLessonExport.buildLessonBundleZip(document, { renderPdf }))
+      .rejects.toThrow(`Could not create "${path}" for the lesson bundle.`);
+    expect(renderPdf).toHaveBeenCalledTimes(calls);
+  });
+
+  it("waits for the saved-state PDF before starting the answer render", async () => {
+    const document = createInitialBuilderDocument("2026-09-02T01:00:00.000Z");
+    document.slides = [{ id: "slide", type: "blank", title: "Slide" }];
+    let finishSaved: (blob: Blob) => void = () => {
+      throw new Error("Render not started");
+    };
+    const renderPdf = vi.fn()
+      .mockImplementationOnce(() => new Promise<Blob>((resolve) => {
+        finishSaved = resolve;
+      }))
+      .mockResolvedValueOnce(new Blob(["%PDF-1.7 answers"]));
+    const pendingBundle = savedLessonExport.buildLessonBundleZip(document, { renderPdf });
+
+    await vi.waitFor(() => expect(renderPdf).toHaveBeenCalledOnce());
+    finishSaved(new Blob(["%PDF-1.7 saved"]));
+    await expect(pendingBundle).resolves.toBeInstanceOf(Blob);
+    expect(renderPdf).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    { calls: 1, path: "Lesson.pdf" },
+    { calls: 2, path: "Lesson-answers.pdf" },
+  ])("names $path when render $calls rejects and never assembles a partial ZIP", async ({ calls, path }) => {
+    const document = createInitialBuilderDocument("2026-09-21T00:00:00.000Z");
+    document.title = "Lesson";
+    document.slides = [{ id: "slide", type: "blank", title: "Slide" }];
+    const cause = new Error("Snapshot upload expired; reopen the lesson.");
+    const renderPdf = vi.fn();
+    if (calls === 2) renderPdf.mockResolvedValueOnce(new Blob(["%PDF-1.7 saved"]));
+    renderPdf.mockRejectedValueOnce(cause);
+    const generateZip = vi.spyOn(JSZip.prototype, "generateAsync");
+
+    const error = await savedLessonExport.buildLessonBundleZip(document, { renderPdf }).catch((reason: unknown) => reason);
+    expect.soft(error).toBeInstanceOf(Error);
+    expect.soft((error as Error).message).toContain(`Could not create "${path}" for the lesson bundle.`);
+    expect.soft((error as Error).message).toContain(cause.message);
+    expect.soft((error as Error).cause).toBe(cause);
+    expect(renderPdf).toHaveBeenCalledTimes(calls);
+    expect(generateZip).not.toHaveBeenCalled();
   });
 
   it("rejects when a worksheet cannot be downloaded", async () => {
@@ -281,7 +364,7 @@ describe("saved lesson static bundle", () => {
     });
 
     const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
-      renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+      renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF-1.7"])),
     });
     const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
 
@@ -376,7 +459,7 @@ describe("saved lesson static bundle", () => {
     );
 
     const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
-      renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"])),
+      renderPdf: vi.fn().mockResolvedValue(new Blob(["%PDF-1.7"])),
     });
     const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
 
@@ -452,18 +535,21 @@ describe("saved lesson static bundle", () => {
       title: id,
     }));
     document.handoutSlideIds = ["slide-2"];
-    let renderedHtml = "";
+    const renderedHtml: string[] = [];
 
     await savedLessonExport.buildLessonBundleZip!(document, {
       renderPdf: vi.fn().mockImplementation(async (html: string) => {
-        renderedHtml = html;
-        return new Blob(["%PDF"]);
+        renderedHtml.push(html);
+        return new Blob(["%PDF-1.7"]);
       }),
     });
 
-    expect(renderedHtml).toContain('data-builder-slide-id="slide-1"');
-    expect(renderedHtml).toContain('data-builder-slide-id="slide-2"');
-    expect(renderedHtml).toContain('data-builder-slide-id="slide-3"');
+    expect(renderedHtml).toHaveLength(2);
+    for (const html of renderedHtml) {
+      expect(html).toContain('data-builder-slide-id="slide-1"');
+      expect(html).toContain('data-builder-slide-id="slide-2"');
+      expect(html).toContain('data-builder-slide-id="slide-3"');
+    }
   });
 
 });

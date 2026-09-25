@@ -264,6 +264,7 @@
 
           <div class="full">
             <label for="bundle-file">Lesson bundle zip</label>
+            <p class="subtext">Current bundles contain a saved-state PDF and an answers PDF, plus any worksheet PDFs. Legacy one-PDF bundles are also supported.</p>
             <div id="file-drop" class="file-drop" role="button" tabindex="0" aria-controls="bundle-file">Drop bundle zip here or choose file</div>
             <input id="bundle-file" class="hidden-file" type="file" accept="application/zip,application/x-zip-compressed,.zip">
             <div id="file-summary" class="file-summary">No bundle selected.</div>
@@ -480,7 +481,7 @@
 
       function validateBundleFile(file) {
         if (!file || !/\.zip$/i.test(String(file.name || ''))) {
-          return 'The selected file should be a .zip bundle.';
+          return 'Choose a lesson bundle .zip containing a saved-state PDF and an answers PDF (or a legacy one-PDF bundle).';
         }
         if (Number(file.size || 0) > MAX_ZIP_BYTES) {
           return 'The selected bundle is larger than ' + formatBytes(MAX_ZIP_BYTES) + '.';
@@ -542,8 +543,8 @@
 
         if (!courseId) return setStatus('Choose a course or paste a course ID.', 'error');
         if (!title) return setStatus('Enter a post title.', 'error');
-        if (!file) return setStatus('Choose a Lesson Builder lesson bundle zip.', 'error');
-        if (!/\.zip$/i.test(file.name)) return setStatus('The selected file should be a .zip bundle.', 'error');
+        if (!file) return setStatus('Choose a Lesson Builder bundle zip with a saved-state PDF and an answers PDF. Legacy one-PDF bundles are also supported.', 'error');
+        if (!/\.zip$/i.test(file.name)) return setStatus('Choose a lesson bundle .zip containing a saved-state PDF and an answers PDF (or a legacy one-PDF bundle).', 'error');
         if (file.size > MAX_ZIP_BYTES) return setStatus('The selected bundle is larger than ' + formatBytes(MAX_ZIP_BYTES) + '.', 'error');
 
         let scheduledTimeIso = '';

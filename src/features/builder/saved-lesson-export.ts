@@ -4,8 +4,8 @@ import { buildStandaloneLessonHtml } from "./lesson-export";
 import { prepareBuilderDocumentForExport } from "./prepare-export-document";
 import {
   collectWorksheetFilesForBundle,
-  createStaticExportDocument,
-  describeStaticExportBehavior,
+  createAnswerKeyExportDocument,
+  createSavedStateExportDocument,
 } from "./saved-lesson-parity";
 import type { BuilderAsset, BuilderDocument, RetrievalItem } from "./schema";
 
@@ -106,26 +106,39 @@ export async function buildLessonBundleZip(
     }
     worksheetFiles.push({ path: entry.path, file });
   }
-  const staticDocument = createStaticExportDocument(embeddedDocument);
-  const html = buildStandaloneLessonHtml(staticDocument, {
+  const baseName = safeFileName(embeddedDocument.title);
+  const savedPdfPath = `${baseName}.pdf`;
+  const answerPdfPath = `${baseName}-answers.pdf`;
+  const savedDocument = createSavedStateExportDocument(embeddedDocument);
+  const answerDocument = createAnswerKeyExportDocument(embeddedDocument);
+  const savedHtml = buildStandaloneLessonHtml(savedDocument, {
     staticAnnotations: true,
   });
-  const lessonPdf = await dependencies.renderPdf(html);
+  const answerHtml = buildStandaloneLessonHtml(answerDocument, {
+    staticAnnotations: false,
+  });
+  const savedPdf = await renderLessonPdf(
+    dependencies.renderPdf, savedHtml, savedPdfPath,
+  );
+  const answerPdf = await renderLessonPdf(
+    dependencies.renderPdf, answerHtml, answerPdfPath,
+  );
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
-  const baseName = safeFileName(embeddedDocument.title);
 
-  zip.file(`${baseName}.pdf`, lessonPdf);
+  zip.file(savedPdfPath, savedPdf);
+  zip.file(answerPdfPath, answerPdf);
   worksheetFiles.forEach(({ path, file }) => zip.file(path, file));
   zip.file(
     "README.txt",
     [
+      "Lesson Builder bundle format: 2",
       `${embeddedDocument.title || "Lesson"} export bundle`,
       "",
       "This bundle was exported from Lesson Builder.",
-      "The lesson PDF uses A4 pages. Ordinary lesson slides are arranged two per page; imported PDF pages use a full A4 page.",
-      "Annotations saved to Lesson Builder are included.",
-      ...describeStaticExportBehavior(embeddedDocument),
+      "Both lesson PDFs use A4 pages. Ordinary lesson slides are arranged two per page; imported PDF pages use a full A4 page.",
+      `"${savedPdfPath}" preserves the saved lesson state, including saved reveals and annotations.`,
+      `"${answerPdfPath}" shows all answers without annotations.`,
       "Worksheet and answer PDFs are included in the worksheets/ folder.",
     ].join("\n"),
   );
@@ -249,6 +262,22 @@ function assertPdfWorksheetAttachment(
     mimeTypes.some((mimeType) => !isPdfCompatibleMimeType(mimeType))
   ) {
     throwNonPdfWorksheetAttachment(path);
+  }
+}
+
+async function renderLessonPdf(
+  renderPdf: BundleDependencies["renderPdf"], html: string, path: string,
+) {
+  const message = `Could not create "${path}" for the lesson bundle.`;
+  try {
+    const blob = await renderPdf(html);
+    if (!blob.size || !(await blobHasPdfHeader(blob))) {
+      throw new Error("The renderer returned an empty or invalid PDF.");
+    }
+    return blob;
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`${message} ${detail}`, { cause });
   }
 }
 

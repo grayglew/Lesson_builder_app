@@ -17,12 +17,6 @@ export type SavedLessonWithConfidence = SavedLessonSummary & {
   confidenceSummary?: ConfidenceSummary | null;
 };
 
-export type StaticSlideVariant = {
-  slide: BuilderSlide;
-  sourceIndex: number;
-  answerMode: "saved" | "none" | "hidden" | "shown";
-};
-
 export type WorksheetBundleEntry = {
   path: string;
   file: BuilderAsset;
@@ -91,87 +85,47 @@ export function confidenceAverageColors(average: number) {
   };
 }
 
-export function expandSlidesForStaticExport(
-  slides: readonly BuilderSlide[],
-): StaticSlideVariant[] {
-  const variants: StaticSlideVariant[] = [];
-  slides.forEach((slide, sourceIndex) => {
-    if (hasPresentationState(slide)) {
-      variants.push({ slide, sourceIndex, answerMode: "saved" });
-      return;
-    }
-    if (!slideHasAnswerImages(slide)) {
-      variants.push({ slide, sourceIndex, answerMode: "none" });
-      return;
-    }
-    variants.push(
-      { slide, sourceIndex, answerMode: "hidden" as const },
-      { slide, sourceIndex, answerMode: "shown" as const },
-    );
-  });
-  return variants;
-}
-
-export function createStaticExportDocument(
+export function createSavedStateExportDocument(
   document: BuilderDocument,
 ): BuilderDocument {
-  const slides = expandSlidesForStaticExport(document.slides).map(
-    ({ slide, sourceIndex, answerMode }, outputIndex) => {
-      if (answerMode === "saved" || answerMode === "none") return slide;
-      const copy = structuredCloneSafe(slide);
-      copy.id = `${slide.id}-static-${sourceIndex}-${outputIndex}`;
-      copy.presentationState = {
-        version: 1,
-        reveals: revealStateForSlide(copy, answerMode === "shown"),
-      };
-      return copy;
-    },
-  );
-  return { ...document, slides };
-}
-
-export function slideHasAnswerImages(value: unknown): boolean {
-  if (!value || typeof value !== "object") return false;
-  if (Array.isArray(value)) return value.some(slideHasAnswerImages);
-  const record = value as Record<string, unknown>;
-  return Object.entries(record).some(([key, nested]) => {
-    const normalized = key.toLowerCase();
-    if (
-      normalized === "answerimage" ||
-      normalized === "answerimages" ||
-      /^answerimage\d+$/.test(normalized)
-    ) {
-      return valueHasImagePayload(nested);
-    }
-    return slideHasAnswerImages(nested);
+  const copy = structuredCloneSafe(document);
+  copy.slides = copy.slides.map((slide) => {
+    if (hasPresentationState(slide)) return slide;
+    slide.presentationState = {
+      version: 1,
+      reveals: revealStateForSlide(slide, false),
+    };
+    return slide;
   });
+  return copy;
 }
 
-export function hasPresentationState(slide: BuilderSlide) {
+export function createAnswerKeyExportDocument(
+  document: BuilderDocument,
+): BuilderDocument {
+  const copy = structuredCloneSafe(document);
+  copy.slides = copy.slides.map((slide) => {
+    slide.presentationState = {
+      version: 1,
+      reveals: revealStateForSlide(slide, true),
+    };
+    slide.annotations = [];
+    return slide;
+  });
+  return copy;
+}
+
+function hasPresentationState(slide: BuilderSlide) {
   const state = asRecord(slide.presentationState);
-  return Number(state.version) === 1 && isRecord(state.reveals);
-}
-
-export function describeStaticExportBehavior(document: BuilderDocument) {
-  const hasSavedState = document.slides.some(hasPresentationState);
-  const hasGeneratedVariants = document.slides.some(
-    (slide) => !hasPresentationState(slide) && slideHasAnswerImages(slide),
+  const reveals = asRecord(state.reveals);
+  const capturedRevealKeys = capturedRevealKeysForSlide(slide);
+  return (
+    state.version === 1 &&
+    isRecord(state.reveals) &&
+    capturedRevealKeys.every(
+      (key) => typeof reveals[key] === "boolean",
+    )
   );
-  const lines: string[] = [];
-  if (hasSavedState) {
-    lines.push(
-      "Presenter-saved slides preserve their saved classroom visibility state.",
-    );
-  }
-  if (hasGeneratedVariants) {
-    lines.push(
-      "Other slides with answer images appear twice: first with answers hidden, then with answers shown.",
-    );
-  }
-  if (!lines.length) {
-    lines.push("Each lesson slide appears once in its saved state.");
-  }
-  return lines;
 }
 
 export function collectWorksheetFilesForBundle(
@@ -204,7 +158,7 @@ function revealStateForSlide(
 ): Record<string, boolean> {
   const data = asRecord(slide);
   if (slide.type === "starter") {
-    const slots = Array.isArray(data.slots) ? data.slots : [];
+    const slots = arrayOfRecords(data.slots).slice(0, 4);
     return Object.fromEntries(
       slots.map((_, index) => [`starter-answer-${index}`, showAnswers]),
     );
@@ -213,11 +167,11 @@ function revealStateForSlide(
     return {
       "example-answer-0": showAnswers,
       "example-answer-1": showAnswers,
-      "example-second-image": true,
+      "example-second-image": showAnswers,
     };
   }
   if (slide.type === "revision") {
-    const items = Array.isArray(data.items) ? data.items : [];
+    const items = arrayOfRecords(data.items).slice(0, 2);
     return Object.fromEntries(
       items.map((_, index) => [`revision-answer-${index}`, showAnswers]),
     );
@@ -225,16 +179,44 @@ function revealStateForSlide(
   return {};
 }
 
-function valueHasImagePayload(value: unknown): boolean {
-  if (!value) return false;
-  if (Array.isArray(value)) return value.some(valueHasImagePayload);
-  if (isAsset(value)) return Boolean(value.dataUrl);
-  if (typeof value === "object") {
-    return Object.values(value as Record<string, unknown>).some(
-      valueHasImagePayload,
-    );
+function capturedRevealKeysForSlide(slide: BuilderSlide): string[] {
+  const data = asRecord(slide);
+  if (slide.type === "starter") {
+    return arrayOfRecords(data.slots)
+      .slice(0, 4)
+      .flatMap((slot, index) =>
+        hasAssetSource(slot.answerImage) ? [`starter-answer-${index}`] : [],
+      );
   }
-  return false;
+  if (slide.type === "example") {
+    const pairs = [
+      [data.image1, data.answerImage1],
+      [data.image2, data.answerImage2],
+    ].filter(([question]) => hasAssetSource(question));
+    return [
+      ...pairs.flatMap(([, answer], index) =>
+        hasAssetSource(answer) ? [`example-answer-${index}`] : [],
+      ),
+      ...(pairs.length > 1 ? ["example-second-image"] : []),
+    ];
+  }
+  if (slide.type === "revision") {
+    return arrayOfRecords(data.items)
+      .slice(0, 2)
+      .flatMap((item, index) =>
+        hasAssetSource(item.answerImage) ? [`revision-answer-${index}`] : [],
+      );
+  }
+  return [];
+}
+
+function arrayOfRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+function hasAssetSource(value: unknown) {
+  const asset = asRecord(value);
+  return Boolean(asset.dataUrl || asset.url || asset.path);
 }
 
 function validTeachingDate(value: string) {

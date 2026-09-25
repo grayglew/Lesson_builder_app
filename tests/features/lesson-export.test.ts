@@ -298,6 +298,9 @@ describe("standalone lesson export", () => {
     expect(html).toContain('"code":"ABC-123"');
     expect(html).toContain("studentUploadButton.hidden = false");
     expect(html).toContain("uploadStudentSnapshot");
+    expect(html.match(/function buildStudentSnapshotHtml\(\)/g)).toHaveLength(1);
+    expect(html).toContain("const STUDENT_REVEAL_SCRIPT =");
+    expect(html).toContain("script-src 'nonce-");
     expect(html).toContain(
       "body.student-shared-view .lesson-slide,body.student-shared-view .lesson-slide *{touch-action:pan-y pinch-zoom!important}",
     );
