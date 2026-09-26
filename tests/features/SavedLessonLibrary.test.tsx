@@ -122,6 +122,55 @@ describe("SavedLessonLibrary production actions", () => {
     expect(screen.getByLabelText("5: 4 responses")).toBeInTheDocument();
   });
 
+  it("collapses taught presenter snapshots beneath a visibly taught source lesson", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listSavedLessons).mockResolvedValue({
+      ok: true,
+      lessons: [
+        lesson(
+          "source",
+          "11Ma2 Bearings with trig 2",
+          "2026-09-21",
+          false,
+          "11Ma2",
+        ),
+        {
+          ...lesson(
+            "snapshot",
+            "11Ma2 Bearings with trig 2 - taught 2026-09-21 1356",
+            "2026-09-21",
+            true,
+            "11Ma2",
+          ),
+          taughtAt: "2026-09-21T13:56:00.000Z",
+        },
+      ],
+      totalByteSize: 200,
+    });
+
+    render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
+
+    const sourceTitle = await screen.findByText("11Ma2 Bearings with trig 2");
+    const sourceRow = sourceTitle.closest("tr");
+    expect(sourceRow).not.toBeNull();
+    expect(within(sourceRow!).getByText("Taught")).toBeInTheDocument();
+    expect(within(sourceRow!).getByText("1 taught version")).toBeInTheDocument();
+    expect(screen.queryByText(/^Taught 21 Sep/)).not.toBeInTheDocument();
+
+    await user.click(
+      within(sourceRow!).getByRole("button", {
+        name: "Show 1 taught version for 11Ma2 Bearings with trig 2",
+      }),
+    );
+
+    expect(screen.getByText(/^Taught 21 Sep/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Hide 1 taught version for 11Ma2 Bearings with trig 2",
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("updates a saved lesson class without opening it", async () => {
     const user = userEvent.setup();
     vi.mocked(updateSavedLessonMetadata).mockResolvedValue(

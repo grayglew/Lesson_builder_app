@@ -17,6 +17,12 @@ export type SavedLessonWithConfidence = SavedLessonSummary & {
   confidenceSummary?: ConfidenceSummary | null;
 };
 
+export type SavedLessonGroup<T extends SavedLessonSummary = SavedLessonSummary> = {
+  lesson: T;
+  taughtVersions: T[];
+  hasBeenTaught: boolean;
+};
+
 export type WorksheetBundleEntry = {
   path: string;
   file: BuilderAsset;
@@ -33,6 +39,62 @@ export function sortSavedLessons<T extends SavedLessonSummary>(
     const dateOrder = rightDate.localeCompare(leftDate);
     if (dateOrder) return dateOrder;
     return left.title.toLowerCase().localeCompare(right.title.toLowerCase());
+  });
+}
+
+export function groupSavedLessons<T extends SavedLessonSummary>(
+  lessons: readonly T[],
+): SavedLessonGroup<T>[] {
+  const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
+  const sourceByLegacyTitle = new Map(
+    lessons
+      .filter((lesson) => !legacySourceTitle(lesson.title))
+      .map((lesson) => [lesson.title.trim().toLowerCase(), lesson]),
+  );
+  const sourceIdByChildId = new Map<string, string>();
+
+  lessons.forEach((lesson) => {
+    const explicitSource =
+      typeof lesson.sourceLessonId === "string"
+        ? lesson.sourceLessonId.trim()
+        : "";
+    if (
+      explicitSource &&
+      explicitSource !== lesson.id &&
+      lessonById.has(explicitSource)
+    ) {
+      sourceIdByChildId.set(lesson.id, explicitSource);
+      return;
+    }
+    const legacyTitle = legacySourceTitle(lesson.title);
+    const legacySource = legacyTitle
+      ? sourceByLegacyTitle.get(legacyTitle.toLowerCase())
+      : undefined;
+    if (legacySource && legacySource.id !== lesson.id) {
+      sourceIdByChildId.set(lesson.id, legacySource.id);
+    }
+  });
+
+  const versionsBySourceId = new Map<string, T[]>();
+  sourceIdByChildId.forEach((sourceId, childId) => {
+    const child = lessonById.get(childId);
+    if (!child) return;
+    const versions = versionsBySourceId.get(sourceId) || [];
+    versions.push(child);
+    versionsBySourceId.set(sourceId, versions);
+  });
+
+  return sortSavedLessons(
+    lessons.filter((lesson) => !sourceIdByChildId.has(lesson.id)),
+  ).map((lesson) => {
+    const taughtVersions = [...(versionsBySourceId.get(lesson.id) || [])].sort(
+      (left, right) => taughtVersionTimestamp(right).localeCompare(taughtVersionTimestamp(left)),
+    );
+    return {
+      lesson,
+      taughtVersions,
+      hasBeenTaught: lesson.isTaught || taughtVersions.length > 0,
+    };
   });
 }
 
@@ -221,6 +283,15 @@ function hasAssetSource(value: unknown) {
 
 function validTeachingDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function legacySourceTitle(title: string) {
+  const match = title.trim().match(/^(.*?)\s+-\s+taught\s+\d{4}-\d{2}-\d{2}\s+\d{4}$/i);
+  return match?.[1]?.trim() || "";
+}
+
+function taughtVersionTimestamp(lesson: SavedLessonSummary) {
+  return lesson.taughtAt || lesson.updatedAt || lesson.createdAt;
 }
 
 function mixHexColor(left: string, right: string, ratio: number) {

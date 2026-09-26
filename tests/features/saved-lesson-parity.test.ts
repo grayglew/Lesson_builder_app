@@ -4,6 +4,7 @@ import {
   confidenceAverageColors,
   createAnswerKeyExportDocument,
   createSavedStateExportDocument,
+  groupSavedLessons,
   isLessonDirty,
   sortSavedLessons,
   usableConfidenceSummary,
@@ -31,6 +32,69 @@ describe("saved lesson production parity", () => {
       "taught",
       "undated",
     ]);
+  });
+
+  it("groups presenter snapshots beneath their source and marks the source as taught", () => {
+    const source = lessonSummary(
+      "source",
+      "11Ma2 Bearings with trig 2",
+      "2026-09-21",
+      false,
+    );
+    const older = {
+      ...lessonSummary(
+        "snapshot-older",
+        "11Ma2 Bearings with trig 2 - taught 2026-09-14 0904",
+        "2026-09-14",
+        true,
+      ),
+      sourceLessonId: "source",
+      taughtAt: "2026-09-14T09:04:00.000Z",
+    };
+    const newer = {
+      ...lessonSummary(
+        "snapshot-newer",
+        "11Ma2 Bearings with trig 2 - taught 2026-09-21 1356",
+        "2026-09-21",
+        true,
+      ),
+      sourceLessonId: "source",
+      taughtAt: "2026-09-21T13:56:00.000Z",
+    };
+    const legacy = {
+      ...lessonSummary(
+        "snapshot-legacy",
+        "11Ma2 Bearings with trig 2 - taught 2026-09-07 0815",
+        "2026-09-07",
+        true,
+      ),
+      taughtAt: "2026-09-07T08:15:00.000Z",
+    };
+    const orphan = {
+      ...lessonSummary(
+        "snapshot-orphan",
+        "Deleted source - taught 2026-09-20 1000",
+        "2026-09-20",
+        true,
+      ),
+      sourceLessonId: "missing-source",
+    };
+
+    const groups = groupSavedLessons([older, source, orphan, newer, legacy]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.find((group) => group.lesson.id === "source")).toMatchObject({
+      hasBeenTaught: true,
+      taughtVersions: [
+        { id: "snapshot-newer" },
+        { id: "snapshot-older" },
+        { id: "snapshot-legacy" },
+      ],
+    });
+    expect(groups.find((group) => group.lesson.id === "snapshot-orphan")).toMatchObject({
+      hasBeenTaught: true,
+      taughtVersions: [],
+    });
   });
 
   it("uses the production 500ms dirty threshold", () => {

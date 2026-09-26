@@ -584,6 +584,88 @@
   box-shadow: inset 4px 0 0 var(--saved-lesson-confidence-border);
 }
 
+.savedLessonTaughtParentRow {
+  background: color-mix(in srgb, var(--builder-warn) 13%, var(--builder-surface));
+  box-shadow: inset 4px 0 0 var(--builder-warn);
+}
+
+.savedLessonTitleCell,
+.savedLessonHistoryTitle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.savedLessonHistoryToggle,
+.savedLessonHistorySpacer {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 2.75rem;
+  margin: -0.45rem 0.4rem -0.45rem -0.6rem;
+}
+
+.savedLessonHistoryToggle {
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--builder-muted);
+  cursor: pointer;
+}
+
+.savedLessonHistoryToggle:hover,
+.savedLessonHistoryToggle:focus-visible {
+  border-color: var(--builder-line-strong);
+  background: color-mix(in srgb, var(--builder-surface) 64%, transparent);
+  color: var(--builder-ink);
+}
+
+.savedLessonHistoryToggle svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 140ms ease;
+}
+
+.savedLessonHistoryToggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.savedLessonVersionCount {
+  margin-top: 0.2rem;
+  color: var(--builder-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.savedLessonHistoryRow {
+  background: color-mix(in srgb, var(--builder-surface-alt) 72%, var(--builder-surface));
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--builder-warn) 42%, var(--builder-line));
+}
+
+.savedLessonHistoryTitle {
+  padding-left: 2.35rem;
+}
+
+.savedLessonHistoryLine {
+  width: 1.2rem;
+  height: 1px;
+  flex: 0 0 auto;
+  margin-right: 0.7rem;
+  background: var(--builder-line-strong);
+}
+
+.savedLessonSnapshotBadge {
+  display: inline-flex;
+  border: 1px solid color-mix(in srgb, var(--builder-warn) 48%, var(--builder-line));
+  border-radius: 999px;
+  background: var(--builder-warn-soft);
+  color: var(--builder-warn);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
 .exampleRetrievalToggle {
   display: inline-flex;
   flex: 0 0 auto;

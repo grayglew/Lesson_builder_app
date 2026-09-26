@@ -4,6 +4,7 @@ import {
   Archive,
   BarChart3,
   CheckCircle2,
+  ChevronRight,
   Copy,
   Download,
   FolderOpen,
@@ -19,6 +20,7 @@ import {
   Undo2,
 } from "lucide-react";
 import {
+  Fragment,
   type CSSProperties,
   useCallback,
   useEffect,
@@ -48,8 +50,8 @@ import {
 } from "./saved-lesson-export";
 import {
   confidenceAverageColors,
+  groupSavedLessons,
   isLessonDirty,
-  sortSavedLessons,
   usableConfidenceSummary,
   type ConfidenceSummary,
   type SavedLessonWithConfidence,
@@ -82,6 +84,9 @@ export function SavedLessonLibrary({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [taughtFilter, setTaughtFilter] = useState<"all" | "planned" | "taught">("all");
+  const [expandedLessonIds, setExpandedLessonIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [confidenceLesson, setConfidenceLesson] = useState<{
     title: string;
     summary: ConfidenceSummary;
@@ -134,18 +139,26 @@ export function SavedLessonLibrary({
     [lessons],
   );
 
-  const filteredLessons = useMemo(() => {
+  const lessonGroups = useMemo(() => groupSavedLessons(lessons), [lessons]);
+
+  const filteredLessonGroups = useMemo(() => {
     const query = titleFilter.trim().toLowerCase();
-    return sortSavedLessons(lessons.filter((lesson) => {
-      if (query && !lesson.title.toLowerCase().includes(query)) return false;
+    return lessonGroups.filter((group) => {
+      const lesson = group.lesson;
+      if (
+        query &&
+        ![lesson, ...group.taughtVersions].some((entry) =>
+          entry.title.toLowerCase().includes(query),
+        )
+      ) return false;
       if (classFilter && lesson.className !== classFilter) return false;
       if (dateFrom && lesson.teachingDate < dateFrom) return false;
       if (dateTo && lesson.teachingDate > dateTo) return false;
-      if (taughtFilter === "planned" && lesson.isTaught) return false;
-      if (taughtFilter === "taught" && !lesson.isTaught) return false;
+      if (taughtFilter === "planned" && group.hasBeenTaught) return false;
+      if (taughtFilter === "taught" && !group.hasBeenTaught) return false;
       return true;
-    }));
-  }, [classFilter, dateFrom, dateTo, lessons, taughtFilter, titleFilter]);
+    });
+  }, [classFilter, dateFrom, dateTo, lessonGroups, taughtFilter, titleFilter]);
 
   const hasActiveFilters = Boolean(
     titleFilter || classFilter || dateFrom || dateTo || taughtFilter !== "all",
@@ -423,6 +436,55 @@ export function SavedLessonLibrary({
     }
   }
 
+  function toggleHistory(lessonId: string) {
+    setExpandedLessonIds((current) => {
+      const next = new Set(current);
+      if (next.has(lessonId)) next.delete(lessonId);
+      else next.add(lessonId);
+      return next;
+    });
+  }
+
+  function lessonActions(
+    lesson: SavedLessonSummary,
+    confidence: ConfidenceSummary | null,
+  ) {
+    return (
+      <div className="flex justify-end gap-1">
+        <IconAction label="Open lesson" disabled={Boolean(busyId)} onClick={() => void openLessonById(lesson)} icon={busyId === lesson.id ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />} />
+        <IconAction label="Present lesson" disabled={Boolean(busyId)} onClick={() => void presentLesson(lesson)} icon={<Presentation className="size-4" />} />
+        {compact ? (
+          <BuilderActionMenu
+            label={`More actions for ${lesson.title}`}
+            triggerContent={<><MoreHorizontal className="size-4" aria-hidden /><span className="sr-only">More actions for {lesson.title}</span></>}
+          >
+            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)}><Download className="size-4" aria-hidden /> Download HTML</button>
+            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)}><Package className="size-4" aria-hidden /> Download lesson bundle</button>
+            <button type="button" disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)}>{lesson.isTaught ? <Archive className="size-4" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />} {lesson.isTaught ? "Mark planned" : "Mark taught"}</button>
+            {confidence ? (
+              <button type="button" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })}><BarChart3 className="size-4" aria-hidden /> View confidence</button>
+            ) : null}
+            <button type="button" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)}><School className="size-4" aria-hidden /> Change class</button>
+            <button type="button" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)}><Pencil className="size-4" aria-hidden /> Rename lesson</button>
+            <button type="button" disabled={Boolean(busyId)} style={{ color: "#b42318" }} onClick={() => void removeLesson(lesson)}><Trash2 className="size-4" aria-hidden /> Delete lesson</button>
+          </BuilderActionMenu>
+        ) : (
+          <>
+            <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
+            <IconAction label="Download lesson bundle" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)} icon={<Package className="size-4" />} />
+            <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
+            {confidence ? (
+              <IconAction label="View confidence" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })} icon={<BarChart3 className="size-4" />} />
+            ) : null}
+            <IconAction label="Change class" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)} icon={<School className="size-4" />} />
+            <IconAction label="Rename lesson" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)} icon={<Pencil className="size-4" />} />
+            <IconAction label="Delete lesson" danger disabled={Boolean(busyId)} onClick={() => void removeLesson(lesson)} icon={<Trash2 className="size-4" />} />
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
     <section className={embedded ? "" : "mx-auto max-w-[1500px] p-4"}>
@@ -490,7 +552,7 @@ export function SavedLessonLibrary({
 
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
           <p className="text-sm text-slate-600">
-            {filteredLessons.length} of {lessons.length} lessons · {formatBytes(lessons.reduce((total, lesson) => total + lesson.byteSize, 0))}
+            {filteredLessonGroups.length} of {lessonGroups.length} lessons · {formatBytes(lessons.reduce((total, lesson) => total + lesson.byteSize, 0))}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <button
@@ -513,7 +575,7 @@ export function SavedLessonLibrary({
             <LoaderCircle className="mb-2 size-6 animate-spin text-teal-700" aria-hidden />
             Loading saved lessons…
           </div>
-        ) : filteredLessons.length ? (
+        ) : filteredLessonGroups.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -532,8 +594,10 @@ export function SavedLessonLibrary({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {filteredLessons.map((lesson) => {
+                {filteredLessonGroups.map((group) => {
+                  const lesson = group.lesson;
                   const active = lesson.id === document.activeLessonId;
+                  const expanded = expandedLessonIds.has(lesson.id);
                   const confidence = usableConfidenceSummary(
                     lesson as SavedLessonWithConfidence,
                   );
@@ -550,63 +614,86 @@ export function SavedLessonLibrary({
                     : undefined;
                   const rowClassName = confidenceColors
                     ? styles.savedLessonConfidenceRow
-                    : lesson.isTaught
-                      ? "bg-slate-100 opacity-70 grayscale"
+                    : group.hasBeenTaught
+                      ? styles.savedLessonTaughtParentRow
                       : active
                         ? "bg-teal-50/70"
                         : "bg-white";
                   return (
-                  <tr key={lesson.id} className={rowClassName} style={rowStyle}>
+                  <Fragment key={lesson.id}>
+                  <tr className={rowClassName} style={rowStyle}>
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-slate-900">
-                        {lesson.title}
-                        {lesson.id === document.activeLessonId && isLessonDirty(document) ? " *" : ""}
-                      </p>
+                      <div className={styles.savedLessonTitleCell}>
+                        {group.taughtVersions.length ? (
+                          <button
+                            className={styles.savedLessonHistoryToggle}
+                            type="button"
+                            aria-expanded={expanded}
+                            aria-label={`${expanded ? "Hide" : "Show"} ${versionCountLabel(group.taughtVersions.length)} for ${lesson.title}`}
+                            onClick={() => toggleHistory(lesson.id)}
+                          >
+                            <ChevronRight aria-hidden />
+                          </button>
+                        ) : <span className={styles.savedLessonHistorySpacer} aria-hidden />}
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-900">
+                            {lesson.title}
+                            {lesson.id === document.activeLessonId && isLessonDirty(document) ? " *" : ""}
+                          </p>
+                          {group.taughtVersions.length ? (
+                            <p className={styles.savedLessonVersionCount}>
+                              {versionCountLabel(group.taughtVersions.length)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
                       {lesson.id === document.activeLessonId ? <p className="mt-1 text-xs font-semibold text-teal-700">Currently open{isLessonDirty(document) ? " · unsaved changes" : ""}</p> : null}
                     </td>
                     <td className="px-4 py-4 text-slate-600">{lesson.className || "—"}</td>
                     <td className="px-4 py-4 text-slate-600">{lesson.teachingDate || "—"}</td>
                     <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${lesson.isTaught ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>
-                        {lesson.isTaught ? "Taught" : "Planned"}
+                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${group.hasBeenTaught ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>
+                        {group.hasBeenTaught ? "Taught" : "Planned"}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-slate-500">{formatBytes(lesson.byteSize)}</td>
                     <td className="px-5 py-4">
-                      <div className="flex justify-end gap-1">
-                        <IconAction label="Open lesson" disabled={Boolean(busyId)} onClick={() => void openLessonById(lesson)} icon={busyId === lesson.id ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />} />
-                        <IconAction label="Present lesson" disabled={Boolean(busyId)} onClick={() => void presentLesson(lesson)} icon={<Presentation className="size-4" />} />
-                        {compact ? (
-                          <BuilderActionMenu
-                            label={`More actions for ${lesson.title}`}
-                            triggerContent={<><MoreHorizontal className="size-4" aria-hidden /><span className="sr-only">More actions for {lesson.title}</span></>}
-                          >
-                            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)}><Download className="size-4" aria-hidden /> Download HTML</button>
-                            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)}><Package className="size-4" aria-hidden /> Download lesson bundle</button>
-                            <button type="button" disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)}>{lesson.isTaught ? <Archive className="size-4" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />} {lesson.isTaught ? "Mark planned" : "Mark taught"}</button>
-                            {confidence ? (
-                              <button type="button" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })}><BarChart3 className="size-4" aria-hidden /> View confidence</button>
-                            ) : null}
-                            <button type="button" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)}><School className="size-4" aria-hidden /> Change class</button>
-                            <button type="button" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)}><Pencil className="size-4" aria-hidden /> Rename lesson</button>
-                            <button type="button" disabled={Boolean(busyId)} style={{ color: "#b42318" }} onClick={() => void removeLesson(lesson)}><Trash2 className="size-4" aria-hidden /> Delete lesson</button>
-                          </BuilderActionMenu>
-                        ) : (
-                          <>
-                            <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
-                            <IconAction label="Download lesson bundle" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)} icon={<Package className="size-4" />} />
-                            <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
-                            {confidence ? (
-                              <IconAction label="View confidence" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })} icon={<BarChart3 className="size-4" />} />
-                            ) : null}
-                            <IconAction label="Change class" disabled={Boolean(busyId)} onClick={() => void changeClass(lesson)} icon={<School className="size-4" />} />
-                            <IconAction label="Rename lesson" disabled={Boolean(busyId)} onClick={() => void renameLesson(lesson)} icon={<Pencil className="size-4" />} />
-                            <IconAction label="Delete lesson" danger disabled={Boolean(busyId)} onClick={() => void removeLesson(lesson)} icon={<Trash2 className="size-4" />} />
-                          </>
-                        )}
-                      </div>
+                      {lessonActions(lesson, confidence)}
                     </td>
                   </tr>
+                  {expanded ? group.taughtVersions.map((version) => {
+                    const versionConfidence = usableConfidenceSummary(
+                      version as SavedLessonWithConfidence,
+                    );
+                    return (
+                      <tr
+                        key={version.id}
+                        className={styles.savedLessonHistoryRow}
+                      >
+                        <td className="px-5 py-3">
+                          <div className={styles.savedLessonHistoryTitle}>
+                            <span className={styles.savedLessonHistoryLine} aria-hidden />
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                {formatTaughtVersionLabel(version)}
+                              </p>
+                              <p className={styles.savedLessonVersionCount}>
+                                Saved from presenter
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{version.className || "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">{version.teachingDate || "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className={styles.savedLessonSnapshotBadge}>Snapshot</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{formatBytes(version.byteSize)}</td>
+                        <td className="px-5 py-3">{lessonActions(version, versionConfidence)}</td>
+                      </tr>
+                    );
+                  }) : null}
+                  </Fragment>
                   );
                 })}
               </tbody>
@@ -689,6 +776,24 @@ function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function versionCountLabel(count: number) {
+  return `${count} taught ${count === 1 ? "version" : "versions"}`;
+}
+
+function formatTaughtVersionLabel(lesson: SavedLessonSummary) {
+  const timestamp = lesson.taughtAt || lesson.updatedAt || lesson.createdAt;
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return "Taught version";
+  return `Taught ${new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed)}`;
 }
 
 function errorMessage(error: unknown, fallback: string) {
