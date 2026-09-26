@@ -112,6 +112,23 @@ const toolLabels: Record<ToolName, string> = {
   math: "LaTeX",
 };
 
+function buildNewLessonMetadata(details: {
+  title: string;
+  className: string;
+  teachingDate: string;
+}) {
+  const lessonTitle = details.title.replace(/\s+/g, " ").trim();
+  const className = details.className.replace(/\s+/g, " ").trim();
+  const [, month, day] = details.teachingDate.split("-");
+
+  return {
+    title: `${className} ${lessonTitle} ${day}-${month}`,
+    className,
+    teachingDate: details.teachingDate,
+    overallLessonLo: lessonTitle,
+  };
+}
+
 export function BuilderShell({
   actorEmail = "",
   initialTheme = "system",
@@ -504,11 +521,10 @@ export function BuilderShell({
     className: string;
     teachingDate: string;
   }) {
+    const metadata = buildNewLessonMetadata(details);
     const nextDocument = {
       ...createInitialBuilderDocument(),
-      title: details.title,
-      className: details.className,
-      teachingDate: details.teachingDate,
+      ...metadata,
       classNames: [...document.classNames],
       retrievalItems: document.retrievalItems,
       slideTemplates: document.slideTemplates,
@@ -517,7 +533,7 @@ export function BuilderShell({
     setBusyAction("new-lesson");
     setStatus({
       tone: "working",
-      message: `Creating and saving "${details.title}"...`,
+      message: `Creating and saving "${metadata.title}"...`,
     });
 
     try {

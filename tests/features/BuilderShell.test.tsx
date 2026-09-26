@@ -156,12 +156,12 @@ describe("BuilderShell legacy UI parity", () => {
     ).toBeInTheDocument();
   });
 
-  it("requires a title and class before creating and saving a new lesson", async () => {
+  it("requires new-lesson metadata and derives the saved name and overall LO", async () => {
     const user = userEvent.setup();
     const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
     document.title = "Current lesson";
     document.className = "Year 10";
-    document.classNames = ["Year 9", "Year 10"];
+    document.classNames = ["7Ma3", "Year 10"];
     document.slides = [{ id: "current-slide", type: "blank", title: "Current" }];
     document.retrievalItems = [
       {
@@ -180,9 +180,9 @@ describe("BuilderShell legacy UI parity", () => {
     vi.mocked(loadBuilderDocument).mockResolvedValue(document);
     vi.mocked(saveCurrentLesson).mockResolvedValue({
       id: "new-lesson-id",
-      title: "New algebra lesson",
-      className: "Year 9",
-      teachingDate: "2026-08-12",
+      title: "7Ma3 Language of probability 26-09",
+      className: "7Ma3",
+      teachingDate: "2026-09-26",
       byteSize: 100,
       taughtAt: "",
       isTaught: false,
@@ -201,21 +201,25 @@ describe("BuilderShell legacy UI parity", () => {
     });
     expect(submit).toBeDisabled();
 
-    await user.type(within(dialog).getByLabelText("Lesson title"), "New algebra lesson");
+    await user.type(
+      within(dialog).getByLabelText("Lesson title"),
+      "Language   of   probability",
+    );
     expect(submit).toBeDisabled();
-    await user.selectOptions(within(dialog).getByLabelText("Class"), "Year 9");
+    await user.selectOptions(within(dialog).getByLabelText("Class"), "7Ma3");
     const teachingDate = within(dialog).getByLabelText("Teaching date");
     await user.clear(teachingDate);
-    await user.type(teachingDate, "2026-08-12");
+    await user.type(teachingDate, "2026-09-26");
     expect(submit).toBeEnabled();
     await user.click(submit);
 
     await waitFor(() =>
       expect(saveCurrentLesson).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: "New algebra lesson",
-          className: "Year 9",
-          teachingDate: "2026-08-12",
+          title: "7Ma3 Language of probability 26-09",
+          className: "7Ma3",
+          teachingDate: "2026-09-26",
+          overallLessonLo: "Language of probability",
           activeLessonId: "",
           slides: [],
         }),
@@ -225,9 +229,10 @@ describe("BuilderShell legacy UI parity", () => {
     await waitFor(() =>
       expect(useBuilderStore.getState().document).toEqual(
         expect.objectContaining({
-          title: "New algebra lesson",
-          className: "Year 9",
-          teachingDate: "2026-08-12",
+          title: "7Ma3 Language of probability 26-09",
+          className: "7Ma3",
+          teachingDate: "2026-09-26",
+          overallLessonLo: "Language of probability",
           activeLessonId: "new-lesson-id",
           slides: [],
           retrievalItems: document.retrievalItems,
