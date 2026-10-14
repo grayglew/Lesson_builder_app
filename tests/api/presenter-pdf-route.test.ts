@@ -30,11 +30,11 @@ vi.mock("@/lib/builder-sync/auth", () => ({
   isPresenterPdfSnapshotPath: vi.fn(),
 }));
 
+import { POST } from "@/app/api/presenter/pdf/route";
 import {
-  POST,
   renderA4BundleSnapshotToPdf,
   renderPresenterSnapshotToPdf,
-} from "@/app/api/presenter/pdf/route";
+} from "@/lib/presenter/pdf-renderer";
 import {
   getAuthorizedBuilderSyncClient,
   isPresenterPdfSnapshotPath,
