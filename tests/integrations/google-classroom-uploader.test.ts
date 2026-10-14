@@ -120,10 +120,59 @@ describe("Google Classroom lesson bundle uploader", () => {
     ]);
   });
 
+  it("attaches all worksheet formats after both lesson PDFs in filename order", () => {
+    const attachments = extract([
+      zipEntry("Lesson-answers.pdf"),
+      zipEntry("worksheets/z-activity.custom"),
+      zipEntry("worksheets/z-other.constructor"),
+      zipEntry("worksheets/d-sheet.xlsx"),
+      zipEntry("worksheets/c-slides.pptx"),
+      zipEntry("worksheets/b-notes.docx"),
+      zipEntry("worksheets/a-image.png"),
+      zipEntry("worksheets/README"),
+      zipEntry("worksheets/"),
+      zipEntry("worksheets/../outside.txt"),
+      zipEntry("outside.txt"),
+      zipEntry("Lesson.pdf"),
+    ]);
+    expect(attachments.map((entry) => [entry.fileName, entry.mimeType])).toEqual([
+      ["Lesson.pdf", "application/pdf"],
+      ["Lesson-answers.pdf", "application/pdf"],
+      ["a-image.png", "image/png"],
+      ["b-notes.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+      ["c-slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+      ["d-sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+      ["README", "application/octet-stream"],
+      ["z-activity.custom", "application/octet-stream"],
+      ["z-other.constructor", "application/octet-stream"],
+    ]);
+    expect(attachments[4].blob.getBytes()).toEqual([1, 2, 3]);
+  });
+
   it("rejects a bundle without a root lesson PDF", () => {
     expect(() => extract([zipEntry("worksheets/practice.pdf")])).toThrow(
       "A current lesson bundle must contain one saved-state PDF and one matching -answers PDF. Found 0 root PDFs.",
     );
+  });
+
+  it("counts non-PDF worksheets toward the Classroom attachment limit before uploading", () => {
+    const sandbox = {
+      Session: { getEffectiveUser: () => ({ getEmail: () => "gglew@dbis.edu.hk" }) },
+      Utilities: {
+        base64Decode: () => [1],
+        newBlob: () => zipEntry("bundle.zip"),
+        unzip: () => [
+          zipEntry("Lesson.pdf"), zipEntry("Lesson-answers.pdf"),
+          ...Array.from({ length: 19 }, (_, index) => zipEntry(`worksheets/activity-${index}.pptx`)),
+        ],
+      },
+    };
+    vm.runInNewContext(readFileSync(uploaderPath, "utf8"), sandbox);
+    const create = (sandbox as typeof sandbox & {
+      createBundleLessonMaterial: (payload: unknown) => unknown;
+    }).createBundleLessonMaterial;
+    expect(() => create({ courseId: "course", title: "Lesson", bundle: { base64: "eA==" } }))
+      .toThrow("This bundle contains 21 attachable files.");
   });
 
   it("rejects two unrelated root PDFs", () => {

@@ -378,32 +378,47 @@ describe("saved lesson static bundle", () => {
 
   it.each([
     {
+      name: "identifyangleslengths(1).pptx",
+      type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    },
+    {
       name: "notes.docx",
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     },
     { name: "diagram.png", type: "image/png" },
-  ])("rejects non-PDF worksheet attachment $name before rendering", async (asset) => {
+    { name: "data.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+    { name: "activity.custom", type: "application/octet-stream" },
+    { name: "activity.verylongextension", type: "application/octet-stream" },
+    { name: "README", type: "text/plain" },
+  ])("preserves original bytes and filename for worksheet and answer attachment $name", async (asset) => {
     const document = createInitialBuilderDocument("2026-09-03T01:00:00.000Z");
     document.slides = [
       {
         id: `worksheet-${asset.name}`,
         type: "worksheet",
-        title: "Unsupported attachment",
+        title: "Original attachment",
         worksheet: {
           ...asset,
           size: 4,
           dataUrl: "data:application/octet-stream;base64,ZmlsZQ==",
         },
+        answers: { ...asset, size: 6, dataUrl: "data:application/octet-stream;base64,YW5zd2Vy" },
       },
     ];
-    const renderPdf = vi.fn().mockResolvedValue(new Blob(["%PDF"]));
+    const renderPdf = vi.fn().mockResolvedValue(new Blob(["%PDF-1.7"]));
 
-    await expect(
-      savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
-    ).rejects.toThrow(
-      `Could not include "worksheets/${asset.name}" in the lesson bundle because worksheet attachments must be PDF files.`,
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      new Response(String(input).includes("YW5zd2Vy") ? "answer" : "file"),
     );
-    expect(renderPdf).not.toHaveBeenCalled();
+    const bundle = await savedLessonExport.buildLessonBundleZip(document, { renderPdf });
+    const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
+    const answerName = asset.name.includes(".")
+      ? asset.name.replace(/(\.[^.]+)$/, "-2$1")
+      : `${asset.name}-2`;
+    expect(await zip.file(`worksheets/${asset.name}`)?.async("string")).toBe("file");
+    expect(await zip.file(`worksheets/${answerName}`)?.async("string")).toBe("answer");
+    expect(zip.file("Untitled-lesson.pdf")).not.toBeNull();
+    expect(zip.file("Untitled-lesson-answers.pdf")).not.toBeNull();
   });
 
   it("rejects a renamed non-PDF answer using its collision-resolved path", async () => {
@@ -432,7 +447,7 @@ describe("saved lesson static bundle", () => {
     await expect(
       savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
     ).rejects.toThrow(
-      'Could not include "worksheets/practice-2.pdf" in the lesson bundle because worksheet attachments must be PDF files.',
+      'Could not include "worksheets/practice-2.pdf" in the lesson bundle because the attachment is named .pdf but is not a valid PDF file.',
     );
     expect(renderPdf).not.toHaveBeenCalled();
   });
@@ -494,7 +509,7 @@ describe("saved lesson static bundle", () => {
     await expect(
       savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
     ).rejects.toThrow(
-      'Could not include "worksheets/renamed.pdf" in the lesson bundle because worksheet attachments must be PDF files.',
+      'Could not include "worksheets/renamed.pdf" in the lesson bundle because the attachment is named .pdf but is not a valid PDF file.',
     );
     expect(renderPdf).not.toHaveBeenCalled();
   });
@@ -522,7 +537,7 @@ describe("saved lesson static bundle", () => {
     await expect(
       savedLessonExport.buildLessonBundleZip!(document, { renderPdf }),
     ).rejects.toThrow(
-      'Could not include "worksheets/disguised.pdf" in the lesson bundle because worksheet attachments must be PDF files.',
+      'Could not include "worksheets/disguised.pdf" in the lesson bundle because the attachment is named .pdf but is not a valid PDF file.',
     );
     expect(renderPdf).not.toHaveBeenCalled();
   });

@@ -325,7 +325,7 @@ function uniqueWorksheetPath(
   let path = `worksheets/${fileName}`;
   let counter = 2;
   while (usedPaths.has(path)) {
-    const match = fileName.match(/(\.[a-z0-9]{1,10})$/i);
+    const match = fileName.match(/(\.[^.]+)$/);
     path = match
       ? `worksheets/${fileName.slice(0, -match[1].length)}-${counter}${match[1]}`
       : `worksheets/${fileName}-${counter}`;

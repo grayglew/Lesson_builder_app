@@ -160,7 +160,7 @@ function extractLessonBundleFiles_(zipBlob) {
 
   const rootPptx = [];
   const rootPdf = [];
-  const worksheetPdfs = [];
+  const worksheetFiles = [];
   const readmeEntries = [];
 
   entries.forEach(function(blob) {
@@ -181,8 +181,8 @@ function extractLessonBundleFiles_(zipBlob) {
       return;
     }
 
-    if (/^worksheets\/[^/]+\.pdf$/i.test(entryName)) {
-      worksheetPdfs.push({ name: entryName, blob: blob });
+    if (/^worksheets\/[^/]+$/i.test(entryName)) {
+      worksheetFiles.push({ name: entryName, blob: blob });
     }
   });
 
@@ -190,7 +190,7 @@ function extractLessonBundleFiles_(zipBlob) {
     throw new Error('The legacy lesson bundle may contain at most one root PowerPoint file (.pptx). Found ' + rootPptx.length + '.');
   }
 
-  worksheetPdfs.sort(function(a, b) {
+  worksheetFiles.sort(function(a, b) {
     return a.name.localeCompare(b.name);
   });
 
@@ -199,7 +199,7 @@ function extractLessonBundleFiles_(zipBlob) {
   });
 
   if (!isFormat2 && rootPdf.length === 1) {
-    return [rootPdf[0]].concat(worksheetPdfs).map(toDriveAttachment_);
+    return [rootPdf[0]].concat(worksheetFiles).map(toDriveAttachment_);
   }
 
   if (rootPdf.length !== 2) {
@@ -220,7 +220,7 @@ function extractLessonBundleFiles_(zipBlob) {
   }
 
   return [pairs[0].lesson, pairs[0].answers]
-    .concat(worksheetPdfs)
+    .concat(worksheetFiles)
     .map(toDriveAttachment_);
 }
 
@@ -362,9 +362,28 @@ function safeDriveFileName_(value) {
 }
 
 function mimeTypeForFileName_(fileName) {
-  if (/\.pdf$/i.test(fileName)) return 'application/pdf';
-  if (/\.pptx$/i.test(fileName)) return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-  return 'application/octet-stream';
+  const extension = String(fileName || '').match(/\.([^.]+)$/);
+  const types = {
+    pdf: 'application/pdf',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ppt: 'application/vnd.ms-powerpoint',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc: 'application/msword',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    xls: 'application/vnd.ms-excel',
+    odt: 'application/vnd.oasis.opendocument.text',
+    ods: 'application/vnd.oasis.opendocument.spreadsheet',
+    odp: 'application/vnd.oasis.opendocument.presentation',
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+    txt: 'text/plain', csv: 'text/csv', html: 'text/html', htm: 'text/html',
+    json: 'application/json', zip: 'application/zip',
+    mp3: 'audio/mpeg', wav: 'audio/wav', mp4: 'video/mp4'
+  };
+  const key = extension ? extension[1].toLowerCase() : '';
+  return Object.prototype.hasOwnProperty.call(types, key)
+    ? types[key]
+    : 'application/octet-stream';
 }
 
 function requireText_(value, label) {

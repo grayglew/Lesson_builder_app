@@ -95,13 +95,13 @@ export async function buildLessonBundleZip(
   );
   const worksheetEntries = collectWorksheetFilesForBundle(embeddedDocument);
   worksheetEntries.forEach((entry) =>
-    assertPdfWorksheetAttachment(entry.file, entry.path),
+    assertWorksheetAttachment(entry.file, entry.path),
   );
   const worksheetFiles: Array<{ path: string; file: Blob }> = [];
   for (const entry of worksheetEntries) {
     const file = await builderAssetToBlobStrict(entry.file, entry.path);
-    assertPdfWorksheetAttachment(entry.file, entry.path, file.type);
-    if (!(await blobHasPdfHeader(file))) {
+    assertWorksheetAttachment(entry.file, entry.path, file.type);
+    if (/\.pdf$/i.test(entry.path) && !(await blobHasPdfHeader(file))) {
       throwNonPdfWorksheetAttachment(entry.path);
     }
     worksheetFiles.push({ path: entry.path, file });
@@ -139,7 +139,8 @@ export async function buildLessonBundleZip(
       "Both lesson PDFs use A4 pages. Ordinary lesson slides are arranged two per page; imported PDF pages use a full A4 page.",
       `"${savedPdfPath}" preserves the saved lesson state, including saved reveals and annotations.`,
       `"${answerPdfPath}" shows all answers without annotations.`,
-      "Worksheet and answer PDFs are included in the worksheets/ folder.",
+      "Worksheet and answer attachments are included in their original formats in the worksheets/ folder; they are not converted into lesson PDF pages.",
+      "Use the current Classroom uploader to attach all worksheet file formats.",
     ].join("\n"),
   );
   return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
@@ -247,18 +248,18 @@ async function builderAssetToBlobStrict(
   }
 }
 
-function assertPdfWorksheetAttachment(
+function assertWorksheetAttachment(
   asset: BuilderAsset,
   path: string,
   downloadedMimeType = "",
 ) {
+  if (!/\.pdf$/i.test(path)) return;
   const source = String(asset.dataUrl || "").trim();
   const dataUrlMimeType = source.match(/^data:([^;,]*)[;,]/i)?.[1] || "";
   const mimeTypes = [asset.type, dataUrlMimeType, downloadedMimeType]
     .map(normalizeMimeType)
     .filter(Boolean);
   if (
-    !/\.pdf$/i.test(path) ||
     mimeTypes.some((mimeType) => !isPdfCompatibleMimeType(mimeType))
   ) {
     throwNonPdfWorksheetAttachment(path);
@@ -312,7 +313,7 @@ function blobArrayBuffer(blob: Blob) {
 
 function throwNonPdfWorksheetAttachment(path: string): never {
   throw new Error(
-    `Could not include "${path}" in the lesson bundle because worksheet attachments must be PDF files.`,
+    `Could not include "${path}" in the lesson bundle because the attachment is named .pdf but is not a valid PDF file.`,
   );
 }
 
