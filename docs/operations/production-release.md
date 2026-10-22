@@ -4,11 +4,20 @@
 
 - Production domain: `https://lesson-builder-online.vercel.app`
 - Unified builder route: `/builder`
-- Current production commit: `2ce40590740fbde4b539412ac92e113e1bb08bed`
+- Current production commit: `5d5c55f4b02d96d830d5be1738757d53bddbc2bc`
 - Current immutable deployment:
-  `https://lesson-builder-online-peayciemg-grayglew-8338s-projects.vercel.app`
+  `https://lesson-builder-online-l5ztr3w1o-grayglew-8338s-projects.vercel.app`
 - Previous rollback deployment:
-  `https://lesson-builder-online-olj1q9o61-grayglew-8338s-projects.vercel.app`
+  `https://lesson-builder-online-bz1h9dwox-grayglew-8338s-projects.vercel.app`
+- Rollback source tag: `rollback/production-before-retrieval-deselect-20261022`
+- Released 22 October 2026: deselect successfully logged retrieval skills;
+  retain selection when logging fails. Only this fix and its tests were
+  brought onto the production branch; pending worksheet/uploader work remains
+  separate.
+- Verification: 362 unit tests, TypeScript, source lint (excluding local
+  worktree/build copies), presenter browser checks, Vercel production build,
+  and three deployment smoke tests on both the candidate and live domain.
+  The live health endpoint reports the production commit above.
 
 Update this section whenever a newer production deployment is promoted.
 
