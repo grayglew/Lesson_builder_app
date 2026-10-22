@@ -397,7 +397,6 @@ async function uploadPresenterSnapshot(lessonId: string, html: string) {
   formData.append("", blob, "presenter.html");
   const uploadResponse = await fetch(ticket.signedUrl, {
     method: "PUT",
-    headers: { "x-upsert": "true" },
     body: formData,
   });
   if (!uploadResponse.ok) {

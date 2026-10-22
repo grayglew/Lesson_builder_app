@@ -38,6 +38,7 @@ import {
 } from "./BuilderCompactChrome";
 import styles from "./BuilderShell.module.css";
 import { BuilderStatusToast } from "./BuilderStatusToast";
+import { BundleDownloadQueuePanel, BundleDownloadQueueProvider } from "./BundleDownloads";
 import { BuilderActionMenu } from "./BuilderActionMenu";
 import { CfuComposer } from "./CfuComposer";
 import { DrawComposer } from "./DrawComposer";
@@ -129,7 +130,15 @@ function buildNewLessonMetadata(details: {
   };
 }
 
-export function BuilderShell({
+export function BuilderShell(props: BuilderShellProps) {
+  return (
+    <BundleDownloadQueueProvider key={props.userEmail}>
+      <BuilderShellWorkspace {...props} />
+    </BundleDownloadQueueProvider>
+  );
+}
+
+function BuilderShellWorkspace({
   actorEmail = "",
   initialTheme = "system",
   isImpersonating = false,
@@ -1263,6 +1272,7 @@ export function BuilderShell({
         />
       ) : null}
 
+      {activeTool !== "saved-lessons" ? <BundleDownloadQueuePanel /> : null}
       <BuilderStatusToast />
     </main>
   );

@@ -1,4 +1,5 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render as renderUi, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SavedLessonLibrary } from "@/features/builder/SavedLessonLibrary";
@@ -15,6 +16,11 @@ import {
 } from "@/features/builder/saved-lesson-export";
 import { createInitialBuilderDocument } from "@/features/builder/schema";
 import { useBuilderStore } from "@/features/builder/store";
+import { BundleDownloadQueueProvider } from "@/features/builder/BundleDownloads";
+
+function render(ui: ReactElement) {
+  return renderUi(<BundleDownloadQueueProvider>{ui}</BundleDownloadQueueProvider>);
+}
 
 vi.mock("@/features/builder/api-client", async (importOriginal) => {
   const original =
@@ -240,10 +246,7 @@ describe("SavedLessonLibrary production actions", () => {
     );
 
     await waitFor(() => expect(buildLessonBundleZip).toHaveBeenCalledOnce());
-    expect(useBuilderStore.getState().status).toEqual({
-      tone: "working",
-      message: 'Building the saved-state and answer PDFs for "Active lesson"…',
-    });
+    expect(screen.getByRole("region", { name: "Bundle downloads" })).toHaveTextContent("Active lesson");
     const dependencies = vi.mocked(buildLessonBundleZip).mock.calls[0]?.[1];
     expect(dependencies?.renderPdf).toEqual(expect.any(Function));
     await dependencies?.renderPdf?.("<!doctype html><p>Saved state</p>");
@@ -266,10 +269,31 @@ describe("SavedLessonLibrary production actions", () => {
       expect.any(Blob),
       "Active lesson-bundle.zip",
     );
-    await waitFor(() => expect(useBuilderStore.getState().status).toEqual({
-      tone: "success",
-      message: 'Downloaded the lesson bundle for "Active lesson".',
+    expect(await screen.findByRole("button", { name: "Download Active lesson again" })).toBeEnabled();
+  });
+
+  it("queues other lessons without locking the library and runs at most two exports", async () => {
+    const user = userEvent.setup();
+    const finishes: Array<(blob: Blob) => void> = [];
+    vi.mocked(buildLessonBundleZip).mockImplementation(() => new Promise(resolve => finishes.push(resolve)));
+    vi.mocked(openSavedLesson).mockImplementation(async id => ({
+      document: createInitialBuilderDocument(),
+      lesson: lesson(id, id, "2026-04-01", false),
     }));
+    render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
+    await screen.findByText("Active lesson *");
+
+    for (const title of ["Active lesson", "Confidence lesson", "Already taught"]) {
+      await user.click(screen.getByRole("button", { name: `More actions for ${title}` }));
+      const download = within(screen.getByRole("menu", { name: `More actions for ${title}` }))
+        .getByRole("button", { name: "Download lesson bundle" });
+      expect(download).toBeEnabled();
+      await user.click(download);
+    }
+    await waitFor(() => expect(buildLessonBundleZip).toHaveBeenCalledTimes(2));
+    expect(screen.getAllByRole("button", { name: "Open lesson" }).every(button => !button.hasAttribute("disabled"))).toBe(true);
+    finishes[0](new Blob(["first"]));
+    await waitFor(() => expect(buildLessonBundleZip).toHaveBeenCalledTimes(3));
   });
 
   it("clears every saved-lesson filter in one action and restores newest-first order", async () => {

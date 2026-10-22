@@ -20,6 +20,7 @@ export type BundleDependencies = {
   renderPdf: (html: string) => Promise<Blob>;
   retrievalItems?: RetrievalItem[];
   prepareDocument?: PrepareExportDocument;
+  onProgress?: (stage: "preparing" | "rendering-saved" | "rendering-answers" | "packaging") => void;
 };
 
 type PrepareExportDocument = (
@@ -88,6 +89,7 @@ export async function buildLessonBundleZip(
   if (!document.slides.length) {
     throw new Error("This saved lesson has no slides to export.");
   }
+  dependencies.onProgress?.("preparing");
   const embeddedDocument = await prepareLessonBundleDocument(
     document,
     dependencies.retrievalItems,
@@ -117,12 +119,15 @@ export async function buildLessonBundleZip(
   const answerHtml = buildStandaloneLessonHtml(answerDocument, {
     staticAnnotations: false,
   });
+  dependencies.onProgress?.("rendering-saved");
   const savedPdf = await renderLessonPdf(
     dependencies.renderPdf, savedHtml, savedPdfPath,
   );
+  dependencies.onProgress?.("rendering-answers");
   const answerPdf = await renderLessonPdf(
     dependencies.renderPdf, answerHtml, answerPdfPath,
   );
+  dependencies.onProgress?.("packaging");
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
 

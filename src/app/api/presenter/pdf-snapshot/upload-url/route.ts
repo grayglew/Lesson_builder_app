@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   const path = presenterPdfSnapshotStoragePath(auth.user.id, lessonId);
   const { data, error } = await auth.supabase.storage.from(BUILDER_SYNC_BUCKET).createSignedUploadUrl(path, {
-    upsert: true,
+    upsert: false,
   });
 
   if (error || !data?.signedUrl) {

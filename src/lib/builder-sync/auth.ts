@@ -13,7 +13,7 @@ import {
 export const BUILDER_SYNC_BUCKET = "lesson-assets";
 export const BUILDER_SYNC_FOLDER = "builder-state";
 export const BUILDER_LESSONS_FOLDER = "lessons";
-export const PRESENTER_PDF_FOLDER = "presenter-pdf";
+export { PRESENTER_PDF_FOLDER, presenterPdfSnapshotStoragePath, isPresenterPdfSnapshotPath } from "./presenter-pdf-snapshots";
 export const PRESENTER_STUDENT_SESSION_FOLDER = "student-sessions";
 
 export async function getAuthorizedBuilderSyncClient() {
@@ -63,14 +63,6 @@ export function isBuilderLessonPath(userId: string, lessonId: string, path: stri
       fileName,
     )
   );
-}
-
-export function presenterPdfSnapshotStoragePath(userId: string, lessonId: string) {
-  return `${userId}/${PRESENTER_PDF_FOLDER}/${lessonId}/snapshot.html`;
-}
-
-export function isPresenterPdfSnapshotPath(userId: string, lessonId: string, path: string) {
-  return path === presenterPdfSnapshotStoragePath(userId, lessonId);
 }
 
 export function studentSessionSnapshotStoragePath(userId: string, sessionId: string) {

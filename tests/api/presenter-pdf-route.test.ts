@@ -49,6 +49,29 @@ describe("presenter PDF route renderer", () => {
     vi.restoreAllMocks();
   });
 
+  it("waits for one shared executable extraction before launching concurrent renders", async () => {
+    let finishExtraction!: (path: string) => void;
+    mocks.executablePath.mockImplementationOnce(() => new Promise(resolve => { finishExtraction = resolve; }));
+    const onePagePdf = await validOnePagePdf();
+    mocks.launch.mockResolvedValue({
+      newPage: async () => ({
+        goto: async () => {}, evaluate: async () => {}, emulateMediaType: async () => {},
+        pdf: async () => onePagePdf, close: async () => {},
+      }),
+      close: async () => {},
+    });
+    const html = '<main class="lesson-deck"><section class="lesson-slide">Lesson</section></main>';
+    const renders = [renderPresenterSnapshotToPdf(html), renderPresenterSnapshotToPdf(html)];
+    await vi.waitFor(() => expect(mocks.executablePath).toHaveBeenCalled());
+    try {
+      expect(mocks.executablePath).toHaveBeenCalledTimes(1);
+      expect(mocks.launch).not.toHaveBeenCalled();
+    } finally {
+      finishExtraction("/tmp/chromium");
+      await Promise.all(renders);
+    }
+  });
+
   it("loads a static mixed-lesson snapshot from a temporary file", async () => {
     const loadedHtml: string[] = [];
     const snapshotPaths: string[] = [];
@@ -235,6 +258,45 @@ describe("presenter PDF route renderer", () => {
         expect(readFile(snapshotPath)).rejects.toMatchObject({ code: "ENOENT" }),
       ),
     );
+  });
+
+  it("rejects foreign or malformed snapshot paths without touching Storage", async () => {
+    const from = vi.fn();
+    vi.mocked(getAuthorizedBuilderSyncClient).mockResolvedValue({
+      user: { id: "user" }, supabase: { from, storage: { from } },
+    } as never);
+    vi.mocked(isPresenterPdfSnapshotPath).mockReturnValue(false);
+    const response = await POST(new Request("http://localhost/api/presenter/pdf", {
+      method: "POST", body: JSON.stringify({
+        lessonId: "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c", snapshotPath: "other-user/snapshot.html",
+      }),
+    }));
+    expect(response.status).toBe(400);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { data: null, error: null, status: 404 },
+    { data: null, error: { message: "Lookup failed" }, status: 500 },
+  ])("cleans its validated snapshot after lesson lookup returns $status", async ({ data, error, status }) => {
+    const snapshotPath = "user/presenter-pdf/lesson/snapshot-unique.html";
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    const download = vi.fn();
+    const lessons = {
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data, error }),
+    };
+    vi.mocked(getAuthorizedBuilderSyncClient).mockResolvedValue({
+      user: { id: "user" },
+      supabase: { from: vi.fn().mockReturnValue(lessons), storage: { from: vi.fn().mockReturnValue({ download, remove }) } },
+    } as never);
+    vi.mocked(isPresenterPdfSnapshotPath).mockReturnValue(true);
+    const response = await POST(new Request("http://localhost/api/presenter/pdf", {
+      method: "POST", body: JSON.stringify({ lessonId: "48ad37c7-2cf5-4d09-9ec4-aad83c99fb8c", snapshotPath }),
+    }));
+    expect(response.status).toBe(status);
+    expect(download).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledExactlyOnceWith([snapshotPath]);
   });
 
   it("returns an A4 PDF for an authenticated a4-bundle request", async () => {

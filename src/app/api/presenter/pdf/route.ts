@@ -29,6 +29,17 @@ export const maxDuration = 300;
 
 chromium.setGraphicsMode = false;
 
+let executablePathPromise: Promise<string> | undefined;
+
+function chromiumExecutablePath() {
+  // Concurrent requests share extraction, never a browser or lesson-specific state.
+  executablePathPromise ??= chromium.executablePath().catch(error => {
+    executablePathPromise = undefined;
+    throw error;
+  });
+  return executablePathPromise;
+}
+
 type LessonLookupRow = {
   id: string;
   title: string;
@@ -47,23 +58,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid presenter PDF snapshot path." }, { status: 400 });
   }
 
-  const { data: lesson, error: lessonError } = await auth.supabase
-    .from("builder_lessons")
-    .select("id, title")
-    .eq("id", lessonId)
-    .eq("owner_id", auth.user.id)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (lessonError) {
-    return NextResponse.json({ ok: false, error: lessonError.message }, { status: 500 });
-  }
-
-  if (!lesson) {
-    return NextResponse.json({ ok: false, error: "Saved lesson not found." }, { status: 404 });
-  }
-
   try {
+    const { data: lesson, error: lessonError } = await auth.supabase
+      .from("builder_lessons")
+      .select("id, title")
+      .eq("id", lessonId)
+      .eq("owner_id", auth.user.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (lessonError) {
+      return NextResponse.json({ ok: false, error: lessonError.message }, { status: 500 });
+    }
+
+    if (!lesson) {
+      return NextResponse.json({ ok: false, error: "Saved lesson not found." }, { status: 404 });
+    }
+
     const { data: snapshot, error: snapshotError } = await auth.supabase.storage
       .from(BUILDER_SYNC_BUCKET)
       .download(snapshotPath);
@@ -178,7 +189,7 @@ async function renderSnapshotDocuments<T>(
         isMobile: false,
         hasTouch: false,
       },
-      executablePath: await chromium.executablePath(),
+      executablePath: await chromiumExecutablePath(),
       headless: "shell",
       protocolTimeout: 180000,
     });

@@ -30,7 +30,6 @@ import {
 import {
   deleteSavedLesson,
   createPresenterStudentSession,
-  downloadA4BundlePdf,
   listSavedLessons,
   openSavedLesson as fetchSavedLesson,
   saveCurrentLesson,
@@ -43,7 +42,6 @@ import { BuilderActionMenu } from "./BuilderActionMenu";
 import styles from "./BuilderShell.module.css";
 import { ConfidenceModal } from "./ConfidenceModal";
 import {
-  buildLessonBundleZip,
   downloadBlob,
   prepareSavedLessonHtml,
   safeFileName,
@@ -57,6 +55,7 @@ import {
   type SavedLessonWithConfidence,
 } from "./saved-lesson-parity";
 import { selectDocument, useBuilderStore } from "./store";
+import { BundleDownloadQueuePanel, useBundleDownloads } from "./BundleDownloads";
 
 export function SavedLessonLibrary({
   onBack,
@@ -79,6 +78,7 @@ export function SavedLessonLibrary({
   const [lessons, setLessons] = useState<SavedLessonSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
+  const bundleDownloads = useBundleDownloads();
   const [titleFilter, setTitleFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -296,23 +296,8 @@ export function SavedLessonLibrary({
     });
   }
 
-  async function downloadLessonBundle(lesson: SavedLessonSummary) {
-    await mutateLesson(lesson.id, async () => {
-      setStatus({
-        tone: "working",
-        message: `Building the saved-state and answer PDFs for "${lesson.title}"…`,
-      });
-      const opened = await fetchSavedLesson(lesson.id);
-      const bundle = await buildLessonBundleZip(opened.document, {
-        retrievalItems: document.retrievalItems,
-        renderPdf: (html) => downloadA4BundlePdf(lesson.id, html),
-      });
-      downloadBlob(bundle, `${safeFileName(lesson.title)}-bundle.zip`);
-      setStatus({
-        tone: "success",
-        message: `Downloaded the lesson bundle for "${lesson.title}".`,
-      });
-    });
+  function downloadLessonBundle(lesson: SavedLessonSummary) {
+    bundleDownloads.enqueueLesson(lesson, document.retrievalItems);
   }
 
   async function changeClass(lesson: SavedLessonSummary) {
@@ -459,7 +444,7 @@ export function SavedLessonLibrary({
             triggerContent={<><MoreHorizontal className="size-4" aria-hidden /><span className="sr-only">More actions for {lesson.title}</span></>}
           >
             <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)}><Download className="size-4" aria-hidden /> Download HTML</button>
-            <button type="button" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)}><Package className="size-4" aria-hidden /> Download lesson bundle</button>
+            <button type="button" disabled={Boolean(busyId) || bundleDownloads.isPending(lesson.id)} onClick={() => downloadLessonBundle(lesson)}><Package className="size-4" aria-hidden /> {bundleDownloads.isPending(lesson.id) ? "Bundle queued or building" : "Download lesson bundle"}</button>
             <button type="button" disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)}>{lesson.isTaught ? <Archive className="size-4" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />} {lesson.isTaught ? "Mark planned" : "Mark taught"}</button>
             {confidence ? (
               <button type="button" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })}><BarChart3 className="size-4" aria-hidden /> View confidence</button>
@@ -471,7 +456,7 @@ export function SavedLessonLibrary({
         ) : (
           <>
             <IconAction label="Download lesson" disabled={Boolean(busyId)} onClick={() => void downloadLesson(lesson)} icon={<Download className="size-4" />} />
-            <IconAction label="Download lesson bundle" disabled={Boolean(busyId)} onClick={() => void downloadLessonBundle(lesson)} icon={<Package className="size-4" />} />
+            <IconAction label="Download lesson bundle" disabled={Boolean(busyId) || bundleDownloads.isPending(lesson.id)} onClick={() => downloadLessonBundle(lesson)} icon={<Package className="size-4" />} />
             <IconAction label={lesson.isTaught ? "Mark planned" : "Mark taught"} disabled={Boolean(busyId)} onClick={() => void toggleTaught(lesson)} icon={lesson.isTaught ? <Archive className="size-4" /> : <CheckCircle2 className="size-4" />} />
             {confidence ? (
               <IconAction label="View confidence" disabled={Boolean(busyId)} onClick={() => setConfidenceLesson({ title: lesson.title, summary: confidence })} icon={<BarChart3 className="size-4" />} />
@@ -525,6 +510,8 @@ export function SavedLessonLibrary({
             </button>
           </div>
         </div>
+
+        <BundleDownloadQueuePanel inline />
 
         <div className="grid gap-3 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
           <label className="xl:col-span-2">

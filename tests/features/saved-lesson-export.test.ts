@@ -90,16 +90,19 @@ describe("saved lesson static bundle", () => {
       .mockResolvedValueOnce(
         new Blob(["%PDF-1.7\nanswers"], { type: "application/pdf" }),
       );
+    const phases: string[] = [];
 
     expect(typeof savedLessonExport.buildLessonBundleZip).toBe("function");
     const bundle = await savedLessonExport.buildLessonBundleZip!(document, {
       prepareDocument,
       renderPdf,
+      onProgress: stage => phases.push(stage),
     });
     const zip = await JSZip.loadAsync(await blobArrayBuffer(bundle));
 
     expect(prepareDocument).toHaveBeenCalledOnce();
     expect(renderPdf).toHaveBeenCalledTimes(2);
+    expect(phases).toEqual(["preparing", "rendering-saved", "rendering-answers", "packaging"]);
     const savedHtml = String(renderPdf.mock.calls[0]?.[0]);
     const answersHtml = String(renderPdf.mock.calls[1]?.[0]);
     const savedDom = new DOMParser().parseFromString(savedHtml, "text/html");
