@@ -183,7 +183,7 @@ describe("RetrievalComposer", () => {
     );
   });
 
-  it("changes progress only when Log selected is explicitly used", async () => {
+  it("logs selected progress and deselects the successfully logged skills", async () => {
     const user = userEvent.setup();
     vi.mocked(logRetrievalItems).mockResolvedValue([
       {
@@ -209,9 +209,34 @@ describe("RetrievalComposer", () => {
         expect.objectContaining({
           seenCount: 2,
           lastTaught: "2026-07-18",
+          selected: false,
         }),
       );
     });
+    expect(screen.getByRole("checkbox", { name: "Select 101a: Expand brackets" }))
+      .not.toBeChecked();
+  });
+
+  it("keeps skills selected and progress unchanged when logging fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(logRetrievalItems).mockRejectedValueOnce(new Error("Logging unavailable"));
+    render(<RetrievalComposer compact />);
+    await user.click(screen.getByRole("checkbox", { name: "Select 101a: Expand brackets" }));
+
+    await user.click(screen.getByRole("button", { name: "Log selected" }));
+
+    await waitFor(() => {
+      expect(useBuilderStore.getState().status).toEqual({
+        tone: "error", message: "Logging unavailable",
+      });
+    });
+    expect(useBuilderStore.getState().document.retrievalItems[0]).toMatchObject({
+      selected: true,
+      seenCount: 1,
+      lastTaught: "2026-01-01",
+    });
+    expect(screen.getByRole("checkbox", { name: "Select 101a: Expand brackets" }))
+      .toBeChecked();
   });
 
   it("rolls selected progress and the taught date back after confirmation", async () => {

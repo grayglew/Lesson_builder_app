@@ -471,6 +471,7 @@ export function RetrievalComposer({
           if (!progress) return item;
           return {
             ...item,
+            selected: false,
             seenCount:
               progress.seenCount ?? progress.seen_count ?? item.seenCount,
             lastTaught:
