@@ -4,20 +4,26 @@
 
 - Production domain: `https://lesson-builder-online.vercel.app`
 - Unified builder route: `/builder`
-- Current production commit: `5d5c55f4b02d96d830d5be1738757d53bddbc2bc`
+- Current production commit: `04795bdd2d7cf8fd1518bb69c850cfa408a84fb3`
 - Current immutable deployment:
-  `https://lesson-builder-online-l5ztr3w1o-grayglew-8338s-projects.vercel.app`
+  `https://lesson-builder-online-e8mjn8cno-grayglew-8338s-projects.vercel.app`
+- Current deployment ID: `dpl_2zabM2cjtu3YLLsqCvjqruL9Q54j`
 - Previous rollback deployment:
-  `https://lesson-builder-online-bz1h9dwox-grayglew-8338s-projects.vercel.app`
-- Rollback source tag: `rollback/production-before-retrieval-deselect-20261022`
-- Released 22 October 2026: deselect successfully logged retrieval skills;
-  retain selection when logging fails. Only this fix and its tests were
-  brought onto the production branch; pending worksheet/uploader work remains
-  separate.
-- Verification: 362 unit tests, TypeScript, source lint (excluding local
-  worktree/build copies), presenter browser checks, Vercel production build,
-  and three deployment smoke tests on both the candidate and live domain.
+  `https://lesson-builder-online-l5ztr3w1o-grayglew-8338s-projects.vercel.app`
+- Previous deployment ID: `dpl_H4JkNx6h39McQ6RFxSvS69tvSjBp`
+- Rollback source tag: `rollback/production-before-bundle-queue-20261023`
+- Released 23 October 2026 after user approval of the authenticated Preview:
+  two concurrent lesson bundle downloads per builder tab, FIFO waiting/retry,
+  independent progress and retained ZIP downloads, unique owner/lesson-scoped
+  PDF snapshots, and serialized Chromium extraction on concurrent cold starts.
+  No schema or database migration. Pending worksheet/uploader work remains separate.
+- Verification: all 386 unit/contract tests on the feature and merged main,
+  TypeScript, lint, presenter browser checks, and the 32-second Vercel production
+  build passed. All three browser deployment smoke tests passed on both the
+  candidate and live domain. Initial error-log scans returned no error records.
   The live health endpoint reports the production commit above.
+- A verified Git bundle containing the previous production source and full
+  history is retained outside the checkout under workspace `backups/releases/`.
 
 Update this section whenever a newer production deployment is promoted.
 
@@ -63,6 +69,9 @@ job records a clear skip instead of failing during Vercel authentication.
 7. Smoke-test `/`, `/builder`, `/builder-v2`, `/student`, and the affected APIs
    on the immutable URL.
 8. Inspect runtime errors, then promote that exact deployment.
+   The canonical `lesson-builder-online.vercel.app` URL is a manually assigned
+   alias, separate from the automatically assigned team URL. Explicitly assign
+   that alias to the verified immutable deployment and confirm its health.
 9. Repeat the health and smoke checks on the production domain.
 
 The manual GitHub workflows under `.github/workflows` implement the candidate
@@ -111,6 +120,8 @@ destination.
 1. Record the current and previous immutable deployment IDs before promotion.
 2. Run `vercel rollback <previous-deployment-id>` or promote the previous
    immutable URL.
+   Also explicitly restore the canonical `lesson-builder-online.vercel.app`
+   alias to that previous immutable URL; changing the team URL alone is not enough.
 3. Verify `/api/health`, login, `/builder`, `/student`, and the affected API.
 4. Record the failed commit and add a regression test before another release.
 
