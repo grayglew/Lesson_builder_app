@@ -1000,29 +1000,33 @@ async function loadRetrievalLoImages(
 ) {
   const validIds = uniqueStrings(retrievalLoIds).filter(isUuid);
   if (!validIds.length) return [] as RetrievalImageRow[];
-  const [personalResult, globalResult] = await Promise.all([
-    supabase
-      .from("retrieval_lo_images")
-      .select("owner_id,retrieval_lo_id,seen_count,role,scope,is_hidden,asset:assets(id,bucket,storage_path,file_name,mime_type,byte_size,checksum)")
-      .eq("owner_id", userId)
-      .eq("scope", "personal")
-      .in("retrieval_lo_id", validIds)
-      .order("seen_count", { ascending: true }),
-    assetSupabase
-      .from("retrieval_lo_images")
-      .select("owner_id,retrieval_lo_id,seen_count,role,scope,is_hidden,asset:assets(id,bucket,storage_path,file_name,mime_type,byte_size,checksum)")
-      .eq("scope", "global")
-      .eq("is_hidden", false)
-      .in("retrieval_lo_id", validIds)
-      .order("seen_count", { ascending: true }),
-  ]);
+  async function loadScope(client: SupabaseClient, scope: "personal" | "global") {
+    const rows: RetrievalImageRow[] = [];
+    const pageSize = 500;
+    while (true) {
+      let query = client
+        .from("retrieval_lo_images")
+        .select("owner_id,retrieval_lo_id,seen_count,role,scope,is_hidden,asset:assets(id,bucket,storage_path,file_name,mime_type,byte_size,checksum)")
+        .eq("scope", scope)
+        .in("retrieval_lo_id", validIds);
+      query = scope === "personal"
+        ? query.eq("owner_id", userId)
+        : query.eq("is_hidden", false);
+      const { data, error } = await query
+        .order("id", { ascending: true })
+        .range(rows.length, rows.length + pageSize - 1);
+      if (error) throw error;
+      if (!data?.length) return rows;
+      // Advance by the actual response size, even if the server cap is smaller.
+      rows.push(...(data as unknown as RetrievalImageRow[]));
+    }
+  }
 
-  if (personalResult.error) throw personalResult.error;
-  if (globalResult.error) throw globalResult.error;
-  return [
-    ...((globalResult.data || []) as unknown as RetrievalImageRow[]),
-    ...((personalResult.data || []) as unknown as RetrievalImageRow[]),
-  ];
+  const [personalRows, globalRows] = await Promise.all([
+    loadScope(supabase, "personal"),
+    loadScope(assetSupabase, "global"),
+  ]);
+  return [...globalRows, ...personalRows];
 }
 
 async function createSignedUrlMap(supabase: SupabaseClient, imageRows: RetrievalImageRow[]) {
