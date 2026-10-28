@@ -2,7 +2,7 @@
 
 ## Intent and size
 
-A small UI change to help teachers identify LOs without retrieval images before selecting them. A logged/taught LO is not necessarily supplied with images. The user confirmed the labelled-badge approach described below; this written specification is awaiting approval before implementation.
+A small UI change to help teachers identify LOs without retrieval images before selecting them. A logged/taught LO is not necessarily supplied with images. The user approved this written specification on 28 October 2026 for implementation and Preview review; production approval remains separate.
 
 ## Approaches
 
