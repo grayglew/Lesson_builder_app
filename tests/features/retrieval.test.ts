@@ -3,12 +3,21 @@ import {
   compareRetrievalItems,
   getDueRetrievalItems,
   getVisibleRetrievalItems,
+  getRetrievalImageWarning,
   incrementRetrievalImageSlot,
   normalizeImageSlots,
 } from "@/features/builder/retrieval";
 import type { RetrievalItem } from "@/features/builder/schema";
 
 describe("retrieval authoring utilities", () => {
+  it.each(["", "https://storage.example/question.png?token=expired"])("derives missing-image warnings from saved metadata, not the URL (%s)", (dataUrl) => {
+    const asset = { name: "question.png", type: "image/png", size: 4, dataUrl, storagePath: "retrieval/question.png" };
+    expect(getRetrievalImageWarning(retrievalItem({ images: [], answerImages: [] }))).toBe("No retrieval images");
+    expect(getRetrievalImageWarning(retrievalItem({ images: [], answerImages: [asset] }))).toBe("No question images");
+    expect(getRetrievalImageWarning(retrievalItem({ images: [asset], answerImages: [] }))).toBe("No answer images");
+    expect(getRetrievalImageWarning(retrievalItem({ images: [asset], answerImages: [asset] }))).toBeNull();
+  });
+
   it("filters by the active class while retaining shared items", () => {
     const items = [
       retrievalItem({ id: "year-9", className: " Year 9 " }),

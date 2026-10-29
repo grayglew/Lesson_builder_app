@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -71,6 +71,68 @@ describe("RetrievalComposer", () => {
     expect(items[0].seenCount).toBe(1);
     expect(items[1].selected).toBe(false);
     expect(logRetrievalItems).not.toHaveBeenCalled();
+  });
+
+  it("warns beside missing LOs without changing counts, due highlighting or logging", async () => {
+    const user = userEvent.setup();
+    const asset = { name: "stored.png", type: "image/png", size: 4, dataUrl: "", storagePath: "stored.png" };
+    const items = ["574l", "574m", "574n", "574o"].map((code) => retrievalItem({
+      id: code, lo: `${code}: Arithmetic series`, seenCount: 1,
+      images: code === "574n" ? Array(8).fill(asset) : [],
+      answerImages: code === "574n" ? Array(8).fill(asset) : [],
+    }));
+    useBuilderStore.getState().updateGlobalData({ retrievalItems: items });
+    render(<RetrievalComposer compact />);
+    for (const code of ["574l", "574m", "574o"]) {
+      const field = screen.getByRole("textbox", { name: `Learning objective ${code}: Arithmetic series` });
+      expect(field).toHaveAccessibleDescription("No retrieval images");
+      expect(within(field.closest("td")!).getByText("No retrieval images")).toBeVisible();
+      expect(field.closest("tr")?.className).toContain("dueRow");
+      expect(field.closest("tr")).toHaveTextContent("Q 0 / 8A 0 / 8");
+    }
+    const complete = screen.getByRole("textbox", { name: "Learning objective 574n: Arithmetic series" });
+    expect(complete).not.toHaveAttribute("aria-describedby");
+    expect(complete.closest("tr")).toHaveTextContent("Q 8 / 8A 8 / 8");
+    await user.click(screen.getByRole("checkbox", { name: "Select 574l: Arithmetic series" }));
+    vi.mocked(logRetrievalItems).mockResolvedValueOnce([{ id: "574l", seenCount: 2, lastTaught: "2026-07-18" }]);
+    await user.click(screen.getByRole("button", { name: "Log selected" }));
+    await waitFor(() => expect(useBuilderStore.getState().document.retrievalItems[0]).toMatchObject({
+      id: "574l", seenCount: 2, lastTaught: "2026-07-18", selected: false,
+    }));
+    expect(screen.getByRole("textbox", { name: "Learning objective 574l: Arithmetic series" })).toHaveAccessibleDescription("No retrieval images");
+  });
+
+  it("updates warnings as saved image metadata changes, preserving selection and history", () => {
+    const asset = { name: "stored.png", type: "image/png", size: 4, dataUrl: "", storagePath: "stored.png" };
+    const item = retrievalItem({ id: "changes", selected: true, seenCount: 4 });
+    useBuilderStore.getState().updateGlobalData({ retrievalItems: [item] });
+    render(<RetrievalComposer compact />);
+    const field = screen.getByRole("textbox", { name: `Learning objective ${item.lo}` });
+    expect(field).toHaveAccessibleDescription("No retrieval images");
+    const update = (images: RetrievalItem["images"], answerImages: RetrievalItem["answerImages"]) => act(() => {
+      useBuilderStore.getState().updateGlobalData({ retrievalItems: [{ ...item, images, answerImages }] });
+    });
+    update([asset], []);
+    expect(field).toHaveAccessibleDescription("No answer images");
+    update([asset], [asset]);
+    expect(field).not.toHaveAttribute("aria-describedby");
+    update([], [asset]);
+    expect(field).toHaveAccessibleDescription("No question images");
+    update([], []);
+    expect(field).toHaveAccessibleDescription("No retrieval images");
+    expect(useBuilderStore.getState().document.retrievalItems[0]).toMatchObject({ selected: true, seenCount: 4, lastTaught: "2026-01-01" });
+  });
+
+  it("suppresses absence warnings during refresh and restores the known bank after failure", () => {
+    const { rerender } = render(<RetrievalComposer compact />);
+    expect(screen.getAllByText("No retrieval images")).toHaveLength(2);
+    rerender(<RetrievalComposer compact refreshing />);
+    expect(screen.queryByText("No retrieval images")).not.toBeInTheDocument();
+    const before = useBuilderStore.getState().document.retrievalItems;
+    // A failed refresh leaves the last known bank intact.
+    rerender(<RetrievalComposer compact refreshing={false} />);
+    expect(screen.getAllByText("No retrieval images")).toHaveLength(2);
+    expect(useBuilderStore.getState().document.retrievalItems).toEqual(before);
   });
 
   it("uses a compact icon-only delete action with an accessible name", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   advanceRetrievalItems,
   archiveRetrievalItem,
@@ -20,6 +20,7 @@ import {
   compareRetrievalItems,
   countRetrievalImages,
   getDueRetrievalItems,
+  getRetrievalImageWarning,
   getVisibleRetrievalItems,
   incrementRetrievalImageSlot,
   normalizeImageSlots,
@@ -65,6 +66,7 @@ export function RetrievalComposer({
   const { confirmDialog } = useAppNotifications();
   const [editor, setEditor] = useState<RetrievalEditorState | null>(null);
   const [busyAction, setBusyAction] = useState("");
+  const warningIdPrefix = useId();
 
   const visibleItems = useMemo(
     () =>
@@ -728,6 +730,8 @@ export function RetrievalComposer({
           <tbody>
             {visibleItems.map((item) => {
               const due = isRetrievalItemDue(item, document.teachingDate);
+              const imageWarning = refreshing ? null : getRetrievalImageWarning(item);
+              const warningId = `${warningIdPrefix}-${item.id}-images`;
               return (
                 <tr key={item.id} className={due ? styles.dueRow : undefined}>
                   <td>
@@ -743,6 +747,7 @@ export function RetrievalComposer({
                   <td>
                     <textarea
                       aria-label={`Learning objective ${item.lo}`}
+                      aria-describedby={imageWarning ? warningId : undefined}
                       rows={2}
                       value={item.lo}
                       onChange={(event) =>
@@ -750,6 +755,11 @@ export function RetrievalComposer({
                       }
                       onBlur={() => void persistItem(item.id)}
                     />
+                    {imageWarning ? (
+                      <span id={warningId} className={styles.retrievalImageWarning}>
+                        {imageWarning}
+                      </span>
+                    ) : null}
                   </td>
                   <td>
                     <input

@@ -58,6 +58,22 @@ export function countRetrievalImages(
   return normalizeImageSlots(values).filter(Boolean).length;
 }
 
+export type RetrievalImageWarning =
+  | "No retrieval images"
+  | "No question images"
+  | "No answer images";
+
+export function getRetrievalImageWarning(
+  item: Pick<RetrievalItem, "images" | "answerImages">,
+): RetrievalImageWarning | null {
+  const hasQuestions = countRetrievalImages(item.images) > 0;
+  const hasAnswers = countRetrievalImages(item.answerImages) > 0;
+  if (!hasQuestions && !hasAnswers) return "No retrieval images";
+  if (!hasQuestions) return "No question images";
+  if (!hasAnswers) return "No answer images";
+  return null;
+}
+
 function normalizeClassName(value: string): string {
   return String(value || "")
     .replace(/\s+/g, " ")
