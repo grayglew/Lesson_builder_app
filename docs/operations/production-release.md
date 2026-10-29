@@ -4,26 +4,32 @@
 
 - Production domain: `https://lesson-builder-online.vercel.app`
 - Unified builder route: `/builder`
-- Current production commit: `04795bdd2d7cf8fd1518bb69c850cfa408a84fb3`
+- Current production commit: `a63260198713e4656942be16903cc58f44c62d9b`
 - Current immutable deployment:
-  `https://lesson-builder-online-e8mjn8cno-grayglew-8338s-projects.vercel.app`
-- Current deployment ID: `dpl_2zabM2cjtu3YLLsqCvjqruL9Q54j`
+  `https://lesson-builder-online-f6ulyv0ih-grayglew-8338s-projects.vercel.app`
+- Current deployment ID: `dpl_Hh2QNssW6MFrvXty1vSXY3jCLt5x`
 - Previous rollback deployment:
-  `https://lesson-builder-online-l5ztr3w1o-grayglew-8338s-projects.vercel.app`
-- Previous deployment ID: `dpl_H4JkNx6h39McQ6RFxSvS69tvSjBp`
-- Rollback source tag: `rollback/production-before-bundle-queue-20261023`
-- Released 23 October 2026 after user approval of the authenticated Preview:
-  two concurrent lesson bundle downloads per builder tab, FIFO waiting/retry,
-  independent progress and retained ZIP downloads, unique owner/lesson-scoped
-  PDF snapshots, and serialized Chromium extraction on concurrent cold starts.
-  No schema or database migration. Pending worksheet/uploader work remains separate.
-- Verification: all 386 unit/contract tests on the feature and merged main,
-  TypeScript, lint, presenter browser checks, and the 32-second Vercel production
-  build passed. All three browser deployment smoke tests passed on both the
-  candidate and live domain. Initial error-log scans returned no error records.
+  `https://lesson-builder-online-e8mjn8cno-grayglew-8338s-projects.vercel.app`
+- Previous deployment ID: `dpl_2zabM2cjtu3YLLsqCvjqruL9Q54j`
+- Previous production commit: `04795bdd2d7cf8fd1518bb69c850cfa408a84fb3`
+- Rollback source tag: `rollback/production-before-retrieval-warnings-20261029`
+- Released 29 October 2026 after explicit production authorization:
+  three missing-retrieval-image warnings beneath LOs, complete paginated image
+  metadata reads with private override precedence, and a persistent top-bar
+  overdue-count badge. The badge follows the selected class/shared items and
+  inclusive lesson teaching date, updating from existing retrieval state.
+  No schema, database, Storage or lesson-format mutation. Existing expired-link
+  repair and pending worksheet/uploader work remain separate.
+- Verification: all 396 unit/contract tests on the feature and merged main,
+  TypeScript, lint, presenter browser checks, and the Vercel production build
+  passed. Twelve local browser UI tests include four responsive widths and both
+  themes. All three deployment smoke tests passed on both the candidate and live
+  domain; unauthenticated retrieval access returns 401. Independent review found
+  no badge blockers. Initial error-log scans returned no error records.
   The live health endpoint reports the production commit above.
 - A verified Git bundle containing the previous production source and full
-  history is retained outside the checkout under workspace `backups/releases/`.
+  history is retained outside the checkout under workspace `backups/releases/`
+  as `2026-10-29-before-retrieval-warnings-and-overdue-badge.bundle`.
 
 Update this section whenever a newer production deployment is promoted.
 
