@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -14,6 +15,7 @@ import {
   archiveClassName,
   loadBuilderDocument,
   loadBuilderGlobalState,
+  logRetrievalItems,
   renameClassName,
   resolveRetrievalImages,
   saveCurrentLesson,
@@ -36,6 +38,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
   return {
     ...original,
     loadBuilderDocument: vi.fn().mockResolvedValue(null),
+    logRetrievalItems: vi.fn().mockResolvedValue([]),
     loadBuilderGlobalState: vi.fn().mockResolvedValue({
       classNames: [],
       retrievalItems: [],
@@ -524,6 +527,58 @@ describe("BuilderShell Compact Console action parity", () => {
     useBuilderStore
       .getState()
       .hydrate(createInitialBuilderDocument("2026-07-18T06:00:00.000Z"));
+  });
+
+  it("keeps the overdue badge tied to the lesson date, class and live progress on every tool", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 9";
+    document.teachingDate = "2026-07-18";
+    document.retrievalItems = [
+      { id: "old", lo: "101a: Old", className: "Year 9", lastTaught: "2026-07-17" },
+      { id: "shared", lo: "102a: Due on teaching date", className: "", lastTaught: "2026-07-18" },
+      { id: "future", lo: "103a: Future", className: "Year 9", lastTaught: "2026-07-19" },
+      { id: "other", lo: "104a: Other class", className: "Year 10", lastTaught: "2026-07-18" },
+    ].map(item => ({ ...item, spacingFactor: 1.3, seenCount: 0, currentImageSlot: 1, selected: false, images: [], answerImages: [] }));
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(loadBuilderGlobalState).mockResolvedValue({ classNames: ["Year 9", "Year 10"], retrievalItems: document.retrievalItems, slideTemplates: [], updatedAt: document.updatedAt });
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+    const badge = await screen.findByRole("status", { name: "Overdue retrieval items" });
+    expect(badge).toHaveTextContent("2 overdue");
+    expect(badge.closest("header")).toBeInTheDocument();
+    for (const tool of ["Example", "Placeholder", "Retrieval", "Starter"]) {
+      await user.click(screen.getByRole("button", { name: tool }));
+      expect(badge).toHaveTextContent("2 overdue");
+    }
+    act(() => useBuilderStore.getState().updateMetadata({ teachingDate: "2026-07-17" }));
+    expect(badge).toHaveTextContent("1 overdue");
+    act(() => useBuilderStore.getState().updateMetadata({ className: "Year 10" }));
+    expect(badge).toHaveTextContent("0 overdue");
+    act(() => useBuilderStore.getState().updateMetadata({ teachingDate: "2026-07-18" }));
+    expect(badge).toHaveTextContent("2 overdue");
+    act(() => useBuilderStore.getState().updateGlobalData({ retrievalItems: document.retrievalItems.map(item => ({ ...item, lastTaught: "2026-07-20" })) }));
+    expect(badge).toHaveTextContent("0 overdue");
+  });
+
+  it("updates the top-bar count after logging selected retrieval items", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    document.className = "Year 9";
+    document.teachingDate = "2026-07-18";
+    document.retrievalItems = [{ id: "logged", lo: "101a: Log this", className: "Year 9", spacingFactor: 1.3, seenCount: 1, currentImageSlot: 1, lastTaught: "2026-01-01", selected: false, images: [], answerImages: [] }];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    vi.mocked(loadBuilderGlobalState).mockResolvedValue({ classNames: ["Year 9"], retrievalItems: document.retrievalItems, slideTemplates: [], updatedAt: document.updatedAt });
+    vi.mocked(logRetrievalItems).mockResolvedValueOnce([{ id: "logged", seenCount: 2, lastTaught: "2026-07-18" }]);
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+    const badge = await screen.findByRole("status", { name: "Overdue retrieval items" });
+    expect(badge).toHaveTextContent("1 overdue");
+    await user.click(screen.getByRole("button", { name: "Retrieval" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Select 101a: Log this" }));
+    await user.click(screen.getByRole("button", { name: "Log selected" }));
+    await waitFor(() => expect(badge).toHaveTextContent("0 overdue"));
+    expect(screen.getByRole("checkbox", { name: "Select 101a: Log this" })).not.toBeChecked();
   });
 
   it("renders the real shell with all eleven tools and production utilities", async () => {

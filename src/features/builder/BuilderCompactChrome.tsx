@@ -58,6 +58,7 @@ type CompactAppBarProps = {
   title: string;
   className: string;
   teachingDate: string;
+  overdueCount: number;
   userEmail: string;
   cloudMessage: string;
   busy: boolean;
@@ -80,6 +81,7 @@ export function CompactAppBar({
   onLessons,
   onPresent,
   onSave,
+  overdueCount,
   teachingDate,
   themePreference,
   title,
@@ -101,7 +103,18 @@ export function CompactAppBar({
         </div>
       </div>
       <div className={styles.compactLessonIdentity}>
-        <strong>{title.trim() || "Untitled lesson"}</strong>
+        <div className={styles.compactLessonTitleRow}>
+          <strong>{title.trim() || "Untitled lesson"}</strong>
+          <output
+            className={styles.compactOverdueBadge}
+            aria-label="Overdue retrieval items"
+            aria-live="polite"
+            aria-atomic="true"
+            title={`Retrieval items due on or before ${teachingDate || "the teaching date"}, for ${className || "all classes"}.`}
+          >
+            {overdueCount} overdue
+          </output>
+        </div>
         <span>{teachingDate || "No teaching date"}</span>
       </div>
       <span className={styles.compactCloudStatus} title={cloudMessage}>

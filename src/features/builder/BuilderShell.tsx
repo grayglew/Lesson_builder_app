@@ -56,6 +56,7 @@ import { NewLessonDialog } from "./NewLessonDialog";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
 import { RetrievalComposer } from "./RetrievalComposer";
+import { getDueRetrievalItems } from "./retrieval";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
@@ -148,6 +149,10 @@ function BuilderShellWorkspace({
   const [themePreference, setThemePreference] =
     useState<BuilderThemePreference>(initialTheme);
   const document = useBuilderStore(selectDocument);
+  const overdueCount = useMemo(
+    () => getDueRetrievalItems(document.retrievalItems, document.className, document.teachingDate).length,
+    [document.retrievalItems, document.className, document.teachingDate],
+  );
   const fallbackPreviewSlides = useMemo(
     () => hydrateStarterSlotsFromRetrievalItems(document).slides,
     [document],
@@ -628,6 +633,7 @@ function BuilderShellWorkspace({
             title={document.title}
             className={document.className}
             teachingDate={document.teachingDate}
+            overdueCount={overdueCount}
             userEmail={userEmail}
             cloudMessage={workspaceAutosave.message}
             busy={Boolean(busyAction)}

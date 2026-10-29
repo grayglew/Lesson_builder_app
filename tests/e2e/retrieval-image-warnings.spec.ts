@@ -23,7 +23,7 @@ for (const theme of ["light", "dark"]) {
       requests++;
       if (refresh.gate) await refresh.gate;
       if (failRefresh) return route.fulfill({ status: 503, json: { ok: false, error: "Fixture refresh failed" } });
-      return route.fulfill({ json: { ok: true, state: { classNames: ["Year 7"], retrievalItems: bank, slideTemplates: [], updatedAt: now } } });
+      return route.fulfill({ json: { ok: true, state: { classNames: ["Year 7", "Year 8"], retrievalItems: bank, slideTemplates: [], updatedAt: now } } });
     });
 
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -34,11 +34,32 @@ for (const theme of ["light", "dark"]) {
     await expect(table.getByText("No question images", { exact: true })).toBeVisible();
     await expect(table.getByText("No answer images", { exact: true })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Learning objective 574n: Complete pairs" })).not.toHaveAttribute("aria-describedby");
+    const badge = page.getByRole("status", { name: "Overdue retrieval items" });
+    await expect(badge).toHaveText("4 overdue");
+    await page.getByLabel(/date of teaching/i).fill("2026-01-01");
+    await expect(badge).toHaveText("0 overdue");
+    await page.getByLabel(/date of teaching/i).fill("2026-01-02");
+    await expect(badge).toHaveText("4 overdue");
+    await page.getByLabel("Class", { exact: true }).selectOption("Year 8");
+    await expect(badge).toHaveText("0 overdue");
+    await page.getByLabel("Class", { exact: true }).selectOption("Year 7");
+    await expect(badge).toHaveText("4 overdue");
+    await page.getByLabel(/lesson title/i).fill("Year 7 A long lesson title that must truncate without hiding the overdue retrieval badge");
     const scroller = table.locator("..");
     const baselineTableWidth = await table.evaluate(element => element.scrollWidth);
 
     for (const width of [375, 768, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 });
+      await expect(badge).toBeVisible();
+      const badgeGeometry = await badge.evaluate(element => {
+        const badge = element.getBoundingClientRect();
+        const title = element.parentElement!.querySelector("strong")!.getBoundingClientRect();
+        const header = element.closest("header")!.getBoundingClientRect();
+        return { fits: badge.right <= header.right && badge.left >= header.left && badge.top >= header.top && badge.bottom <= header.bottom,
+          adjacent: title.right <= badge.left && title.width > 0,
+          textFits: element.scrollWidth <= element.clientWidth };
+      });
+      expect(badgeGeometry).toEqual({ fits: true, adjacent: true, textFits: true });
       const geometry = await table.evaluate(element => {
         const warnings = Array.from(element.querySelectorAll("[class*='retrievalImageWarning']"));
         return {
@@ -68,6 +89,7 @@ for (const theme of ["light", "dark"]) {
     // Refresh via the normal tool navigation, first successful then failed.
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("button", { name: "Starter", exact: true }).click();
+    await expect(badge).toHaveText("4 overdue");
     bank = bank.map(item => item.id === "none" ? { ...item, images: [asset], answerImages: [asset] } : item);
     await page.getByRole("button", { name: "Retrieval", exact: true }).click();
     await expect(table.getByText("No retrieval images", { exact: true })).toHaveCount(0);

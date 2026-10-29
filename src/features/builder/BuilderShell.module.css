@@ -1895,6 +1895,31 @@
   padding-left: 0.75rem;
 }
 
+.compactLessonTitleRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.compactLessonTitleRow strong {
+  min-width: 0;
+}
+
+.compactOverdueBadge {
+  flex: 0 0 auto;
+  border: 1px solid var(--builder-warn-border);
+  border-radius: 0.25rem;
+  background: var(--builder-warn-soft);
+  color: var(--builder-warn);
+  padding: 0.15rem 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
 .compactCloudStatus {
   display: flex;
   max-width: 12rem;
