@@ -4,32 +4,29 @@
 
 - Production domain: `https://lesson-builder-online.vercel.app`
 - Unified builder route: `/builder`
-- Current production commit: `a63260198713e4656942be16903cc58f44c62d9b`
+- Current production commit: `6dae092b442a97f45edd9b9e51eb272847bbe844`
 - Current immutable deployment:
-  `https://lesson-builder-online-f6ulyv0ih-grayglew-8338s-projects.vercel.app`
-- Current deployment ID: `dpl_Hh2QNssW6MFrvXty1vSXY3jCLt5x`
+  `https://lesson-builder-online-n871mj5fw-grayglew-8338s-projects.vercel.app`
+- Current deployment ID: `dpl_CevxDNqNeQGEoh6K6syTtk4yYFsx`
 - Previous rollback deployment:
-  `https://lesson-builder-online-e8mjn8cno-grayglew-8338s-projects.vercel.app`
-- Previous deployment ID: `dpl_2zabM2cjtu3YLLsqCvjqruL9Q54j`
-- Previous production commit: `04795bdd2d7cf8fd1518bb69c850cfa408a84fb3`
-- Rollback source tag: `rollback/production-before-retrieval-warnings-20261029`
-- Released 29 October 2026 after explicit production authorization:
-  three missing-retrieval-image warnings beneath LOs, complete paginated image
-  metadata reads with private override precedence, and a persistent top-bar
-  overdue-count badge. The badge follows the selected class/shared items and
-  inclusive lesson teaching date, updating from existing retrieval state.
-  No schema, database, Storage or lesson-format mutation. Existing expired-link
-  repair and pending worksheet/uploader work remain separate.
-- Verification: all 396 unit/contract tests on the feature and merged main,
-  TypeScript, lint, presenter browser checks, and the Vercel production build
-  passed. Twelve local browser UI tests include four responsive widths and both
-  themes. All three deployment smoke tests passed on both the candidate and live
-  domain; unauthenticated retrieval access returns 401. Independent review found
-  no badge blockers. Initial error-log scans returned no error records.
-  The live health endpoint reports the production commit above.
+  `https://lesson-builder-online-f6ulyv0ih-grayglew-8338s-projects.vercel.app`
+- Previous deployment ID: `dpl_Hh2QNssW6MFrvXty1vSXY3jCLt5x`
+- Previous production commit: `a63260198713e4656942be16903cc58f44c62d9b`
+- Rollback source tag: `rollback/production-before-presenter-student-code-zoom-20261104`
+- Released 4 November 2026 after explicit production authorization:
+  the presenter's bottom-right student code toggles between normal and four
+  times normal text size on desktop, capped on narrow screens. Keyboard
+  operation and the existing live announcement are supported. No schema,
+  database, Storage, or lesson-format changes.
+- Verification: lint, TypeScript, all 396 unit/contract tests, the presenter
+  runtime check, the desktop and phone toggle browser test, and the Vercel
+  production build passed. All three deployment smoke tests passed on both the
+  candidate and live domain. The live health endpoint reports the production
+  commit above, and the initial error-log scan returned no records.
 - A verified Git bundle containing the previous production source and full
   history is retained outside the checkout under workspace `backups/releases/`
-  as `2026-10-29-before-retrieval-warnings-and-overdue-badge.bundle`.
+  as `2026-11-04-before-presenter-student-code-zoom.bundle` (SHA-256:
+  `B51F2B9BDDBE946361CEA331D94E910EF0C13E57343AD4533F4B4BC9549C2BA2`).
 
 Update this section whenever a newer production deployment is promoted.
 
