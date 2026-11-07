@@ -39,14 +39,14 @@ applyUnitToLesson(document, unit|null): BuilderDocument in unit-of-work.ts;
 store saveUnitOfWork(unit), associateUnitOfWork(id), refreshUnitOfWork().
 Named saves include unitOfWorkId/name/version but exclude unitsOfWork.
 
-- [ ] Write tests for legacy defaults, validation, workspace round trip, saved
+- [x] Write tests for legacy defaults, validation, workspace round trip, saved
   open/New/reset preserving catalogue, association/clear/refresh ordering,
   invalid source, handout IDs, detached duplicates and snapshot immutability.
-- [ ] Run focused test, expect failure because fields/actions are absent.
-- [ ] Implement defaults and pure snapshot replacement, retain catalogue across
+- [x] Run focused test, expect failure because fields/actions are absent.
+- [x] Implement defaults and pure snapshot replacement, retain catalogue across
   store transitions and add association metadata to explicit saved formats.
-- [ ] Run focused tests and existing schema/store/persistence suites; expect pass.
-- [ ] Commit: feat: persist unit library and lesson resource snapshots.
+- [x] Run focused tests and existing schema/store/persistence suites; expect pass.
+- [x] Commit: feat: persist unit library and lesson resource snapshots.
 
 ### Task 2: Library editor and lesson association UI
 
@@ -58,14 +58,14 @@ tests/features/UnitOfWorkEditor.test.tsx; tests/e2e/unit-of-work.spec.ts.
 confirmations. Selector associates or explicitly refreshes snapshots. Editor
 saves only valid draft content and never auto-refreshes lessons.
 
-- [ ] Write component tests for create/edit/save, invalid duplicate names,
+- [x] Write component tests for create/edit/save, invalid duplicate names,
   draft-discard protection, selection and refresh confirmation/cancellation.
-- [ ] Run tests; expect missing component/action failures.
-- [ ] Implement Library navigation/editor and setup selector using existing
+- [x] Run tests; expect missing component/action failures.
+- [x] Implement Library navigation/editor and setup selector using existing
   CSS tokens and native accessible controls; preserve catalogue on New lesson.
-- [ ] Run component tests and responsive browser flow at 375/768/1440 in both
+- [x] Run component tests and responsive browser flow at 375/768/1440 in both
   themes, including cache reload and saved-lesson reopen; expect pass.
-- [ ] Commit: feat: manage and attach unit resource slides.
+- [x] Commit: feat: manage and attach unit resource slides.
 
 ### Task 3: Safe student navigation and PDF hyperlinks
 
@@ -78,24 +78,24 @@ real merged-PDF annotation test proves existing preservation.
 Export named STUDENT_VIEWER_SANDBOX from student-snapshot-runtime.ts for viewer
 and browser fixture; only add allow-popups and allow-popups-to-escape-sandbox.
 
-- [ ] Write sanitizer/browser tests proving safe links survive and open a new
+- [x] Write sanitizer/browser tests proving safe links survive and open a new
   tab while javascript/data/control/credentials links do not; retained teacher
   control stripping and local Q/A reveals; final merged PDF URI annotations.
-- [ ] Run tests; expect anchor preservation/popup failures.
-- [ ] Normalize anchors, retain existing sanitizer/CSP restrictions, use the
+- [x] Run tests; expect anchor preservation/popup failures.
+- [x] Normalize anchors, retain existing sanitizer/CSP restrictions, use the
   restricted iframe sandbox constant. Fix PDF pipeline only if tests demand.
-- [ ] Run focused tests and presenter/student regression suite; expect pass.
-- [ ] Commit: feat: allow safe student resource links and verify PDF links.
+- [x] Run focused tests and presenter/student regression suite; expect pass.
+- [x] Commit: feat: allow safe student resource links and verify PDF links.
 
 ### Task 4: Review, verification and Preview
 
 **Files:** operations Preview verification note and this plan's test ledger.
 
-- [ ] Run diff --check, lint, typecheck, full unit suite, presenter checks,
+- [x] Run diff --check, lint, typecheck, full unit suite, presenter checks,
   focused browser regressions and production build; expect zero failures.
-- [ ] Request fresh whole-branch review; fix critical/important findings with
+- [x] Request fresh whole-branch review; fix critical/important findings with
   RED/GREEN regression tests and rerun affected/full suites.
-- [ ] Push only feature/unit-of-work-resources and deploy Preview with existing
+- [x] Push only feature/unit-of-work-resources and deploy Preview with existing
   production-project exclusion guard. Verify Preview health, auth and source SHA.
-- [ ] Report exact link, test evidence, assumptions, blockers and manual test
+- [x] Report exact link, test evidence, assumptions, blockers and manual test
   checklist; leave production and main unchanged.
