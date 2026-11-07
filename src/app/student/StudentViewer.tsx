@@ -1,5 +1,7 @@
 "use client";
 
+import { STUDENT_VIEWER_SANDBOX } from "@/features/builder/student-snapshot-runtime";
+
 import {
   FormEvent,
   useCallback,
@@ -253,7 +255,7 @@ export default function StudentViewer({ initialCode = "" }: { initialCode?: stri
             className="min-h-[72vh] flex-1 rounded-lg border border-slate-300 bg-white shadow-sm"
             title={snapshotTitle || "Shared lesson"}
             srcDoc={snapshotHtml}
-            sandbox="allow-scripts"
+            sandbox={STUDENT_VIEWER_SANDBOX}
             referrerPolicy="no-referrer"
           />
         ) : (

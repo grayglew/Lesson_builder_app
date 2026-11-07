@@ -1,3 +1,5 @@
+export const STUDENT_VIEWER_SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
+
 const STUDENT_SHARED_VIEW_CSS =
   "html,body{margin:0;padding:0;min-height:100%;background:#eef5f3;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;touch-action:pan-y pinch-zoom;overscroll-behavior-y:auto;-webkit-overflow-scrolling:touch}" +
   "body.student-shared-view .lesson-header{position:static;display:flex;justify-content:space-between;gap:18px;max-width:1120px;margin:12px auto 0;padding:10px 14px;box-sizing:border-box;background:#fff;border:1px solid #cad7d7;border-radius:8px;box-shadow:0 4px 14px rgba(19,37,42,.08)}" +
@@ -131,9 +133,31 @@ function buildStudentSnapshotHtml() {
     "base,link,map,area,meta[http-equiv='refresh']",
   ).forEach(node => node.remove());
 
-  snapshot.querySelectorAll("a,details,summary").forEach(node =>
+  snapshot.querySelectorAll("details,summary").forEach(node =>
     node.replaceWith(...Array.from(node.childNodes)),
   );
+
+  snapshot.querySelectorAll("a").forEach(anchor => {
+    const raw = anchor.getAttribute("href") || "";
+    try {
+      if (/[\u0000-\u001f\u007f]/.test(raw) || !/^https?:\/\//i.test(raw.trim())) {
+        throw new Error("Only absolute web links are permitted.");
+      }
+      const destination = new URL(raw.trim());
+      if (!["http:", "https:"].includes(destination.protocol) || destination.username || destination.password) {
+        throw new Error("Unsafe resource destination.");
+      }
+      anchor.setAttribute("href", destination.href);
+      anchor.setAttribute("target", "_blank");
+      anchor.setAttribute("rel", "noopener noreferrer");
+      anchor.setAttribute("referrerpolicy", "no-referrer");
+      anchor.removeAttribute("ping");
+      anchor.removeAttribute("download");
+      anchor.removeAttribute("attributionsrc");
+    } catch {
+      anchor.replaceWith(...Array.from(anchor.childNodes));
+    }
+  });
 
   snapshot.querySelectorAll("*").forEach(node => {
     Array.from(node.attributes).forEach(attribute => {

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { buildStandaloneLessonHtml } from "../../src/features/builder/lesson-export";
 import { createSavedStateExportDocument } from "../../src/features/builder/saved-lesson-parity";
-import { studentSnapshotRuntimeSource } from "../../src/features/builder/student-snapshot-runtime";
+import { studentSnapshotRuntimeSource, STUDENT_VIEWER_SANDBOX } from "../../src/features/builder/student-snapshot-runtime";
 import type { BuilderDocument } from "../../src/features/builder/schema";
 import { fixtureImage, forgedImportedControl, studentLesson } from "../fixtures/student-lesson";
 
@@ -11,9 +11,9 @@ async function snapshotFromExport(page: Page, document: BuilderDocument) {
 }
 
 async function mountStudent(page: Page, html: string) {
-  await page.setContent('<iframe title="Student lesson" sandbox="allow-scripts" style="width:100%;height:900px;border:0"></iframe>');
+  await page.setContent(`<iframe title="Student lesson" sandbox="${STUDENT_VIEWER_SANDBOX}" style="width:100%;height:900px;border:0"></iframe>`);
   await page.locator("iframe").evaluate((frame, source) => { (frame as HTMLIFrameElement).srcdoc = source; }, html);
-  await expect(page.locator("iframe")).toHaveAttribute("sandbox", "allow-scripts");
+  await expect(page.locator("iframe")).toHaveAttribute("sandbox", STUDENT_VIEWER_SANDBOX);
   const frame = page.frameLocator("iframe");
   await expect(frame.locator(".lesson-deck")).toBeVisible();
   await frame.locator(".lesson-deck img").evaluateAll(async (images) => {

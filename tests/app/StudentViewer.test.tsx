@@ -52,7 +52,7 @@ describe("StudentViewer", () => {
 
     expect(await screen.findByTitle("Shared algebra")).toHaveAttribute(
       "sandbox",
-      "allow-scripts",
+      "allow-scripts allow-popups allow-popups-to-escape-sandbox",
     );
     expect(screen.getByTitle("Shared algebra").getAttribute("srcdoc")).toContain(
       '.lesson-deck,.lesson-slide,.lesson-slide *{touch-action:pan-y pinch-zoom!important}',
@@ -99,7 +99,7 @@ describe("StudentViewer", () => {
     );
     const secondFrame = screen.getByTitle("Shared algebra");
     expect(secondFrame).not.toBe(firstFrame);
-    expect(secondFrame).toHaveAttribute("sandbox", "allow-scripts");
+    expect(secondFrame).toHaveAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
     expect(
       screen.getByText("Lesson updated automatically."),
     ).toBeInTheDocument();
