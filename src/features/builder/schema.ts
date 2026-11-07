@@ -229,9 +229,32 @@ export const slideTemplateSchema = z
   })
   .passthrough();
 
+export const unitResourceSchema = z.object({
+  id: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(200),
+  bullets: z.array(z.string()).default([]),
+});
+
+export const unitOfWorkSchema = z.object({
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(200),
+  slides: z.array(unitResourceSchema).min(1),
+  updatedAt: z.string().min(1),
+}).refine(unit => new Set(unit.slides.map(slide => slide.id)).size === unit.slides.length, {
+  message: "Resource slide IDs must be unique.",
+});
+
+const unitAssociationShape = {
+  unitOfWorkId: z.string().default(""),
+  unitOfWorkName: z.string().default(""),
+  unitOfWorkVersion: z.string().default(""),
+};
+
 export const builderDocumentSchema = z
   .object({
     schemaVersion: z.literal(2),
+    ...unitAssociationShape,
+    unitsOfWork: z.array(unitOfWorkSchema).default([]),
     title: z.string(),
     className: z.string(),
     teachingDate: isoDateSchema,
@@ -252,6 +275,8 @@ export const workspaceDocumentSchema = z
   .object({
     schemaVersion: z.literal(3),
     syncKind: z.literal("workspace"),
+    ...unitAssociationShape,
+    unitsOfWork: z.array(unitOfWorkSchema).default([]),
     title: z.string(),
     className: z.string(),
     teachingDate: isoDateSchema,
@@ -272,6 +297,8 @@ export type BuilderDocument = z.infer<typeof builderDocumentSchema>;
 export type WorkspaceDocument = z.infer<typeof workspaceDocumentSchema>;
 export type RetrievalItem = z.infer<typeof retrievalItemSchema>;
 export type SlideTemplate = z.infer<typeof slideTemplateSchema>;
+export type UnitOfWork = z.infer<typeof unitOfWorkSchema>;
+export type UnitResource = z.infer<typeof unitResourceSchema>;
 
 export function todayIso() {
   const date = new Date();
@@ -291,6 +318,10 @@ export function createBuilderId(prefix: string) {
 export function createInitialBuilderDocument(now = new Date().toISOString()): BuilderDocument {
   return {
     schemaVersion: 2,
+    unitsOfWork: [],
+    unitOfWorkId: "",
+    unitOfWorkName: "",
+    unitOfWorkVersion: "",
     title: "Untitled lesson",
     className: "",
     teachingDate: todayIso(),
@@ -332,6 +363,12 @@ export function normalizeBuilderDocument(input: unknown): BuilderDocument {
   return builderDocumentSchema.parse({
     ...source,
     schemaVersion: 2,
+    unitsOfWork: parseArray(unitOfWorkSchema, source.unitsOfWork).filter(
+      (unit, index, units) => units.findIndex(entry => entry.id === unit.id) === index,
+    ),
+    unitOfWorkId: asString(source.unitOfWorkId),
+    unitOfWorkName: asString(source.unitOfWorkName),
+    unitOfWorkVersion: asString(source.unitOfWorkVersion),
     title: asString(source.title) || base.title,
     className,
     teachingDate: isoDateSchema.safeParse(source.teachingDate).success
@@ -404,6 +441,10 @@ export function toWorkspaceDocument(document: BuilderDocument): WorkspaceDocumen
   return workspaceDocumentSchema.parse({
     schemaVersion: 3,
     syncKind: "workspace",
+    unitsOfWork: structuredCloneSafe(document.unitsOfWork),
+    unitOfWorkId: document.unitOfWorkId,
+    unitOfWorkName: document.unitOfWorkName,
+    unitOfWorkVersion: document.unitOfWorkVersion,
     title: document.title || "Untitled lesson",
     className: document.className,
     teachingDate: document.teachingDate,

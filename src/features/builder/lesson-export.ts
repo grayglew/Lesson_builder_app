@@ -174,6 +174,9 @@ export function normalizeImportedBuilderDocument(
   const imported = normalizeBuilderDocument(input);
   return normalizeBuilderDocument({
     ...imported,
+    unitsOfWork: Object.hasOwn(lessonSource, "unitsOfWork")
+      ? imported.unitsOfWork
+      : current.unitsOfWork,
     classNames: Object.hasOwn(lessonSource, "classNames")
       ? imported.classNames
       : current.classNames,

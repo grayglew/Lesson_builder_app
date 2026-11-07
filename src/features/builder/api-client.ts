@@ -294,6 +294,9 @@ export async function saveCurrentLesson(
   const savedDocument = {
     schemaVersion: 1,
     lessonKind: "saved-builder-lesson",
+    unitOfWorkId: document.unitOfWorkId,
+    unitOfWorkName: document.unitOfWorkName,
+    unitOfWorkVersion: document.unitOfWorkVersion,
     title: document.title.trim() || "Untitled lesson",
     className: document.className.trim(),
     teachingDate: document.teachingDate,

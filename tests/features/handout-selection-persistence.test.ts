@@ -71,6 +71,10 @@ describe("persistent handout slide selection", () => {
   it("writes the selection into named saves and Save As copies", async () => {
     const document = documentWithSlides();
     document.title = "Selected handout";
+    document.unitOfWorkId = "probability";
+    document.unitOfWorkName = "Probability";
+    document.unitOfWorkVersion = NOW;
+    document.unitsOfWork = [{ id: "private", name: "Private unit", updatedAt: NOW, slides: [{ id: "resource", title: "Private resource", bullets: [] }] }];
     document.handoutSlideIds = ["first", "third"];
     const fetchMock = vi.fn(async (
       input: RequestInfo | URL,
@@ -121,5 +125,7 @@ describe("persistent handout slide selection", () => {
     });
     const saved = JSON.parse(fileText) as Record<string, unknown>;
     expect(saved.handoutSlideIds).toEqual(["first", "third"]);
+    expect(saved).toMatchObject({ unitOfWorkId: "probability", unitOfWorkName: "Probability", unitOfWorkVersion: NOW });
+    expect(saved).not.toHaveProperty("unitsOfWork");
   });
 });

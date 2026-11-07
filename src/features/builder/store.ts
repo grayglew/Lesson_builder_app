@@ -8,10 +8,13 @@ import {
   type RetrievalItem,
   type SlideTemplate,
   type StarterSlot,
+  type UnitOfWork,
+  unitOfWorkSchema,
   createBuilderId,
   createInitialBuilderDocument,
   normalizeBuilderDocument,
 } from "./schema";
+import { applyUnitToLesson } from "./unit-of-work";
 
 type MetadataPatch = Partial<
   Pick<BuilderDocument, "title" | "className" | "teachingDate" | "overallLessonLo">
@@ -49,6 +52,9 @@ export type BuilderStore = {
   clearActiveLesson: (id?: string) => void;
   updateGlobalData: (patch: GlobalDataPatch) => void;
   reset: () => void;
+  saveUnitOfWork: (unit: UnitOfWork) => void;
+  associateUnitOfWork: (id: string) => void;
+  refreshUnitOfWork: () => void;
   updateMetadata: (patch: MetadataPatch) => void;
   selectSlide: (slideId: string | null) => void;
   toggleHandoutSlide: (slideId: string) => void;
@@ -101,6 +107,7 @@ export const useBuilderStore = create<BuilderStore>()(
           ]),
           retrievalItems: state.document.retrievalItems,
           slideTemplates: state.document.slideTemplates,
+          unitsOfWork: state.document.unitsOfWork,
           updatedAt: new Date().toISOString(),
         };
         state.selectedSlideId = null;
@@ -169,13 +176,47 @@ export const useBuilderStore = create<BuilderStore>()(
 
     reset: () =>
       set((state) => {
-        state.document = createInitialBuilderDocument();
+        const unitsOfWork = state.document.unitsOfWork;
+        state.document = { ...createInitialBuilderDocument(), unitsOfWork };
         state.selectedSlideId = null;
         state.hydrated = true;
         state.status = {
           tone: "success",
           message: "Started a new lesson in the v2 workspace.",
         };
+      }),
+
+    saveUnitOfWork: (input) =>
+      set((state) => {
+        const unit = unitOfWorkSchema.parse(input);
+        if (state.document.unitsOfWork.some(entry =>
+          entry.id !== unit.id && entry.name.toLowerCase() === unit.name.toLowerCase(),
+        )) throw new Error("A unit with that name already exists.");
+        const index = state.document.unitsOfWork.findIndex(entry => entry.id === unit.id);
+        const previousTime = index < 0 ? 0 : Date.parse(state.document.unitsOfWork[index].updatedAt) || 0;
+        const updatedAt = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
+        const saved = { ...unit, updatedAt };
+        if (index < 0) state.document.unitsOfWork.push(saved);
+        else state.document.unitsOfWork[index] = saved;
+        state.document.updatedAt = updatedAt;
+      }),
+
+    associateUnitOfWork: (id) =>
+      set((state) => {
+        const unit = id ? state.document.unitsOfWork.find(entry => entry.id === id) : null;
+        if (id && !unit) throw new Error("The source unit is not available in your library.");
+        state.document = applyUnitToLesson(state.document, unit || null);
+        if (!state.document.slides.some(slide => slide.id === state.selectedSlideId)) state.selectedSlideId = null;
+        touchDocument(state.document);
+      }),
+
+    refreshUnitOfWork: () =>
+      set((state) => {
+        const unit = state.document.unitsOfWork.find(entry => entry.id === state.document.unitOfWorkId);
+        if (!unit) throw new Error("The source unit is not available in your library.");
+        state.document = applyUnitToLesson(state.document, unit);
+        if (!state.document.slides.some(slide => slide.id === state.selectedSlideId)) state.selectedSlideId = null;
+        touchDocument(state.document);
       }),
 
     updateMetadata: (patch) =>
@@ -268,6 +309,8 @@ export const useBuilderStore = create<BuilderStore>()(
         if (sourceIndex < 0) return;
         const duplicate = clonePlain(state.document.slides[sourceIndex]);
         duplicate.id = createBuilderId("slide");
+        delete duplicate.unitOfWorkId;
+        delete duplicate.unitResourceId;
         duplicate.title = duplicate.title ? `${duplicate.title} copy` : "Slide copy";
         duplicate.createdAt = new Date().toISOString();
         state.document.slides.splice(sourceIndex + 1, 0, duplicate);
