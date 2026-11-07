@@ -60,6 +60,8 @@ import { getDueRetrievalItems } from "./retrieval";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
+import { UnitOfWorkEditor } from "./UnitOfWorkEditor";
+import { UnitOfWorkSelector } from "./UnitOfWorkSelector";
 import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
 import {
   type BuilderSlide,
@@ -95,6 +97,7 @@ const tools: Array<{ name: ToolName; label: string }> = [
   { name: "cfu", label: "CFU" },
   { name: "draw", label: "Draw" },
   { name: "templates", label: "Templates" },
+  { name: "units", label: "Units of work" },
   { name: "placeholder", label: "Placeholder" },
   { name: "math", label: "LaTeX" },
 ];
@@ -109,6 +112,7 @@ const toolLabels: Record<ToolName, string> = {
   cfu: "CFU",
   draw: "Draw",
   templates: "Templates",
+  units: "Units of work",
   "shared-data": "Shared data",
   placeholder: "Placeholder",
   math: "LaTeX",
@@ -542,6 +546,7 @@ function BuilderShellWorkspace({
       classNames: [...document.classNames],
       retrievalItems: document.retrievalItems,
       slideTemplates: document.slideTemplates,
+      unitsOfWork: document.unitsOfWork,
     };
 
     setBusyAction("new-lesson");
@@ -811,6 +816,7 @@ function BuilderShellWorkspace({
             }
           />
 
+          <UnitOfWorkSelector />
           <div className={styles.lessonQuickActions} aria-label="Lesson save actions">
             {variant === "classic" ? (
             <button
@@ -911,6 +917,7 @@ function BuilderShellWorkspace({
           >
           <h2 className={styles.srOnly}>{toolLabels[activeTool]}</h2>
           {activeTool === "starter" ? <StarterComposer /> : null}
+          {activeTool === "units" ? <div className={styles.toolPanel}><UnitOfWorkEditor /></div> : null}
           {activeTool === "saved-lessons" ? (
             <div className={styles.toolPanel}>
               <SavedLessonLibrary

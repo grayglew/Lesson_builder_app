@@ -92,7 +92,8 @@ describe("BuilderShell legacy UI parity", () => {
       screen
         .getByRole("navigation", { name: "Slide tools" })
         .querySelectorAll("button"),
-    ).toHaveLength(11);
+    ).toHaveLength(12);
+    expect(screen.getByRole("button", { name: "Units of work", exact: true })).toBeInTheDocument();
     expect(screen.getByLabelText("Lesson title")).toBeInTheDocument();
     expect(screen.getByLabelText("Class")).toBeInTheDocument();
     expect(screen.getByLabelText("Date of teaching")).toBeInTheDocument();
@@ -581,7 +582,7 @@ describe("BuilderShell Compact Console action parity", () => {
     expect(screen.getByRole("checkbox", { name: "Select 101a: Log this" })).not.toBeChecked();
   });
 
-  it("renders the real shell with all eleven tools and production utilities", async () => {
+  it("renders the real shell with unit resources and production utilities", async () => {
     render(
       <BuilderShell
         userEmail="teacher@example.com"
@@ -592,7 +593,8 @@ describe("BuilderShell Compact Console action parity", () => {
 
     expect(await screen.findByRole("region", { name: "Starter" })).toBeInTheDocument();
     const navigation = screen.getByRole("navigation", { name: "Slide tools" });
-    expect(navigation.querySelectorAll("button[data-active]")).toHaveLength(12);
+    expect(navigation.querySelectorAll("button[data-active]")).toHaveLength(13);
+    expect(screen.getByRole("button", { name: "Units of work", exact: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Templates" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Shared data" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lessons" })).toBeInTheDocument();

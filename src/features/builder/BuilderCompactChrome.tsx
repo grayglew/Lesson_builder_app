@@ -50,6 +50,7 @@ export type BuilderToolName =
   | "cfu"
   | "draw"
   | "templates"
+  | "units"
   | "shared-data"
   | "placeholder"
   | "math";
@@ -179,7 +180,7 @@ const groups: Array<{
   label: string;
   tools: Array<{ name: BuilderToolName; label: string; icon: typeof BookOpen }>;
 }> = [
-  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "templates", label: "Templates", icon: LayoutTemplate }, { name: "shared-data", label: "Shared data", icon: Layers3 }] },
+  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "units", label: "Units of work", icon: BookOpen }, { name: "templates", label: "Templates", icon: LayoutTemplate }, { name: "shared-data", label: "Shared data", icon: Layers3 }] },
   { label: "Core slides", tools: [{ name: "starter", label: "Starter", icon: LayoutGrid }, { name: "retrieval", label: "Retrieval", icon: RefreshCw }, { name: "example", label: "Example", icon: BookOpenCheck }, { name: "cfu", label: "CFU", icon: ListChecks }] },
   { label: "Resources", tools: [{ name: "worksheet", label: "Worksheet", icon: Files }, { name: "pdf", label: "PDF", icon: FileText }] },
   { label: "Create", tools: [{ name: "draw", label: "Draw", icon: PencilRuler }, { name: "placeholder", label: "Placeholder", icon: SquareDashed }, { name: "math", label: "LaTeX", icon: Sigma }] },
