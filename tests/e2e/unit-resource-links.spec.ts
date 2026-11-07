@@ -10,6 +10,32 @@ function resourceLesson() {
   return { ...createInitialBuilderDocument(), slides: [{ id: "resources", type: "template", title: "Unit resources", bullets: ["[Extra practice](https://example.org/practice)", "[Scheme of work](https://example.org/sow)"] }] };
 }
 
+test("Save to Builder keeps the unit association without copying the private catalogue", async ({ page }) => {
+  let saved: Record<string, unknown> = {};
+  await page.route("https://presenter.test/**", async route => {
+    const url = route.request().url();
+    if (url.endsWith("/upload")) {
+      const body = route.request().postDataBuffer()!.toString("utf8");
+      saved = JSON.parse(body.slice(body.indexOf("{"), body.lastIndexOf("}") + 1));
+      return route.fulfill({ body: "{}" });
+    }
+    if (url.endsWith("/ticket")) return route.fulfill({ json: { ok: true, id: "taught", path: "taught.json", signedUrl: "https://presenter.test/upload" } });
+    if (url.endsWith("/complete")) return route.fulfill({ json: { ok: true, lesson: { id: "taught" } } });
+    if (url.endsWith("/taught")) return route.fulfill({ json: { ok: true } });
+    return route.fulfill({ body: "<html></html>", contentType: "text/html" });
+  });
+  await page.goto("https://presenter.test/");
+  const document = { ...resourceLesson(), unitOfWorkId: "probability", unitOfWorkName: "Probability", unitOfWorkVersion: "version-1" };
+  await page.setContent(buildStandaloneLessonHtml(document, { presenterConfig: {
+    enabled: true, sourceLessonId: "original", originalTitle: document.title, className: document.className, teachingDate: document.teachingDate,
+    uploadEndpoint: "https://presenter.test/ticket", completeEndpoint: "https://presenter.test/complete", taughtEndpoint: "https://presenter.test/taught",
+  } }));
+  await page.getByRole("button", { name: "Save to Builder" }).click();
+  await expect.poll(() => saved.unitOfWorkId).toBe("probability");
+  expect(saved).toMatchObject({ unitOfWorkName: "Probability", unitOfWorkVersion: "version-1" });
+  expect(saved).not.toHaveProperty("unitsOfWork");
+});
+
 test("student resource links open separately and do not enable teacher tools", async ({ page, context }) => {
   const runtime = await import("../../src/features/builder/student-snapshot-runtime");
   await page.setContent(buildStandaloneLessonHtml(resourceLesson()));
@@ -28,6 +54,18 @@ test("student resource links open separately and do not enable teacher tools", a
   await expect(frame.locator(".presenter-tools,button:not([data-student-qa-toggle]),input,form")).toHaveCount(0);
   expect(await popup.evaluate(() => window.opener)).toBeNull();
   await popup.close();
+});
+
+test("imported SVG cannot animate a safe resource destination into a rejected URL", async ({ page }) => {
+  const document = resourceLesson();
+  document.slides.push({ id: "svg", type: "imported-html", title: "Imported",
+    html: '<svg viewBox="0 0 200 100"><a href="https://example.org/safe"><set attributeName="href" to="https://user:secret@example.org/private" begin="0s"/><text x="5" y="30">Safe resource</text></a></svg>' } as never);
+  await page.setContent(buildStandaloneLessonHtml(document));
+  const html = await page.evaluate(source => new Function(`${source}\nreturn buildStudentSnapshotHtml();`)() as string, studentSnapshotRuntimeSource());
+  await page.setContent(html);
+  const anchor = page.locator('svg a');
+  await anchor.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  expect(await anchor.evaluate(node => (node as SVGAElement).href.animVal)).toBe("https://example.org/safe");
 });
 
 for (const mode of ["saved", "answers"] as const) {

@@ -130,7 +130,8 @@ function buildStudentSnapshotHtml() {
   snapshot.querySelectorAll(
     ".presenter-tools,script,input,.live-retrieval-controls," +
     "[data-ignore-annotation],iframe,object,embed,form,select,textarea," +
-    "base,link,map,area,meta[http-equiv='refresh']",
+    "base,link,map,area,meta[http-equiv='refresh']," +
+    "animate,animateMotion,animateTransform,animateColor,set,discard",
   ).forEach(node => node.remove());
 
   snapshot.querySelectorAll("details,summary").forEach(node =>
@@ -154,6 +155,7 @@ function buildStudentSnapshotHtml() {
       anchor.removeAttribute("ping");
       anchor.removeAttribute("download");
       anchor.removeAttribute("attributionsrc");
+      anchor.removeAttribute("xlink:href");
     } catch {
       anchor.replaceWith(...Array.from(anchor.childNodes));
     }

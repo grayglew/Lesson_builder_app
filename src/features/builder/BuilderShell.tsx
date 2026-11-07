@@ -917,7 +917,9 @@ function BuilderShellWorkspace({
           >
           <h2 className={styles.srOnly}>{toolLabels[activeTool]}</h2>
           {activeTool === "starter" ? <StarterComposer /> : null}
-          {activeTool === "units" ? <div className={styles.toolPanel}><UnitOfWorkEditor /></div> : null}
+          <div hidden={activeTool !== "units"}>
+            <div className={styles.toolPanel}><UnitOfWorkEditor /></div>
+          </div>
           {activeTool === "saved-lessons" ? (
             <div className={styles.toolPanel}>
               <SavedLessonLibrary

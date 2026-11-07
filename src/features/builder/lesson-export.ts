@@ -1513,6 +1513,9 @@ function standaloneInteractionScript() {
       const taughtDocument = {
         schemaVersion: 1,
         lessonKind: "presented-builder-lesson",
+        unitOfWorkId: state.unitOfWorkId || "",
+        unitOfWorkName: state.unitOfWorkName || "",
+        unitOfWorkVersion: state.unitOfWorkVersion || "",
         sourceLessonId: presenterConfig.sourceLessonId,
         title: presentedLessonTitle,
         className: state.className || presenterConfig.className || "",

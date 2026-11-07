@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { act, renderHook, cleanup } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createInitialBuilderDocument, mergeWorkspaceAndGlobal, normalizeBuilderDocument, toWorkspaceDocument } from "../../src/features/builder/schema";
 import { useBuilderStore } from "../../src/features/builder/store";
+import { useLessonExportActions } from "../../src/features/builder/useLessonExportActions";
+import { buildStandaloneLessonHtml } from "../../src/features/builder/lesson-export";
 
 const unit = {
   id: "probability", name: "Probability", updatedAt: "2026-11-07T10:00:00Z",
@@ -9,6 +12,7 @@ const unit = {
 const metadata = { id: "saved", title: "Saved lesson", className: "7Ma3", teachingDate: "2026-11-07", updatedAt: "2026-11-07T11:00:00Z" };
 
 beforeEach(() => useBuilderStore.getState().hydrate(createInitialBuilderDocument()));
+afterEach(cleanup);
 
 describe("unit-of-work persistence and snapshots", () => {
   it("opens legacy documents with no unit and an empty catalogue", () => {
@@ -75,5 +79,16 @@ describe("unit-of-work persistence and snapshots", () => {
     useBuilderStore.getState().hydrate({ ...createInitialBuilderDocument(), unitOfWorkId: "missing", slides: [{ id: "existing", type: "template", title: "Old resources", unitOfWorkId: "missing", bullets: [] }] });
     expect(() => useBuilderStore.getState().refreshUnitOfWork()).toThrow(/not available/i);
     expect(useBuilderStore.getState().document.slides[0].id).toBe("existing");
+  });
+
+  it("imports HTML through the real action without losing the unit association or local catalogue", async () => {
+    useBuilderStore.getState().hydrate({ ...createInitialBuilderDocument(), unitsOfWork: [unit] });
+    const imported = normalizeBuilderDocument({ unitOfWorkId: unit.id, unitOfWorkName: unit.name, unitOfWorkVersion: unit.updatedAt,
+      slides: [{ id: "snapshot", type: "template", title: "Resources", bullets: [], unitOfWorkId: unit.id, unitResourceId: "resources" }] });
+    const file = new File([], "lesson.html", { type: "text/html" });
+    Object.defineProperty(file, "text", { value: async () => buildStandaloneLessonHtml(imported) });
+    const { result } = renderHook(useLessonExportActions);
+    await act(() => result.current.importHtml(file));
+    expect(useBuilderStore.getState().document).toMatchObject({ unitOfWorkId: "probability", unitOfWorkName: "Probability", unitOfWorkVersion: unit.updatedAt, unitsOfWork: [unit] });
   });
 });

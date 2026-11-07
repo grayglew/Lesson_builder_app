@@ -73,6 +73,16 @@ describe("BuilderShell legacy UI parity", () => {
       .hydrate(createInitialBuilderDocument("2026-07-18T06:00:00.000Z"));
   });
 
+  it("keeps an unsaved unit draft when navigating to another tool and back", async () => {
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Units of work" }));
+    await user.type(screen.getByLabelText("Unit name"), "My unsaved unit");
+    await user.click(screen.getByRole("button", { name: /^Starter$/ }));
+    await user.click(screen.getByRole("button", { name: "Units of work" }));
+    expect(screen.getByLabelText("Unit name")).toHaveValue("My unsaved unit");
+  });
+
   it("uses the original three-region workflow and tool order", async () => {
     render(<BuilderShell userEmail="teacher@example.com" />);
 
@@ -93,7 +103,7 @@ describe("BuilderShell legacy UI parity", () => {
         .getByRole("navigation", { name: "Slide tools" })
         .querySelectorAll("button"),
     ).toHaveLength(12);
-    expect(screen.getByRole("button", { name: "Units of work", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Units of work" })).toBeInTheDocument();
     expect(screen.getByLabelText("Lesson title")).toBeInTheDocument();
     expect(screen.getByLabelText("Class")).toBeInTheDocument();
     expect(screen.getByLabelText("Date of teaching")).toBeInTheDocument();
@@ -594,7 +604,7 @@ describe("BuilderShell Compact Console action parity", () => {
     expect(await screen.findByRole("region", { name: "Starter" })).toBeInTheDocument();
     const navigation = screen.getByRole("navigation", { name: "Slide tools" });
     expect(navigation.querySelectorAll("button[data-active]")).toHaveLength(13);
-    expect(screen.getByRole("button", { name: "Units of work", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Units of work" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Templates" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Shared data" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lessons" })).toBeInTheDocument();
