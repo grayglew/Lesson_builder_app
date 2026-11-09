@@ -26,7 +26,7 @@
 - [x] Extend dialog props/details and add the optional unit selector plus conditional name field.
 - [x] Extract preparation into `new-lesson.ts`; construct the unit locally and apply resources before saving, hydrate only on success.
 - [x] Verify focused/full unit suites, lint, TypeScript, presenter checks and responsive browser save/reopen tests.
-- [ ] Review, commit/push the feature branch, deploy a clean Preview, run health/auth smoke checks and share its link.
+- [x] Review, commit/push the feature branch, deploy a clean Preview, run health/auth smoke checks and share its link.
 
 ## Verification record
 
