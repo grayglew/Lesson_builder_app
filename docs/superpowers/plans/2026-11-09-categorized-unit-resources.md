@@ -31,30 +31,30 @@ lesson-export.ts, handout-export.ts, BuilderShell.tsx, student-snapshot-runtime.
 Interfaces: UnitResourceLinks (seven string fields), safeUnitResourceHref(value,
 allowEmail=false): string|null, renderUnitResourceCards(title,resources): string.
 
-- [ ] Write URL/security, persistence, categorized HTML and handout tests; run RED.
-- [ ] Add optional resources, snapshot copying, shared safe renderer/styles and
+- [x] Write URL/security, persistence, categorized HTML and handout tests; run RED.
+- [x] Add optional resources, snapshot copying, shared safe renderer/styles and
   student mailto preservation; no changes to unrelated templates.
-- [ ] Run focused suites GREEN and commit.
+- [x] Run focused suites GREEN and commit.
 
 ### Task 2: Authoring UI
 
 Files: UnitOfWorkEditor.tsx/module.css and associated component/browser tests.
 Consumes Task 1 resource field definitions and renderer.
 
-- [ ] Write tests for all seven inputs, plain URL to labelled button, invalid
+- [x] Write tests for all seven inputs, plain URL to labelled button, invalid
   text tile, email, literal escaping, legacy preservation and live preview.
-- [ ] Run RED, replace free-text authoring with categorized fieldsets, retain
+- [x] Run RED, replace free-text authoring with categorized fieldsets, retain
   earlier content for reference, and add a live preview.
-- [ ] Run GREEN component/browser tests at 375/768/1440 light/dark and commit.
+- [x] Run GREEN component/browser tests at 375/768/1440 light/dark and commit.
 
 ### Task 3: Verification and Preview
 
 Files: unit resource browser/PDF tests, operations Preview note.
 
-- [ ] Test real student web navigation and preserved email href, inert notes,
+- [x] Test real student web navigation and preserved email href, inert notes,
   mobile layout, and final merged PDF URI annotations in both variants.
-- [ ] Run lint, typecheck, full unit suite, presenter and focused browser checks.
-- [ ] Fresh review; fix Important/Critical findings with RED/GREEN regressions.
-- [ ] Push feature branch, guard Preview database isolation, deploy exact
+- [x] Run lint, typecheck, full unit suite, presenter and focused browser checks.
+- [x] Fresh review; fix Important/Critical findings with RED/GREEN regressions.
+- [x] Push feature branch, guard Preview database isolation, deploy exact
   reviewed source, verify Preview health/auth and unchanged production.
-- [ ] Give fresh Preview link and manual test steps.
+- [x] Give fresh Preview link and manual test steps.
