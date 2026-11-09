@@ -569,7 +569,13 @@
 
 .newLessonDialog {
   width: min(520px, 100%);
+  min-width: 0;
+  box-sizing: border-box;
 }
+
+.newLessonForm .textInput, .newLessonDialog button { min-height: 2.75rem; }
+.newLessonUnitHint { margin: .5rem 0 0; color: var(--builder-muted); font-size: .875rem; line-height: 1.5; }
+.newLessonUnitError { margin: 0; color: var(--builder-danger); font-size: .875rem; line-height: 1.5; }
 
 .newLessonDescription {
   margin: 0 0 18px;

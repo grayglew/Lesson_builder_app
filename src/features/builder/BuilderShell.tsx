@@ -53,6 +53,7 @@ import {
   hydrateStarterSlotsFromRetrievalItems,
 } from "./live-starter";
 import { NewLessonDialog } from "./NewLessonDialog";
+import { prepareNewLessonDocument, type NewLessonDetails } from "./new-lesson";
 import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
 import { RetrievalComposer } from "./RetrievalComposer";
@@ -65,10 +66,7 @@ import { UnitOfWorkSelector } from "./UnitOfWorkSelector";
 import { UnitResourceSlide } from "./UnitResourceSlide";
 import { hasUnitResources } from "./unit-resources";
 import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
-import {
-  type BuilderSlide,
-  createInitialBuilderDocument,
-} from "./schema";
+import { type BuilderSlide } from "./schema";
 import {
   selectDocument,
   useBuilderStore,
@@ -119,23 +117,6 @@ const toolLabels: Record<ToolName, string> = {
   placeholder: "Placeholder",
   math: "LaTeX",
 };
-
-function buildNewLessonMetadata(details: {
-  title: string;
-  className: string;
-  teachingDate: string;
-}) {
-  const lessonTitle = details.title.replace(/\s+/g, " ").trim();
-  const className = details.className.replace(/\s+/g, " ").trim();
-  const [, month, day] = details.teachingDate.split("-");
-
-  return {
-    title: `${className} ${lessonTitle} ${day}-${month}`,
-    className,
-    teachingDate: details.teachingDate,
-    overallLessonLo: lessonTitle,
-  };
-}
 
 export function BuilderShell(props: BuilderShellProps) {
   return (
@@ -536,28 +517,12 @@ function BuilderShellWorkspace({
     }
   }
 
-  async function createAndSaveNewLesson(details: {
-    title: string;
-    className: string;
-    teachingDate: string;
-  }) {
-    const metadata = buildNewLessonMetadata(details);
-    const nextDocument = {
-      ...createInitialBuilderDocument(),
-      ...metadata,
-      classNames: [...document.classNames],
-      retrievalItems: document.retrievalItems,
-      slideTemplates: document.slideTemplates,
-      unitsOfWork: document.unitsOfWork,
-    };
-
+  async function createAndSaveNewLesson(details: NewLessonDetails) {
     setBusyAction("new-lesson");
-    setStatus({
-      tone: "working",
-      message: `Creating and saving "${metadata.title}"...`,
-    });
 
     try {
+      const nextDocument = prepareNewLessonDocument(document, details);
+      setStatus({ tone: "working", message: `Creating and saving "${nextDocument.title}"...` });
       const saved = await saveCurrentLesson(nextDocument, { copy: true });
       const savedDocument = {
         ...nextDocument,
@@ -1282,6 +1247,7 @@ function BuilderShellWorkspace({
         <NewLessonDialog
           busy={busyAction === "new-lesson"}
           classNames={document.classNames}
+          units={document.unitsOfWork}
           onClose={() => {
             if (busyAction !== "new-lesson") setNewLessonDialogOpen(false);
           }}

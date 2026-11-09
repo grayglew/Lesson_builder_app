@@ -2,18 +2,14 @@
 
 import { type FormEvent, useState } from "react";
 import styles from "./BuilderShell.module.css";
-import { todayIso } from "./schema";
+import { todayIso, type UnitOfWork } from "./schema";
+import { newLessonUnitError, type NewLessonDetails, type NewLessonUnitChoice } from "./new-lesson";
 import { useDialogFocus } from "./useDialogFocus";
-
-type NewLessonDetails = {
-  title: string;
-  className: string;
-  teachingDate: string;
-};
 
 type NewLessonDialogProps = {
   busy: boolean;
   classNames: string[];
+  units: readonly Pick<UnitOfWork, "id" | "name">[];
   onClose: () => void;
   onSubmit: (details: NewLessonDetails) => void;
 };
@@ -21,16 +17,22 @@ type NewLessonDialogProps = {
 export function NewLessonDialog({
   busy,
   classNames,
+  units,
   onClose,
   onSubmit,
 }: NewLessonDialogProps) {
   const [title, setTitle] = useState("");
   const [className, setClassName] = useState("");
   const [teachingDate, setTeachingDate] = useState(todayIso);
+  const [unitOption, setUnitOption] = useState("");
+  const [newUnitName, setNewUnitName] = useState("");
+  const unit: NewLessonUnitChoice = unitOption === "new" ? { mode: "new", name: newUnitName.replace(/\s+/g, " ").trim() }
+    : unitOption ? { mode: "existing", id: unitOption.slice(5) } : { mode: "none" };
+  const unitError = newLessonUnitError(units, unit);
   const dialogRef = useDialogFocus<HTMLElement>(() => {
     if (!busy) onClose();
   });
-  const canSubmit = Boolean(title.trim() && className.trim() && teachingDate) && !busy;
+  const canSubmit = Boolean(title.trim() && className.trim() && teachingDate) && !unitError && !busy;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,6 +41,7 @@ export function NewLessonDialog({
       title: title.trim(),
       className: className.trim(),
       teachingDate,
+      unit,
     });
   }
 
@@ -69,8 +72,8 @@ export function NewLessonDialog({
         </div>
 
         <p id="new-lesson-description" className={styles.newLessonDescription}>
-          Choose a title, class and teaching date. Your current workspace will
-          only be replaced after the new blank lesson has saved successfully.
+          Choose a title, class and teaching date, and optionally a unit. Your current workspace will
+          only be replaced after the new lesson has saved successfully.
         </p>
 
         <form className={styles.newLessonForm} onSubmit={handleSubmit}>
@@ -83,6 +86,7 @@ export function NewLessonDialog({
               autoComplete="off"
               autoFocus
               required
+              disabled={busy}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
@@ -94,6 +98,7 @@ export function NewLessonDialog({
               id="new-lesson-class"
               className={styles.textInput}
               required
+              disabled={busy}
               value={className}
               onChange={(event) => setClassName(event.target.value)}
             >
@@ -113,10 +118,35 @@ export function NewLessonDialog({
               className={styles.textInput}
               type="date"
               required
+              disabled={busy}
               value={teachingDate}
               onChange={(event) => setTeachingDate(event.target.value)}
             />
           </label>
+
+          <div>
+            <label htmlFor="new-lesson-unit">
+              <span className={styles.fieldLabel}>Unit of work (optional)</span>
+              <select id="new-lesson-unit" className={styles.textInput} value={unitOption} disabled={busy}
+                aria-describedby="new-lesson-unit-help" onChange={event => setUnitOption(event.target.value)}>
+                <option value="">No unit</option>
+                {units.map(entry => <option key={entry.id} value={`unit:${entry.id}`}>{entry.name}</option>)}
+                <option value="new">Create new unit…</option>
+              </select>
+            </label>
+            <p id="new-lesson-unit-help" className={styles.newLessonUnitHint}>
+              {unit.mode === "new" ? "Create the unit with this lesson, then add its resources in Library → Units of work."
+                : unit.mode === "existing" ? "The unit’s resource slides will be included in the new lesson." : "Choose a unit to include its reusable resource slides."}
+            </p>
+          </div>
+          {unit.mode === "new" ? <label htmlFor="new-lesson-unit-name">
+            <span className={styles.fieldLabel}>New unit name</span>
+            <input id="new-lesson-unit-name" className={styles.textInput} type="text" required maxLength={200}
+              autoComplete="off" disabled={busy} value={newUnitName} aria-invalid={Boolean(newUnitName.trim() && unitError)}
+              aria-describedby={newUnitName.trim() && unitError ? "new-lesson-unit-error" : undefined}
+              onChange={event => setNewUnitName(event.target.value)} />
+          </label> : null}
+          {unitError && (unit.mode === "existing" || newUnitName.trim()) ? <p id="new-lesson-unit-error" role="alert" className={styles.newLessonUnitError}>{unitError}</p> : null}
 
           <div className={styles.newLessonActions}>
             <button

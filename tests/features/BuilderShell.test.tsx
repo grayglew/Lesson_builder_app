@@ -277,6 +277,8 @@ describe("BuilderShell legacy UI parity", () => {
     });
     await user.type(within(dialog).getByLabelText("Lesson title"), "Failed lesson");
     await user.selectOptions(within(dialog).getByLabelText("Class"), "Year 9");
+    await user.selectOptions(within(dialog).getByLabelText("Unit of work (optional)"), "new");
+    await user.type(within(dialog).getByLabelText("New unit name"), "Must not be created");
     await user.click(
       within(dialog).getByRole("button", { name: "Create and save lesson" }),
     );
@@ -294,6 +296,42 @@ describe("BuilderShell legacy UI parity", () => {
       expect.objectContaining({ id: "safe-slide" }),
     ]);
     expect(dialog).toBeInTheDocument();
+    expect(useBuilderStore.getState().document.unitsOfWork).toEqual([]);
+  });
+
+  it.each(["existing", "new"])("creates a lesson associated with an %s unit only after saving", async (mode) => {
+    const document = createInitialBuilderDocument();
+    document.classNames = ["7Ma3"];
+    document.title = "Current lesson";
+    document.unitsOfWork = [{ id: "probability", name: "Probability", updatedAt: "2026-11-09T00:00:00Z", slides: [{ id: "resources", title: "Probability resources", bullets: ["Unit support"] }] }];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    let completeSave!: (saved: Awaited<ReturnType<typeof saveCurrentLesson>>) => void;
+    vi.mocked(saveCurrentLesson).mockImplementation(() => new Promise(resolve => { completeSave = resolve; }));
+    const user = userEvent.setup();
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await user.click(screen.getByRole("button", { name: "New lesson" }));
+    const dialog = screen.getByRole("dialog", { name: "Create and save a new lesson" });
+    await user.type(within(dialog).getByLabelText("Lesson title"), "Language of probability");
+    await user.selectOptions(within(dialog).getByLabelText("Class"), "7Ma3");
+    await user.selectOptions(within(dialog).getByLabelText("Unit of work (optional)"), mode === "existing" ? "unit:probability" : "new");
+    if (mode === "new") await user.type(within(dialog).getByLabelText("New unit name"), "Statistics");
+    await user.click(within(dialog).getByRole("button", { name: "Create and save lesson" }));
+    expect(useBuilderStore.getState().document.title).toBe("Current lesson");
+    expect(useBuilderStore.getState().document.unitsOfWork).toHaveLength(1);
+    const pending = vi.mocked(saveCurrentLesson).mock.calls[0][0];
+    expect(pending.unitOfWorkName).toBe(mode === "existing" ? "Probability" : "Statistics");
+    expect(pending.slides).toHaveLength(1);
+    expect(pending.slides[0].unitOfWorkId).toBe(pending.unitOfWorkId);
+    await act(async () => completeSave({ id: "new-unit-lesson", title: pending.title, className: "7Ma3", teachingDate: pending.teachingDate, byteSize: 100, taughtAt: "", isTaught: false, createdAt: "2026-11-09T00:00:00Z", updatedAt: "2026-11-09T00:00:00Z" }));
+    await waitFor(() => expect(useBuilderStore.getState().document.activeLessonId).toBe("new-unit-lesson"));
+    const created = useBuilderStore.getState().document;
+    expect(created.unitOfWorkName).toBe(mode === "existing" ? "Probability" : "Statistics");
+    expect(created.unitsOfWork).toHaveLength(mode === "existing" ? 1 : 2);
+    expect(created.overallLessonLo).toBe("Language of probability");
+    if (mode === "existing") expect(created.slides[0]).toMatchObject({ title: "Probability resources", bullets: ["Unit support"] });
+    else expect(created.unitsOfWork[1]).toMatchObject({ name: "Statistics", slides: [{ title: "Unit resources" }] });
+    expect(screen.queryByRole("dialog", { name: "Create and save a new lesson" })).not.toBeInTheDocument();
   });
 
   it("inserts a placeholder below the selected preview slide", async () => {
