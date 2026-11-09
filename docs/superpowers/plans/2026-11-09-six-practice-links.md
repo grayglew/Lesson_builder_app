@@ -24,7 +24,7 @@
 - [x] Add optional `additionalPractice` in `schema.ts`; extend `unit-resources.ts` rendering and shared grid CSS.
 - [x] Add dynamic fields, count and capped Add/remove controls in `UnitOfWorkEditor.tsx` using existing theme tokens.
 - [x] Extend browser checks for all six entries, responsive layouts and PDF hyperlinks; run focused then full verification.
-- [ ] Review, commit and push only the feature branch; deploy a clean exact-commit Preview and run smoke tests.
+- [x] Review, commit and push only the feature branch; deploy a clean exact-commit Preview and run smoke tests.
 
 ## Verification evidence
 
