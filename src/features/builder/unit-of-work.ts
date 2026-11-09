@@ -12,6 +12,7 @@ export function applyUnitToLesson(document: BuilderDocument, unit: UnitOfWork | 
     type: "template",
     title: resource.title,
     bullets: [...resource.bullets],
+    ...(resource.resources ? { resources: { ...resource.resources } } : {}),
     unitOfWorkId: unit!.id,
     unitResourceId: resource.id,
     createdAt: new Date().toISOString(),

@@ -20,9 +20,9 @@ describe("unit library editing", () => {
     render(<UnitOfWorkEditor />);
     fireEvent.change(screen.getByLabelText("Unit name"), { target: { value: "Probability" } });
     fireEvent.change(screen.getByLabelText("Slide 1 title"), { target: { value: "Unit resources" } });
-    fireEvent.change(screen.getByLabelText("Slide 1 content"), { target: { value: "[Practice](https://example.org)" } });
+    fireEvent.change(screen.getByLabelText("Slide 1 Extra practice resources"), { target: { value: "https://example.org" } });
     fireEvent.click(screen.getByRole("button", { name: "Save unit" }));
-    expect(useBuilderStore.getState().document.unitsOfWork[0]).toMatchObject({ name: "Probability", slides: [{ title: "Unit resources", bullets: ["[Practice](https://example.org)"] }] });
+    expect(useBuilderStore.getState().document.unitsOfWork[0]).toMatchObject({ name: "Probability", slides: [{ title: "Unit resources", resources: { practice: "https://example.org" } }] });
     expect(useBuilderStore.getState().document.slides).toEqual([]);
   });
 
@@ -37,6 +37,17 @@ describe("unit library editing", () => {
     fireEvent.change(screen.getByLabelText("Edit unit"), { target: { value: "a" } });
     await waitFor(() => expect(confirmDialog).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText("Unit name")).toHaveValue("probability");
+  });
+
+  it("offers the seven categorized fields and previews links as buttons or non-clickable notes", () => {
+    render(<UnitOfWorkEditor />);
+    for (const name of ["Video", "Scaffolded support sheet", "Email your teacher", "Extra practice resources", "Challenging exam questions", "Maths challenge questions", "Investigation task"]) {
+      expect(screen.getByLabelText("Slide 1 " + name)).toBeInTheDocument();
+    }
+    fireEvent.change(screen.getByLabelText("Slide 1 Video"), { target: { value: "https://example.org/video" } });
+    fireEvent.change(screen.getByLabelText("Slide 1 Investigation task"), { target: { value: "Try the task in your book" } });
+    expect(screen.getByRole("link", { name: "Video" })).toHaveAttribute("href", "https://example.org/video");
+    expect(screen.getByText("Try the task in your book", { selector: "div" })).not.toHaveAttribute("href");
   });
 });
 

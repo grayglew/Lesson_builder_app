@@ -11,6 +11,7 @@ import type {
 } from "./schema";
 import { renderLatexDocument } from "./latex";
 import { inlineMarkdownToHtml } from "./markdown";
+import { UNIT_RESOURCE_CSS, hasUnitResources, renderUnitResourceCards } from "./unit-resources";
 import { normalizeBuilderDocument } from "./schema";
 import { renderStaticAnnotationSvg } from "./static-annotations";
 import { extractRetrievalLoCode } from "./example";
@@ -388,6 +389,7 @@ function renderStandaloneSlide(
   }
 
   if (slide.type === "template") {
+    if (hasUnitResources(data.resources)) return `<section ${attrs}>${renderUnitResourceCards(slide.title || "Unit resources", data.resources)}</section>`;
     return `<section ${attrs}><div class="template-slide-inner"><h4>${title}</h4><ul>${stringArray(data.bullets)
       .map((bullet) => `<li>${inlineMarkdownToHtml(bullet)}</li>`)
       .join("")}</ul></div><span class="slide-label">Template</span></section>`;
@@ -520,6 +522,7 @@ function sanitizeImportedSlideClass(value: unknown) {
 
 function standaloneLessonCss() {
   return `
+${UNIT_RESOURCE_CSS}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 :root{--presenter-edge-space:6px;--presenter-toolbar-space:64px;--presenter-slide-width:100vw;--presenter-slide-height:62.5vw}
 .lesson-header{position:sticky;top:0;z-index:4;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;background:#fff;border-bottom:1px solid #cad7d7}

@@ -1,3 +1,4 @@
+import { safeUnitResourceHref } from "./unit-resources";
 export const STUDENT_VIEWER_SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 
 const STUDENT_SHARED_VIEW_CSS =
@@ -23,6 +24,7 @@ document.addEventListener("click", event => {
 
   return String.raw`
 const STUDENT_REVEAL_SCRIPT = ${JSON.stringify(revealScript)};
+const safeUnitResourceHref = (${safeUnitResourceHref.toString()});
 const STUDENT_SHARED_VIEW_CSS = ${JSON.stringify(STUDENT_SHARED_VIEW_CSS)};
 
 function isUnsafeStudentUrl(name, value) {
@@ -141,14 +143,11 @@ function buildStudentSnapshotHtml() {
   snapshot.querySelectorAll("a").forEach(anchor => {
     const raw = anchor.getAttribute("href") || "";
     try {
-      if (/[\u0000-\u001f\u007f]/.test(raw) || !/^https?:\/\//i.test(raw.trim())) {
-        throw new Error("Only absolute web links are permitted.");
-      }
-      const destination = new URL(raw.trim());
-      if (!["http:", "https:"].includes(destination.protocol) || destination.username || destination.password) {
+      const destination = safeUnitResourceHref(raw, /^mailto:/i.test(raw.trim()));
+      if (!destination) {
         throw new Error("Unsafe resource destination.");
       }
-      anchor.setAttribute("href", destination.href);
+      anchor.setAttribute("href", destination);
       anchor.setAttribute("target", "_blank");
       anchor.setAttribute("rel", "noopener noreferrer");
       anchor.setAttribute("referrerpolicy", "no-referrer");

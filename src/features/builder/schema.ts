@@ -142,10 +142,22 @@ const drawingSlideSchema = z
   })
   .passthrough();
 
+export const unitResourceLinksSchema = z.object({
+  video: z.string().default(""),
+  supportSheet: z.string().default(""),
+  email: z.string().default(""),
+  practice: z.string().default(""),
+  examQuestions: z.string().default(""),
+  mathsChallenge: z.string().default(""),
+  investigation: z.string().default(""),
+});
+export type UnitResourceLinks = z.infer<typeof unitResourceLinksSchema>;
+
 const templateSlideSchema = z
   .object({
     ...slideBaseShape,
     type: z.literal("template"),
+    resources: unitResourceLinksSchema.optional(),
     bullets: z.array(z.string()).default([]),
   })
   .passthrough();
@@ -233,6 +245,7 @@ export const unitResourceSchema = z.object({
   id: z.string().trim().min(1),
   title: z.string().trim().min(1).max(200),
   bullets: z.array(z.string()).default([]),
+  resources: unitResourceLinksSchema.optional(),
 });
 
 export const unitOfWorkSchema = z.object({

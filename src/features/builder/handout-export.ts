@@ -1,5 +1,6 @@
 import { renderLatexDocument } from "./latex";
 import { inlineMarkdownToHtml } from "./markdown";
+import { UNIT_RESOURCE_CSS, hasUnitResources, renderUnitResourceCards } from "./unit-resources";
 import { extractRetrievalLoCode } from "./example";
 import {
   loadPdfDocument,
@@ -492,6 +493,7 @@ function halfSlideHtml(slide: BuilderSlide) {
     return imageHtml(assetOf(data.image), slide.title || "Drawing");
   }
   if (slide.type === "template") {
+    if (hasUnitResources(data.resources)) return renderUnitResourceCards(slide.title || "Unit resources", data.resources);
     return `<div class="handout-text-panel">
   <h2>${escapeHtml(slide.title || "Template")}</h2>
   <ul>${stringArray(data.bullets)
@@ -669,6 +671,7 @@ function escapeAttr(value: string) {
 
 function a4HandoutCss() {
   return `
+${UNIT_RESOURCE_CSS}
 @page{size:A4 portrait;margin:8mm}
 *{box-sizing:border-box}
 html,body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,sans-serif}

@@ -5,17 +5,25 @@ import { useAppNotifications } from "./AppNotifications";
 import { type UnitOfWork, createBuilderId } from "./schema";
 import { useBuilderStore } from "./store";
 import styles from "./UnitOfWorkEditor.module.css";
+import { UNIT_RESOURCE_GROUPS, emptyUnitResources, safeUnitResourceHref } from "./unit-resources";
+import { UnitResourceSlide } from "./UnitResourceSlide";
+
+function prepareDraft(unit: UnitOfWork): UnitOfWork {
+  const draft = structuredClone(unit);
+  draft.slides = draft.slides.map(slide => ({ ...slide, resources: { ...emptyUnitResources(), ...slide.resources } }));
+  return draft;
+}
 
 function emptyUnit(): UnitOfWork {
   return { id: createBuilderId("unit"), name: "", updatedAt: new Date().toISOString(),
-    slides: [{ id: createBuilderId("resource"), title: "Unit resources", bullets: [] }] };
+    slides: [{ id: createBuilderId("resource"), title: "Unit resources", bullets: [], resources: emptyUnitResources() }] };
 }
 
 export function UnitOfWorkEditor() {
   const units = useBuilderStore(state => state.document.unitsOfWork);
   const saveUnit = useBuilderStore(state => state.saveUnitOfWork);
   const { confirmDialog } = useAppNotifications();
-  const [draft, setDraft] = useState<UnitOfWork>(() => units[0] ? structuredClone(units[0]) : emptyUnit());
+  const [draft, setDraft] = useState<UnitOfWork>(() => units[0] ? prepareDraft(units[0]) : emptyUnit());
   const [baseline, setBaseline] = useState(() => JSON.stringify(draft));
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -26,7 +34,7 @@ export function UnitOfWorkEditor() {
       confirmLabel: "Discard changes", tone: "warning",
     })) return;
     const next = units.find(unit => unit.id === id);
-    const value = next ? structuredClone(next) : emptyUnit();
+    const value = next ? prepareDraft(next) : emptyUnit();
     setDraft(value);
     setBaseline(JSON.stringify(value));
     setError("");
@@ -84,17 +92,44 @@ export function UnitOfWorkEditor() {
               <label className={styles.field}>Slide {index + 1} title
                 <input required maxLength={200} value={slide.title} onChange={event => setDraft({ ...draft, slides: draft.slides.map(entry => entry.id === slide.id ? { ...entry, title: event.target.value } : entry) })} />
               </label>
-              <label className={styles.field}>Slide {index + 1} content
-                <textarea rows={6} value={slide.bullets.join("\n")} onChange={event => setDraft({ ...draft, slides: draft.slides.map(entry => entry.id === slide.id ? { ...entry, bullets: event.target.value.split("\n") } : entry) })} />
-              </label>
-              <p className={styles.note}>One item per line. Link format: <code>[Extra practice](https://example.org)</code>. Bold, italic and inline code are also supported.</p>
+              <p className={styles.note}>Paste a full URL to create a labelled button, or write a note to show as text. Leave unused fields blank. No Markdown is needed.</p>
+              <div className={styles.categories}>
+                {UNIT_RESOURCE_GROUPS.map(group => (
+                  <fieldset key={group.key} className={styles.category}>
+                    <legend>{group.title}</legend>
+                    {group.fields.map(field => {
+                      const value = slide.resources?.[field.key] || "";
+                      const isLink = Boolean(safeUnitResourceHref(value, field.key === "email"));
+                      return <label key={field.key} className={styles.field}>
+                        {field.label}
+                        <input type="text" inputMode={field.key === "email" ? "email" : "text"}
+                          aria-label={`Slide ${index + 1} ${field.label}`}
+                          placeholder={field.key === "email" ? "Email address, mailto link, or note" : "https://… or a note"}
+                          value={value}
+                          onChange={event => setDraft({ ...draft, slides: draft.slides.map(entry => entry.id === slide.id
+                            ? { ...entry, resources: { ...emptyUnitResources(), ...entry.resources, [field.key]: event.target.value } } : entry) })} />
+                        {value.trim() ? <small className={styles.fieldHint}>{isLink ? "Link button — URL hidden" : "Text only — not clickable"}</small> : null}
+                      </label>;
+                    })}
+                  </fieldset>
+                ))}
+              </div>
+              {slide.bullets.some(line => line.trim()) ? <details className={styles.legacy}>
+                <summary>Earlier free-text content</summary>
+                <p className={styles.note}>Kept for reference. Move the resources you want into the fields above; only those fields appear on the categorized slide.</p>
+                <textarea readOnly aria-label={`Slide ${index + 1} earlier content`} value={slide.bullets.join("\n")} />
+              </details> : null}
+              <details className={styles.livePreview} open>
+                <summary>Slide preview</summary>
+                <UnitResourceSlide title={slide.title || "Unit resources"} resources={slide.resources} />
+              </details>
             </article>
           ))}
         </div>
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         {message ? <p role="status" className={styles.note}>{message}</p> : null}
         <div className={styles.actions}>
-          <button type="button" onClick={() => setDraft({ ...draft, slides: [...draft.slides, { id: createBuilderId("resource"), title: "More resources", bullets: [] }] })}>Add resource slide</button>
+          <button type="button" onClick={() => setDraft({ ...draft, slides: [...draft.slides, { id: createBuilderId("resource"), title: "More resources", bullets: [], resources: emptyUnitResources() }] })}>Add resource slide</button>
           <button type="submit" className={styles.primary}>Save unit</button>
         </div>
       </form>

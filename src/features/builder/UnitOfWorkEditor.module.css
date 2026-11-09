@@ -8,7 +8,16 @@
 .field input, .field select, .field textarea, .unitSelect { box-sizing: border-box; width: 100%; min-width: 0; min-height: 2.75rem; padding: .6rem; color: var(--builder-ink); background: var(--builder-surface); border: 1px solid var(--builder-line); border-radius: .2rem; font: inherit; }
 .field textarea { resize: vertical; font-weight: 400; line-height: 1.5; }
 .resources { display: grid; gap: 1rem; }
-.resource { min-width: 0; padding: 1rem; border: 1px solid var(--builder-line); border-left: 3px solid var(--builder-accent); background: var(--builder-surface); }
+.resource { container: unit-authoring / inline-size; min-width: 0; padding: 1rem; border: 1px solid var(--builder-line); border-left: 3px solid var(--builder-accent); background: var(--builder-surface); }
+.categories { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.category { min-width: 0; margin: 0; padding: .75rem; border: 1px solid var(--builder-line); background: var(--builder-surface-alt); }
+.category legend { padding: 0 .3rem; font-size: 1rem; font-weight: 750; }
+.fieldHint { font-size: .75rem; line-height: 1.4; font-weight: 400; color: var(--builder-muted); }
+.livePreview, .legacy { margin-top: 1rem; border: 1px solid var(--builder-line); min-width: 0; }
+.livePreview summary, .legacy summary { display: flex; align-items: center; min-height: 2.75rem; padding: .5rem .75rem; cursor: pointer; font-weight: 650; }
+.legacy textarea { box-sizing: border-box; margin: .75rem; width: calc(100% - 1.5rem); min-height: 5rem; padding: .75rem; color: var(--builder-ink); background: var(--builder-surface); border: 1px solid var(--builder-line); }
+.legacy p { padding: 0 .75rem; }
+@container unit-authoring (min-width: 40rem) { .categories { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .editor button, .selector button { min-height: 2.75rem; min-width: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--builder-line); border-radius: .2rem; background: var(--builder-surface); color: var(--builder-ink); cursor: pointer; font-family: inherit; font-size: .875rem; line-height: 1.3; font-weight: 650; }
 .editor button:disabled, .selector button:disabled { cursor: default; opacity: .5; }

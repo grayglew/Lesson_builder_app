@@ -62,6 +62,8 @@ import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
 import { UnitOfWorkEditor } from "./UnitOfWorkEditor";
 import { UnitOfWorkSelector } from "./UnitOfWorkSelector";
+import { UnitResourceSlide } from "./UnitResourceSlide";
+import { hasUnitResources } from "./unit-resources";
 import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
 import {
   type BuilderSlide,
@@ -1318,6 +1320,11 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
   }
 
   if (slide.type === "template") {
+    if (hasUnitResources(data.resources)) return (
+      <SlideFrame label="Unit resources" contentClassName={styles.fullBleedSlide}>
+        <UnitResourceSlide title={label} resources={data.resources} />
+      </SlideFrame>
+    );
     return (
       <SlideFrame label="Template">
         <h4>{label}</h4>

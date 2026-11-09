@@ -31,7 +31,7 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Units of work", exact: true }).click();
     await page.getByLabel("Unit name").fill("Probability");
     await page.getByLabel("Slide 1 title").fill("Probability resources");
-    await page.getByLabel("Slide 1 content").fill("[Extra practice](https://example.org/practice)");
+    await page.getByLabel("Slide 1 Extra practice resources").fill("https://example.org/practice");
     for (const width of [375, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       const editor = page.getByRole("region", { name: "Unit library" });
