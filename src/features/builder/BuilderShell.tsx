@@ -1322,7 +1322,7 @@ function SlidePreview({ slide }: { slide: BuilderSlide }) {
   if (slide.type === "template") {
     if (hasUnitResources(data.resources)) return (
       <SlideFrame label="Unit resources" contentClassName={styles.fullBleedSlide}>
-        <UnitResourceSlide title={label} resources={data.resources} />
+        <UnitResourceSlide title={label} resources={data.resources} thumbnail />
       </SlideFrame>
     );
     return (

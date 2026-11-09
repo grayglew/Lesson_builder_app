@@ -35,7 +35,7 @@ export function safeUnitResourceHref(value: string, allowEmail = false): string 
     const queryStart = emailSource.indexOf("?");
     const encodedAddress = queryStart < 0 ? emailSource : emailSource.slice(0, queryStart);
     const query = queryStart < 0 ? "" : emailSource.slice(queryStart + 1);
-    const address = decodeURIComponent(encodedAddress);
+    const address = /^mailto:/i.test(raw) ? decodeURIComponent(encodedAddress) : encodedAddress;
     if (!/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9.-]*[A-Z0-9])?\.[A-Z]{2,}$/i.test(address)) return null;
     const [local, domain] = address.split("@");
     if (local.startsWith(".") || local.endsWith(".") || local.includes("..") ||
@@ -46,7 +46,7 @@ export function safeUnitResourceHref(value: string, allowEmail = false): string 
       if (!["subject", "body"].includes(key.toLowerCase()) || /[\u0000-\u001f\u007f]/.test(text)) return null;
     }
     const encodedQuery = Array.from(params, ([key, text]) => encodeURIComponent(key) + "=" + encodeURIComponent(text)).join("&");
-    return "mailto:" + encodeURI(address) + (query ? "?" + encodedQuery : "");
+    return "mailto:" + encodeURIComponent(local) + "@" + domain + (query ? "?" + encodedQuery : "");
   } catch { return null; }
 }
 
@@ -54,15 +54,18 @@ export function hasUnitResources(value: unknown): value is UnitResourceLinks {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-export function renderUnitResourceCards(title: string, value: unknown): string {
+export function renderUnitResourceCards(title: string, value: unknown, interactive = true): string {
   const resources = hasUnitResources(value) ? value : emptyUnitResources();
   return `<div class="unit-resource-board"><h4 class="unit-resource-title">${escapeText(title)}</h4><div class="unit-resource-columns">${UNIT_RESOURCE_GROUPS.map(group => {
     const items = group.fields.flatMap(field => {
       const raw = typeof resources[field.key] === "string" ? resources[field.key] : "";
       if (!raw.trim()) return [];
       const href = safeUnitResourceHref(raw, field.key === "email");
+      const label = `<span>${field.label}</span><span aria-hidden="true">↗</span>`;
       return [href
-        ? `<a class="unit-resource-action" href="${escapeText(href)}" target="_blank" rel="noopener noreferrer"><span>${field.label}</span><span aria-hidden="true">↗</span></a>`
+        ? interactive
+          ? `<a class="unit-resource-action" href="${escapeText(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+          : `<span class="unit-resource-action">${label}</span>`
         : `<div class="unit-resource-action is-note">${escapeText(raw.trim())}</div>`];
     });
     return `<section class="unit-resource-category unit-resource-${group.key}" aria-label="${group.title}"><h5>${group.title}</h5><div class="unit-resource-items">${items.join("") || '<p class="unit-resource-empty">No resources added</p>'}</div></section>`;
@@ -99,5 +102,13 @@ export const UNIT_RESOURCE_CSS = `
  .unit-resource-empty{font-size:1.65cqw}
 }
 .student-shared-view .unit-resource-action{min-height:44px;font-size:max(14px,1.85cqw)}
+.unit-resource-thumbnail .unit-resource-board{padding:4%;gap:2%}
+.unit-resource-thumbnail .unit-resource-title,.handout-half-panel .unit-resource-title{font-size:3.8cqw}
+.unit-resource-thumbnail .unit-resource-columns,.handout-half-panel .unit-resource-columns{grid-template-columns:repeat(3,minmax(0,1fr));gap:2cqw}
+.unit-resource-thumbnail .unit-resource-category,.handout-half-panel .unit-resource-category{padding:1.7cqw}
+.unit-resource-thumbnail .unit-resource-category h5,.handout-half-panel .unit-resource-category h5{font-size:2.5cqw;margin-bottom:2cqw}
+.unit-resource-thumbnail .unit-resource-items,.handout-half-panel .unit-resource-items{gap:1.4cqw}
+.unit-resource-thumbnail .unit-resource-action,.handout-half-panel .unit-resource-action{font-size:1.85cqw;min-height:6cqw;padding:1.4cqw}
+.unit-resource-thumbnail .unit-resource-empty,.handout-half-panel .unit-resource-empty{font-size:1.65cqw}
 @media(max-width:760px){.student-shared-view .lesson-slide:has(.unit-resource-board){aspect-ratio:auto}}
 `;

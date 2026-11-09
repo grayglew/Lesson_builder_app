@@ -26,6 +26,8 @@ describe("categorized unit resource slides", () => {
   it.each([
     ["https://example.org/a?b=1", false, "https://example.org/a?b=1"],
     ["teacher@school.org", true, "mailto:teacher@school.org"],
+    ["teacher#support@school.org", true, "mailto:teacher%23support@school.org"],
+    ["mailto:teacher%23support@school.org", true, "mailto:teacher%23support@school.org"],
     ["mailto:teacher@school.org?subject=Please%20help", true, "mailto:teacher@school.org?subject=Please%20help"],
     ["teacher@school.org", false, null],
     ["mailto:teacher@school.org?bcc=someone@else.org", true, null],

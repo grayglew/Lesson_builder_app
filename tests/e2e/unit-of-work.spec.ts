@@ -48,6 +48,9 @@ for (const theme of ["light", "dark"]) {
     const id = await page.getByLabel("Edit unit").inputValue();
     await page.getByRole("combobox", { name: "Unit of work", exact: true }).selectOption(id);
     await expect(page.getByRole("button", { name: "Select slide 1 as active from title" })).toHaveText(/Probability resources/);
+    const thumbnail = page.getByRole("button", { name: "Select slide 1 as active from preview" });
+    await expect(thumbnail.locator("a")).toHaveCount(0);
+    expect(await thumbnail.locator(".unit-resource-board").evaluate(node => node.scrollHeight <= node.clientHeight + 1 && node.scrollWidth <= node.clientWidth)).toBe(true);
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect.poll(() => (saved as { unitOfWorkId?: string }).unitOfWorkId).toBe(id);
     expect(saved).not.toHaveProperty("unitsOfWork");
