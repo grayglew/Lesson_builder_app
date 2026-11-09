@@ -32,13 +32,18 @@ for (const theme of ["light", "dark"]) {
     await page.getByLabel("Unit name").fill("Probability");
     await page.getByLabel("Slide 1 title").fill("Probability resources");
     await page.getByLabel("Slide 1 Extra practice resources").fill("https://example.org/practice");
+    for (let number = 2; number <= 6; number++) {
+      await page.getByRole("button", { name: "Add practice link", exact: true }).click();
+      await page.getByLabel(`Slide 1 Practice resource ${number}`).fill(`https://example.org/practice${number}`);
+    }
+    await expect(page.getByRole("button", { name: "Add practice link", exact: true })).toBeDisabled();
     for (const width of [375, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       const editor = page.getByRole("region", { name: "Unit library" });
       await expect(editor).toBeVisible();
       expect(await editor.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      for (const field of [page.getByLabel("Unit name"), page.getByRole("button", { name: "Save unit", exact: true })]) {
+      for (const field of [page.getByLabel("Unit name"), page.getByLabel("Slide 1 Practice resource 6"), page.getByRole("button", { name: "Add practice link", exact: true }), page.getByRole("button", { name: "Save unit", exact: true })]) {
         expect((await field.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
       await page.screenshot({ path: testInfo.outputPath(`unit-${theme}-${width}.png`) });
@@ -63,5 +68,6 @@ for (const theme of ["light", "dark"]) {
     await expect(page.getByRole("combobox", { name: "Unit of work", exact: true })).toHaveValue(id);
     await page.getByRole("button", { name: "Units of work", exact: true }).click();
     await expect(page.getByLabel("Unit name")).toHaveValue("Probability");
+    await expect(page.getByLabel("Slide 1 Practice resource 6")).toHaveValue("https://example.org/practice6");
   });
 }

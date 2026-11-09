@@ -10,6 +10,7 @@ function lesson(): BuilderDocument {
   return { ...createInitialBuilderDocument(), slides: [{ id: "unit", type: "template", title: "Probability resources", bullets: [], resources: {
     video: "https://example.org/video", supportSheet: "https://example.org/support",
     email: "teacher@school.org", practice: "https://example.org/practice",
+    additionalPractice: ["https://example.org/practice2", "https://example.org/practice3", "Resource four is in your book", "https://example.org/practice5", "https://example.org/practice6"],
     examQuestions: "Ask me for the challenge sheet", mathsChallenge: "https://example.org/challenge",
     investigation: "Try questions 4–6 in your book",
   } }] };
@@ -22,7 +23,8 @@ test("categorized student resources stay readable, linked and contained on phone
   await page.locator("iframe").evaluate((frame, source) => { (frame as HTMLIFrameElement).srcdoc = source; }, html);
   const frame = page.frameLocator("iframe");
   await expect(frame.getByRole("link", { name: "Email your teacher" })).toHaveAttribute("href", "mailto:teacher@school.org");
-  await expect(frame.getByRole("link")).toHaveCount(5);
+  await expect(frame.getByRole("link")).toHaveCount(9);
+  await expect(frame.locator(".unit-resource-practice .unit-resource-action")).toHaveCount(6);
   await expect(frame.locator(".unit-resource-board")).not.toContainText("https://");
   await expect(frame.getByText("Ask me for the challenge sheet", { exact: true })).toHaveCount(1);
   await expect(frame.getByRole("link", { name: /Ask me/ })).toHaveCount(0);
@@ -36,14 +38,20 @@ test("categorized student resources stay readable, linked and contained on phone
     })).toBe(true);
     for (const link of await frame.getByRole("link").all()) {
       expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await link.boundingBox())!.width).toBeGreaterThanOrEqual(44);
     }
+    const cards = await frame.locator(".unit-resource-practice .unit-resource-action").evaluateAll(nodes => nodes.map(node => ({ x: node.getBoundingClientRect().x, y: node.getBoundingClientRect().y })));
+    expect(Math.abs(cards[0].y - cards[1].y)).toBeLessThan(1);
+    expect(Math.abs(cards[0].x - cards[2].x)).toBeLessThan(1);
+    expect(Math.abs(cards[0].x - cards[4].x)).toBeLessThan(1);
+    expect(cards[4].y).toBeGreaterThan(cards[2].y);
     await page.screenshot({ path: testInfo.outputPath(`student-resources-${width}.png`) });
   }
   await context.route("https://example.org/**", route => route.fulfill({ body: "Practice resources" }));
   const popupPromise = context.waitForEvent("page");
-  await frame.getByRole("link", { name: "Extra practice resources" }).click();
+  await frame.getByRole("link", { name: "Practice 6" }).click();
   const popup = await popupPromise;
-  await expect(popup).toHaveURL("https://example.org/practice");
+  await expect(popup).toHaveURL("https://example.org/practice6");
   expect(await popup.evaluate(() => window.opener)).toBeNull();
   await popup.close();
 });
@@ -73,6 +81,7 @@ for (const answers of [false, true]) {
       }
     }
     expect(links).toEqual(expect.arrayContaining(["https://example.org/video", "https://example.org/support", "mailto:teacher@school.org", "https://example.org/practice", "https://example.org/challenge"]));
-    expect(links).toHaveLength(5);
+    expect(links).toEqual(expect.arrayContaining(["https://example.org/practice2", "https://example.org/practice3", "https://example.org/practice5", "https://example.org/practice6"]));
+    expect(links).toHaveLength(9);
   });
 }

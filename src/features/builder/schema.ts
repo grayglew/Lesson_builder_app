@@ -147,6 +147,7 @@ export const unitResourceLinksSchema = z.object({
   supportSheet: z.string().default(""),
   email: z.string().default(""),
   practice: z.string().default(""),
+  additionalPractice: z.array(z.string()).max(5).optional(),
   examQuestions: z.string().default(""),
   mathsChallenge: z.string().default(""),
   investigation: z.string().default(""),

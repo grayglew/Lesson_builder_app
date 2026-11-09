@@ -13,6 +13,9 @@
 .category { min-width: 0; margin: 0; padding: .75rem; border: 1px solid var(--builder-line); background: var(--builder-surface-alt); }
 .category legend { padding: 0 .3rem; font-size: 1rem; font-weight: 750; }
 .fieldHint { font-size: .75rem; line-height: 1.4; font-weight: 400; color: var(--builder-muted); }
+.practiceField { border-top: 1px solid var(--builder-line); padding-bottom: .75rem; }
+.practiceField > button { width: 100%; }
+.practiceActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .75rem; }
 .livePreview, .legacy { margin-top: 1rem; border: 1px solid var(--builder-line); min-width: 0; }
 .livePreview summary, .legacy summary { display: flex; align-items: center; min-height: 2.75rem; padding: .5rem .75rem; cursor: pointer; font-weight: 650; }
 .legacy textarea { box-sizing: border-box; margin: .75rem; width: calc(100% - 1.5rem); min-height: 5rem; padding: .75rem; color: var(--builder-ink); background: var(--builder-surface); border: 1px solid var(--builder-line); }

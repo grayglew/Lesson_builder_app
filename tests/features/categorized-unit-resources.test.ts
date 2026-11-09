@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error -- test-only transitive dependency
 import { JSDOM } from "jsdom";
-import { createInitialBuilderDocument, normalizeBuilderDocument, toWorkspaceDocument } from "../../src/features/builder/schema";
+import { createInitialBuilderDocument, normalizeBuilderDocument, toWorkspaceDocument, unitResourceLinksSchema } from "../../src/features/builder/schema";
 import { useBuilderStore } from "../../src/features/builder/store";
 import { buildStandaloneLessonHtml } from "../../src/features/builder/lesson-export";
 import { buildA4Handout } from "../../src/features/builder/handout-export";
@@ -23,6 +23,38 @@ function documentWithResources() {
 }
 
 describe("categorized unit resource slides", () => {
+  it("retains six practice entries through validation and rejects a seventh", () => {
+    const six = { ...resources, additionalPractice: ["https://example.org/2", "https://example.org/3", "Text note", "https://example.org/5", "https://example.org/6"] };
+    expect(unitResourceLinksSchema.parse(six)).toEqual(six);
+    expect(unitResourceLinksSchema.safeParse({ ...six, additionalPractice: [...six.additionalPractice, "https://example.org/7"] }).success).toBe(false);
+    expect(unitResourceLinksSchema.parse(resources).practice).toBe(resources.practice);
+  });
+
+  it("renders six numbered practice resources in exports while leaving a note non-clickable", async () => {
+    const document = documentWithResources();
+    document.slides[0].resources = { ...resources, additionalPractice: ["https://example.org/2", "https://example.org/3", "Ask for resource four", "https://example.org/5", "https://example.org/6"] };
+    const handout = await buildA4Handout(document);
+    for (const html of [buildStandaloneLessonHtml(document), handout.html]) {
+      const dom = new JSDOM(html);
+      const practice = dom.window.document.querySelector('.unit-resource-practice')!;
+      expect(practice.querySelectorAll('.unit-resource-action')).toHaveLength(6);
+      expect(Array.from(practice.querySelectorAll('a')).map(node => (node as Element).textContent?.replace('↗', ''))).toEqual(["Practice 1", "Practice 2", "Practice 3", "Practice 5", "Practice 6"]);
+      expect(practice.querySelector('.is-note')?.textContent).toBe("Ask for resource four");
+      expect(practice.textContent).not.toContain("https://");
+      dom.window.close();
+    }
+  });
+
+  it("persists additional practice entries in unit snapshots and workspace recovery", () => {
+    const extended = { ...resources, additionalPractice: ["https://example.org/2", "Note for practice three"] };
+    useBuilderStore.getState().hydrate(createInitialBuilderDocument());
+    useBuilderStore.getState().saveUnitOfWork({ id: "six", name: "Six", updatedAt: "now", slides: [{ id: "r", title: "Resources", bullets: [], resources: extended }] });
+    useBuilderStore.getState().associateUnitOfWork("six");
+    const restored = normalizeBuilderDocument(toWorkspaceDocument(useBuilderStore.getState().document));
+    expect(restored.slides[0]).toMatchObject({ resources: { additionalPractice: ["https://example.org/2", "Note for practice three"] } });
+    expect(restored.unitsOfWork[0].slides[0].resources?.additionalPractice).toEqual(["https://example.org/2", "Note for practice three"]);
+  });
+
   it.each([
     ["https://example.org/a?b=1", false, "https://example.org/a?b=1"],
     ["teacher@school.org", true, "mailto:teacher@school.org"],

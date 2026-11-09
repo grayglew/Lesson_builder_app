@@ -16,6 +16,31 @@ beforeEach(() => {
 });
 
 describe("unit library editing", () => {
+  it("adds up to six practice entries, removes a middle entry and saves the remaining entries", () => {
+    render(<UnitOfWorkEditor />);
+    fireEvent.change(screen.getByLabelText("Unit name"), { target: { value: "Six practice resources" } });
+    fireEvent.change(screen.getByLabelText("Slide 1 Extra practice resources"), { target: { value: "https://example.org/1" } });
+    for (let number = 2; number <= 6; number++) {
+      fireEvent.click(screen.getByRole("button", { name: "Add practice link" }));
+      fireEvent.change(screen.getByLabelText(`Slide 1 Practice resource ${number}`), { target: { value: `https://example.org/${number}` } });
+    }
+    expect(screen.getByRole("button", { name: "Add practice link" })).toBeDisabled();
+    expect(screen.queryByLabelText("Slide 1 Practice resource 7")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Practice 6" })).toHaveAttribute("href", "https://example.org/6");
+    fireEvent.click(screen.getByRole("button", { name: "Remove practice resource 3 from slide 1" }));
+    expect(screen.getByLabelText("Slide 1 Practice resource 3")).toHaveValue("https://example.org/4");
+    expect(screen.getByRole("button", { name: "Add practice link" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Add practice link" }));
+    fireEvent.change(screen.getByLabelText("Slide 1 Practice resource 6"), { target: { value: "https://example.org/7" } });
+    expect(screen.getByRole("button", { name: "Add practice link" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save unit" }));
+    expect(useBuilderStore.getState().document.unitsOfWork[0].slides[0].resources).toMatchObject({ practice: "https://example.org/1", additionalPractice: ["https://example.org/2", "https://example.org/4", "https://example.org/5", "https://example.org/6", "https://example.org/7"] });
+    cleanup();
+    render(<UnitOfWorkEditor />);
+    expect(screen.getByLabelText("Slide 1 Practice resource 5")).toHaveValue("https://example.org/6");
+    expect(screen.getByLabelText("Slide 1 Practice resource 6")).toHaveValue("https://example.org/7");
+  });
+
   it("creates a unit with reusable resource text without inserting it into the current lesson", () => {
     render(<UnitOfWorkEditor />);
     fireEvent.change(screen.getByLabelText("Unit name"), { target: { value: "Probability" } });

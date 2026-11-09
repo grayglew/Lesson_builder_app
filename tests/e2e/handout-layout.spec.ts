@@ -12,7 +12,8 @@ test.describe("flexible A4 handout print layout", () => {
     const slides = Array.from({ length: 6 }, (_, index) => ({
       id: "unit-" + index, type: "template", title: "Unit resources", bullets: [],
       resources: { video: "https://example.org/video", supportSheet: "https://example.org/support", email: "teacher@school.org",
-        practice: "https://example.org/practice", examQuestions: "https://example.org/exam", mathsChallenge: "https://example.org/challenge", investigation: "https://example.org/investigation" },
+        practice: "https://example.org/practice", additionalPractice: ["https://example.org/2", "https://example.org/3", "https://example.org/4", "https://example.org/5", "https://example.org/6"],
+        examQuestions: "https://example.org/exam", mathsChallenge: "https://example.org/challenge", investigation: "https://example.org/investigation" },
     }));
     await stubHandoutBuilder(page, slides, slides.map(slide => slide.id));
     await page.goto("/builder?visual=1");
@@ -24,6 +25,7 @@ test.describe("flexible A4 handout print layout", () => {
     await expect(handout.locator(".handout-page")).toHaveCount(3);
     for (const board of await handout.locator(".unit-resource-board").all()) {
       expect(await board.evaluate(node => node.scrollHeight <= node.clientHeight + 1 && node.scrollWidth <= node.clientWidth)).toBe(true);
+      await expect(board.locator(".unit-resource-practice .unit-resource-action")).toHaveCount(6);
     }
     await handout.close();
   });

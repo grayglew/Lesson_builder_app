@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAppNotifications } from "./AppNotifications";
-import { type UnitOfWork, createBuilderId } from "./schema";
+import { type UnitOfWork, type UnitResourceLinks, createBuilderId } from "./schema";
 import { useBuilderStore } from "./store";
 import styles from "./UnitOfWorkEditor.module.css";
 import { UNIT_RESOURCE_GROUPS, emptyUnitResources, safeUnitResourceHref } from "./unit-resources";
@@ -46,6 +46,11 @@ export function UnitOfWorkEditor() {
     const [resource] = slides.splice(index, 1);
     slides.splice(index + direction, 0, resource);
     setDraft({ ...draft, slides });
+  }
+
+  function updateResources(slideId: string, patch: Partial<UnitResourceLinks>) {
+    setDraft(current => ({ ...current, slides: current.slides.map(slide => slide.id === slideId
+      ? { ...slide, resources: { ...emptyUnitResources(), ...slide.resources, ...patch } } : slide) }));
   }
 
   return (
@@ -106,11 +111,33 @@ export function UnitOfWorkEditor() {
                           aria-label={`Slide ${index + 1} ${field.label}`}
                           placeholder={field.key === "email" ? "Email address, mailto link, or note" : "https://… or a note"}
                           value={value}
-                          onChange={event => setDraft({ ...draft, slides: draft.slides.map(entry => entry.id === slide.id
-                            ? { ...entry, resources: { ...emptyUnitResources(), ...entry.resources, [field.key]: event.target.value } } : entry) })} />
+                          onChange={event => updateResources(slide.id, { [field.key]: event.target.value })} />
                         {value.trim() ? <small className={styles.fieldHint}>{isLink ? "Link button — URL hidden" : "Text only — not clickable"}</small> : null}
                       </label>;
                     })}
+                    {group.key === "practice" ? <>
+                      {(slide.resources?.additionalPractice || []).map((value, practiceIndex) => (
+                        <div key={practiceIndex} className={styles.practiceField}>
+                          <label className={styles.field}>
+                            Practice resource {practiceIndex + 2}
+                            <input type="text" aria-label={`Slide ${index + 1} Practice resource ${practiceIndex + 2}`}
+                              placeholder="https://… or a note" value={value}
+                              onChange={event => updateResources(slide.id, { additionalPractice: slide.resources!.additionalPractice!.map((entry, entryIndex) => entryIndex === practiceIndex ? event.target.value : entry) })} />
+                            {value.trim() ? <small className={styles.fieldHint}>{safeUnitResourceHref(value) ? "Link button — URL hidden" : "Text only — not clickable"}</small> : null}
+                          </label>
+                          <button type="button" aria-label={`Remove practice resource ${practiceIndex + 2} from slide ${index + 1}`}
+                            onClick={() => updateResources(slide.id, { additionalPractice: slide.resources!.additionalPractice!.filter((_, entryIndex) => entryIndex !== practiceIndex) })}>Remove</button>
+                        </div>
+                      ))}
+                      <div className={styles.practiceActions}>
+                        <button type="button" disabled={(slide.resources?.additionalPractice?.length || 0) >= 5}
+                          onClick={() => {
+                            const additional = slide.resources?.additionalPractice || [];
+                            if (additional.length < 5) updateResources(slide.id, { additionalPractice: [...additional, ""] });
+                          }}>Add practice link</button>
+                        <small className={styles.fieldHint}>{1 + (slide.resources?.additionalPractice?.length || 0)} / 6</small>
+                      </div>
+                    </> : null}
                   </fieldset>
                 ))}
               </div>

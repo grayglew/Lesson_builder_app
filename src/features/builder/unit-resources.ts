@@ -57,18 +57,24 @@ export function hasUnitResources(value: unknown): value is UnitResourceLinks {
 export function renderUnitResourceCards(title: string, value: unknown, interactive = true): string {
   const resources = hasUnitResources(value) ? value : emptyUnitResources();
   return `<div class="unit-resource-board"><h4 class="unit-resource-title">${escapeText(title)}</h4><div class="unit-resource-columns">${UNIT_RESOURCE_GROUPS.map(group => {
-    const items = group.fields.flatMap(field => {
-      const raw = typeof resources[field.key] === "string" ? resources[field.key] : "";
-      if (!raw.trim()) return [];
-      const href = safeUnitResourceHref(raw, field.key === "email");
-      const label = `<span>${field.label}</span><span aria-hidden="true">↗</span>`;
-      return [href
+    const practice = [resources.practice, ...(Array.isArray(resources.additionalPractice) ? resources.additionalPractice.slice(0, 5) : [])]
+      .filter((raw): raw is string => typeof raw === "string" && Boolean(raw.trim()));
+    const entries = group.key === "practice"
+      ? practice.map((raw, index) => ({ raw, label: practice.length > 1 ? `Practice ${index + 1}` : "Extra practice resources", email: false }))
+      : group.fields.flatMap(field => {
+        const raw = typeof resources[field.key] === "string" ? resources[field.key] : "";
+        return raw.trim() ? [{ raw, label: field.label, email: field.key === "email" }] : [];
+      });
+    const items = entries.map(entry => {
+      const href = safeUnitResourceHref(entry.raw, entry.email);
+      const label = `<span>${entry.label}</span><span aria-hidden="true">↗</span>`;
+      return href
         ? interactive
           ? `<a class="unit-resource-action" href="${escapeText(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
           : `<span class="unit-resource-action">${label}</span>`
-        : `<div class="unit-resource-action is-note">${escapeText(raw.trim())}</div>`];
+        : `<div class="unit-resource-action is-note">${escapeText(entry.raw.trim())}</div>`;
     });
-    return `<section class="unit-resource-category unit-resource-${group.key}" aria-label="${group.title}"><h5>${group.title}</h5><div class="unit-resource-items">${items.join("") || '<p class="unit-resource-empty">No resources added</p>'}</div></section>`;
+    return `<section class="unit-resource-category unit-resource-${group.key}" aria-label="${group.title}"><h5>${group.title}</h5><div class="unit-resource-items${group.key === "practice" && items.length > 1 ? " unit-resource-practice-grid" : ""}">${items.join("") || '<p class="unit-resource-empty">No resources added</p>'}</div></section>`;
   }).join("")}</div></div>`;
 }
 
@@ -86,6 +92,7 @@ export const UNIT_RESOURCE_CSS = `
 .unit-resource-category.unit-resource-deeper{border-top-color:#405a82;background:#f1f4f9}
 .unit-resource-category h5{margin:0 0 1rem;font-size:1.1rem;line-height:1.2;font-weight:800;color:#172124}
 .unit-resource-items{display:grid;gap:.75rem}
+.unit-resource-practice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .unit-resource-action{box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;gap:.5rem;min-height:44px;padding:.75rem;border:1px solid #9cb9ae;border-radius:4px;background:#fff;color:#174f46;font-size:1rem;font-weight:700;line-height:1.3;text-decoration:none;overflow-wrap:anywhere;min-width:0}
 .unit-resource-action:hover{background:#e2f3ed;border-color:#247569}
 .unit-resource-action:focus-visible{outline:3px solid #0f766e;outline-offset:3px}
