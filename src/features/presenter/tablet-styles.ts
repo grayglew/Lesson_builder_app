@@ -110,18 +110,19 @@ export const TABLET_PRESENTER_CSS = `
   .presenter-classroom .presenter-student-code[aria-pressed="true"] small{display:block}
   .presenter-classroom:not(.presenter-zoom-mode) .lesson-deck{
     box-sizing:border-box;max-width:none;height:100vh;height:100dvh;overflow:auto;overscroll-behavior:contain;
-    padding:var(--presenter-toolbar-space) var(--presenter-edge-space) var(--presenter-edge-space);gap:0;
+    padding:var(--presenter-toolbar-space) var(--presenter-edge-space) var(--presenter-edge-space);row-gap:12px;
     scroll-padding:var(--presenter-toolbar-space) var(--presenter-edge-space) var(--presenter-edge-space);
     align-content:start;justify-items:center
   }
   .presenter-classroom:not(.presenter-zoom-mode) .lesson-slide{
     box-sizing:border-box;width:var(--presenter-slide-width);height:var(--presenter-slide-height);max-height:none;
-    --slide-spare-space:max(0px,calc(100dvh - var(--presenter-toolbar-space) - var(--presenter-edge-space) - var(--presenter-slide-height)));
-    --slide-top-gap:calc(var(--slide-spare-space) * .44);
-    margin-block:var(--slide-top-gap) calc(var(--slide-spare-space) - var(--slide-top-gap));
     border:1px solid #b6c9c2;box-shadow:0 6px 24px #183f2f16
   }
-  .presenter-classroom:not(.presenter-zoom-mode) .lesson-slide.pdf-page-slide{margin-block:0}
+  /* Give the last slide enough scroll room to align under the toolbar
+     without inserting that spare space between slides. */
+  .presenter-classroom:not(.presenter-zoom-mode) .lesson-deck > .lesson-slide:last-child{
+    margin-block-end:max(0px,calc(100dvh - var(--presenter-toolbar-space) - var(--presenter-edge-space) - var(--presenter-slide-height)))
+  }
   /* Keep zoom gutters in the scrolling content; padding larger than the
      viewport makes the scrollport itself grow and Fit restores a clipped slide. */
   body.presenter-classroom.presenter-zoom-mode .lesson-deck{

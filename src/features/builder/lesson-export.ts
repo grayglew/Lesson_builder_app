@@ -885,19 +885,12 @@ function standaloneInteractionScript() {
 
   function visibleSlideIndex() {
     if (classroom) {
-      const deckBottom = deck?.getBoundingClientRect().bottom || window.innerHeight;
-      const barBottom = document.querySelector(".presenter-tools")?.getBoundingClientRect().bottom || 0;
-      let best = 0;
-      let visibleHeight = -1;
-      slides.forEach((slide, index) => {
-        const rect = slide.getBoundingClientRect();
-        const overlap = Math.min(deckBottom, rect.bottom) - Math.max(barBottom, rect.top);
-        if (overlap > visibleHeight) {
-          best = index;
-          visibleHeight = overlap;
-        }
-      });
-      return visibleHeight > 0 ? best : Math.min(displayedSlide, slides.length - 1);
+      // Multiple slides can be visible in portrait. Track the slide at the
+      // top of the reading area, not the taller slide further down.
+      const readingLine = (deck?.getBoundingClientRect().top || 0) +
+        (parseFloat(getComputedStyle(deck).scrollPaddingTop) || 0) + 1;
+      const index = slides.findIndex(slide => slide.getBoundingClientRect().bottom > readingLine);
+      return index < 0 ? Math.min(displayedSlide, slides.length - 1) : index;
     }
     const centerX = window.innerWidth / 2;
     const centerY = window.innerHeight / 2;
@@ -953,11 +946,10 @@ function standaloneInteractionScript() {
       const style = getComputedStyle(document.documentElement);
       const padding = parseFloat(style.getPropertyValue("--presenter-toolbar-space")) || 0;
       const edge = parseFloat(style.getPropertyValue("--presenter-edge-space")) || 0;
-      const margin = parseFloat(getComputedStyle(slide).marginTop) || 0;
       const slideBounds = slide.getBoundingClientRect();
       const deckBounds = deck.getBoundingClientRect();
       deck.scrollTo({
-        top: deck.scrollTop + slideBounds.top - deckBounds.top - padding - margin,
+        top: deck.scrollTop + slideBounds.top - deckBounds.top - padding,
         left: zoomScale > 1 ? deck.scrollLeft + slideBounds.left - deckBounds.left - edge : 0,
         behavior: "instant",
       });

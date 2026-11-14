@@ -103,6 +103,41 @@ test("next and previous show the current slide and preserve it on rotation", asy
   await expect(position).toContainText("1 / 5");
 });
 
+test("a tall narrow window keeps adjacent slides close and brings the last slide to the toolbar", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1200 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setContent(html);
+  const slides = page.locator(".lesson-deck > .lesson-slide");
+  const gaps = () => slides.evaluateAll(items => items.slice(1).map((slide, index) =>
+    slide.getBoundingClientRect().top - items[index].getBoundingClientRect().bottom,
+  ));
+  await expect.poll(gaps).toEqual([12, 12, 12, 12]);
+  const insetBelowToolbar = (index: number) => slides.nth(index).evaluate(slide => {
+    const toolbar = document.querySelector(".presenter-tools")!;
+    return Math.round(slide.getBoundingClientRect().top - toolbar.getBoundingClientRect().bottom);
+  });
+  await expect.poll(() => insetBelowToolbar(0)).toBe(6);
+  const secondSlideOffset = await slides.nth(1).evaluate((slide) =>
+    slide.getBoundingClientRect().top - document.querySelector(".presenter-tools")!.getBoundingClientRect().bottom,
+  );
+  await page.locator(".lesson-deck").evaluate((deck, offset) => { deck.scrollTop += offset; }, secondSlideOffset);
+  const position = page.locator("#presenter-slide-position");
+  await expect(position).toContainText("2 / 5");
+  const next = page.getByRole("button", { name: "Next slide", exact: true });
+  for (const count of [3, 4, 5]) {
+    await next.click();
+    await expect(position).toContainText(`${count} / 5`);
+    await expect.poll(() => insetBelowToolbar(count - 1)).toBe(6);
+  }
+  await expect(next).toBeDisabled();
+  await page.setViewportSize({ width: 1340, height: 1260 });
+  await expect.poll(gaps).toEqual([12, 12, 12, 12]);
+  await expect.poll(() => insetBelowToolbar(4)).toBe(6);
+  await page.getByRole("button", { name: "Previous slide", exact: true }).click();
+  await expect.poll(() => insetBelowToolbar(3)).toBe(6);
+  await expect(position).toContainText("4 / 5");
+});
+
 test("zooming a middle slide and fitting it again keeps its reveal below the toolbar", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.emulateMedia({ reducedMotion: "reduce" });
