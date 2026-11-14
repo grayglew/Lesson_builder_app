@@ -578,6 +578,90 @@ describe("BuilderShell Compact Console action parity", () => {
       .hydrate(createInitialBuilderDocument("2026-07-18T06:00:00.000Z"));
   });
 
+  it("edits the chosen example without replacing its identity or changing handout selection", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument();
+    const image = { name: "question.png", type: "image/png", size: 16, dataUrl: "data:image/png;base64,YQ==" };
+    document.slides = [
+      { id: "example-one", type: "example", title: "Expand", lo: "Expand one bracket", image1: image, annotations: [{ type: "pen" }] },
+      { id: "example-two", type: "example", title: "Factorise", lo: "Factorise one bracket", image1: image },
+    ];
+    document.handoutSlideIds = ["example-one"];
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+    const actions = () => screen.findAllByRole("button", { name: "Edit slide" });
+    await user.click((await actions())[0]);
+    const lo = screen.getByRole("textbox", { name: "Learning objective" });
+    expect(lo).toHaveValue("Expand one bracket");
+    await user.clear(lo);
+    await user.type(lo, "Expand two brackets");
+    await user.click(screen.getByRole("button", { name: "Select slide 2 as active from title" }));
+    await user.click(screen.getByRole("button", { name: "Update slide" }));
+    const saved = useBuilderStore.getState().document;
+    expect(saved.slides).toEqual([
+      expect.objectContaining({ id: "example-one", lo: "Expand two brackets", image1: image, annotations: [{ type: "pen" }] }),
+      expect.objectContaining({ id: "example-two", lo: "Factorise one bracket" }),
+    ]);
+    expect(saved.handoutSlideIds).toEqual(["example-one"]);
+    await user.click((await actions())[1]);
+    await user.clear(screen.getByRole("textbox", { name: "Learning objective" }));
+    await user.click(screen.getByRole("button", { name: "Cancel edit" }));
+    expect(useBuilderStore.getState().document.slides[1]).toMatchObject({ lo: "Factorise one bracket" });
+  });
+
+  it("offers in-place editing only for supported lesson content and opens the exact shared unit source", async () => {
+    const user = userEvent.setup();
+    const document = createInitialBuilderDocument();
+    document.unitsOfWork = [
+      { id: "other", name: "Other unit", updatedAt: document.updatedAt, slides: [{ id: "other-resource", title: "Other resource", bullets: [] }] },
+      { id: "algebra", name: "Algebra", updatedAt: document.updatedAt, slides: [{ id: "resource", title: "Algebra resources", bullets: [] }] },
+    ];
+    document.slides = [
+      { id: "starter", type: "starter", title: "Starter", slots: [] },
+      { id: "worksheet", type: "worksheet", title: "Worksheet", worksheet: { name: "Sheet.pdf", type: "application/pdf", size: 16, dataUrl: "data:application/pdf;base64,YQ==" } },
+      { id: "cfu", type: "cfu", title: "CFU", placement: "top-left", image: { name: "question.png", type: "image/png", size: 16, dataUrl: "data:image/png;base64,YQ==" } },
+      { id: "placeholder", type: "placeholder", title: "Placeholder", text: "Opening task" },
+      { id: "math", type: "math", title: "Math", mode: "Answers", latex: "An answer" },
+      { id: "plain", type: "template", title: "Independent work", bullets: ["Task"] },
+      { id: "shared", type: "template", title: "Algebra resources", bullets: [], unitOfWorkId: "algebra", unitResourceId: "resource" },
+      { id: "retrieval", type: "revision", title: "Revision", items: [] },
+      { id: "pdf", type: "pdf-page", title: "PDF" },
+      { id: "drawing", type: "drawing", title: "Drawing" },
+    ];
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    render(<BuilderShell userEmail="teacher@example.com" variant="compact-console" />);
+    expect(await screen.findAllByRole("button", { name: "Edit slide" })).toHaveLength(6);
+    await user.click(screen.getByRole("button", { name: "Manage unit resources" }));
+    expect(await screen.findByRole("textbox", { name: "Unit name" })).toHaveValue("Algebra");
+    expect(screen.getByRole("textbox", { name: "Slide 1 title" })).toHaveValue("Algebra resources");
+    await user.click(screen.getByRole("button", { name: "Open retrieval bank" }));
+    expect(screen.getByRole("region", { name: "Retrieval" })).toBeInTheDocument();
+
+    const update = async (index: number, role: "textbox" | "combobox", name: string, value: string) => {
+      await user.click(screen.getAllByRole("button", { name: "Edit slide" })[index]);
+      const field = screen.getByRole(role, { name });
+      if (role === "combobox") await user.selectOptions(field, value);
+      else {
+        fireEvent.change(field, { target: { value } });
+      }
+      await user.click(screen.getByRole("button", { name: "Update slide" }));
+    };
+    await update(1, "textbox", "Slide title", "Class worksheet");
+    await update(2, "combobox", "Placement", "top-center");
+    await update(3, "textbox", "Placeholder text", "Revised opening task");
+    await update(4, "textbox", "LaTeX", "$x=1$");
+    await update(5, "textbox", "Slide bullets (one per line)", "Revised task");
+    const slides = useBuilderStore.getState().document.slides;
+    expect(slides.slice(1, 6)).toEqual([
+      expect.objectContaining({ id: "worksheet", title: "Class worksheet", worksheet: expect.objectContaining({ name: "Sheet.pdf" }) }),
+      expect.objectContaining({ id: "cfu", placement: "top-center", image: expect.objectContaining({ name: "question.png" }) }),
+      expect.objectContaining({ id: "placeholder", text: "Revised opening task" }),
+      expect.objectContaining({ id: "math", mode: "Answers", latex: "$x=1$" }),
+      expect.objectContaining({ id: "plain", bullets: ["Revised task"] }),
+    ]);
+    expect(useBuilderStore.getState().document.slides).toHaveLength(10);
+  }, 15000);
+
   it("keeps the overdue badge tied to the lesson date, class and live progress on every tool", async () => {
     const user = userEvent.setup();
     const document = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");

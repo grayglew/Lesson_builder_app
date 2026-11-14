@@ -5,18 +5,27 @@ import { useState } from "react";
 import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
 import { type CfuPlacement, createCfuSlide } from "./cfu";
-import type { BuilderAsset } from "./schema";
+import { type BuilderAsset, cfuSlideSchema } from "./schema";
+import { SlideEditActions, SlideEditHeading, type SlideEditProps } from "./SlideEditForm";
 import { useBuilderStore } from "./store";
 
-export function CfuComposer() {
+export function CfuComposer({ editingSlide, onUpdate, onCancel }: SlideEditProps = {}) {
+  const [existing] = useState(() => editingSlide ? cfuSlideSchema.safeParse(editingSlide).data : undefined);
   const addSlides = useBuilderStore((state) => state.addSlides);
+  const updateSlideContent = useBuilderStore((state) => state.updateSlideContent);
   const setStatus = useBuilderStore((state) => state.setStatus);
-  const [placement, setPlacement] = useState<CfuPlacement>("full");
-  const [image, setImage] = useState<BuilderAsset | null>(null);
+  const [placement, setPlacement] = useState<CfuPlacement>(
+    existing?.placement === "top-left" || existing?.placement === "top-center" ? existing.placement : "full",
+  );
+  const [image, setImage] = useState<BuilderAsset | null>(existing?.image ?? null);
 
   function addCfuSlide() {
     if (!image) {
       setStatus({ tone: "error", message: "Add a CFU image first." });
+      return;
+    }
+    if (existing) {
+      if (updateSlideContent(existing.id, { type: "cfu", image, placement })) onUpdate?.();
       return;
     }
     addSlides([createCfuSlide(image, placement)]);
@@ -29,7 +38,7 @@ export function CfuComposer() {
   return (
     <section className={styles.toolPanel} data-testid="cfu-panel">
       <div className={styles.panelHead}>
-        <h3>Check for Understanding</h3>
+        {existing ? <SlideEditHeading>Edit CFU slide</SlideEditHeading> : <h3>Check for Understanding</h3>}
       </div>
 
       <label className={styles.fieldLabel} htmlFor="v2-cfu-placement">
@@ -58,7 +67,7 @@ export function CfuComposer() {
         />
       </div>
 
-      <div className={styles.actionRow}>
+      {existing ? <SlideEditActions onCancel={onCancel} onSave={addCfuSlide} /> : <div className={styles.actionRow}>
         <button
           className={styles.primaryButton}
           type="button"
@@ -67,7 +76,7 @@ export function CfuComposer() {
           <Plus className="size-4" aria-hidden />
           Add CFU slide
         </button>
-      </div>
+      </div>}
     </section>
   );
 }

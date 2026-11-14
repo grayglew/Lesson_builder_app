@@ -2,10 +2,12 @@
 
 import {
   GripVertical,
+  Library,
   LoaderCircle,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Trash2,
   X,
 } from "lucide-react";
@@ -62,7 +64,8 @@ import { getDueRetrievalItems } from "./retrieval";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
-import { UnitOfWorkEditor } from "./UnitOfWorkEditor";
+import { UnitOfWorkEditor, type UnitOfWorkEditorHandle } from "./UnitOfWorkEditor";
+import { TextSlideEditor } from "./SlideEditForm";
 import { UnitOfWorkSelector } from "./UnitOfWorkSelector";
 import { UnitResourceSlide } from "./UnitResourceSlide";
 import { hasUnitResources } from "./unit-resources";
@@ -87,6 +90,18 @@ type BuilderShellProps = {
 };
 
 type ToolName = BuilderToolName;
+
+function deckSlideTool(slide: BuilderSlide): ToolName | null {
+  if (slide.unitOfWorkId || slide.unitResourceId) return "units";
+  if (slide.type === "revision" || slide.type === "retrieval" ||
+      (slide.type === "starter" && slide.title === "Retrieval" && Array.isArray(slide.slots) &&
+        slide.slots.some(slot => slot?.lockImageSlot && slot.retrievalItemId))) return "retrieval";
+  if (slide.type === "template") return slide.resources ? null : "templates";
+  switch (slide.type) {
+    case "starter": case "example": case "worksheet": case "cfu": case "placeholder": case "math": return slide.type;
+    default: return null;
+  }
+}
 
 const tools: Array<{ name: ToolName; label: string }> = [
   { name: "starter", label: "Starter" },
@@ -172,6 +187,7 @@ function BuilderShellWorkspace({
     (state) => state.toggleHandoutSlide,
   );
   const addPlaceholderSlide = useBuilderStore((state) => state.addPlaceholderSlide);
+  const updateSlideContent = useBuilderStore((state) => state.updateSlideContent);
   const moveSlide = useBuilderStore((state) => state.moveSlide);
   const removeSlide = useBuilderStore((state) => state.removeSlide);
   const setStatus = useBuilderStore((state) => state.setStatus);
@@ -191,8 +207,10 @@ function BuilderShellWorkspace({
   const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
-  const [editingStarterId, setEditingStarterId] = useState<string | null>(null);
-  const editingStarter = document.slides.find(slide => slide.id === editingStarterId && slide.type === "starter");
+  const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
+  const editingSlide = document.slides.find(slide => slide.id === editingSlideId);
+  const editingStarter = editingSlide?.type === "starter" ? editingSlide : undefined;
+  const unitEditor = useRef<UnitOfWorkEditorHandle>(null);
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
   const lessonDrawerRef = useActiveDialogFocus<HTMLElement>(
@@ -219,6 +237,49 @@ function BuilderShellWorkspace({
     setActiveTool(tool);
     if (compactMobileViewport) setCompactMobilePanel("build");
   }
+
+  async function openDeckSlide(slide: BuilderSlide, tool: ToolName) {
+    if (tool !== "units" && tool !== "retrieval" && editingSlide && editingSlide.id !== slide.id &&
+      !await confirmDialog({
+        title: "Switch slide editor?",
+        description: "Any unsaved changes to the slide you’re editing will be lost.",
+        confirmLabel: "Switch slides",
+        tone: "warning",
+      })) return;
+    selectCompactTool(tool);
+    if (tool === "units") {
+      unitEditor.current?.openResource(String(slide.unitOfWorkId ?? ""), String(slide.unitResourceId ?? ""));
+    } else if (tool === "retrieval") {
+      requestAnimationFrame(() => workspaceRef.current?.querySelector<HTMLElement>("h2")?.focus());
+    } else {
+      setEditingSlideId(slide.id);
+      selectSlide(slide.id);
+    }
+  }
+
+  function closeSlideEditor() {
+    setEditingSlideId(null);
+    requestAnimationFrame(() => {
+      const panel = workspaceRef.current?.querySelector<HTMLElement>("[data-testid$='-panel']:not([hidden] *)");
+      const heading = (panel ?? workspaceRef.current)?.querySelector<HTMLElement>("h3, h2");
+      if (heading) {
+        heading.tabIndex = -1;
+        heading.focus();
+      }
+    });
+  }
+
+  function finishSlideEdit() {
+    closeSlideEditor();
+    setStatus({ tone: "success", message: "Slide updated." });
+  }
+
+  const slideEditProps = { onUpdate: finishSlideEdit, onCancel: closeSlideEditor };
+  const textSlide = editingSlide && (
+    (editingSlide.type === "placeholder" && activeTool === "placeholder") ||
+    (editingSlide.type === "math" && activeTool === "math") ||
+    (editingSlide.type === "template" && activeTool === "templates")
+  ) ? editingSlide : undefined;
 
   function updateThemePreference(preference: BuilderThemePreference) {
     setThemePreference(preference);
@@ -516,6 +577,7 @@ function BuilderShellWorkspace({
     });
     if (approved) {
       reset();
+      setEditingSlideId(null);
       setActiveTool("starter");
     }
   }
@@ -542,6 +604,7 @@ function BuilderShellWorkspace({
       };
 
       hydrate(savedDocument);
+      setEditingSlideId(null);
       setActiveTool("starter");
       setNewLessonDialogOpen(false);
 
@@ -887,13 +950,13 @@ function BuilderShellWorkspace({
                 : styles.classicWorkspaceBody
             }
           >
-          <h2 className={styles.srOnly}>{toolLabels[activeTool]}</h2>
+          <h2 className={styles.srOnly} tabIndex={-1}>{toolLabels[activeTool]}</h2>
           {variant === "compact-console" ? <CompactWorkspaceTools activeTool={activeTool} onSelect={selectCompactTool} busy={Boolean(busyAction)} onNewLesson={() => setNewLessonDialogOpen(true)} /> : null}
           {activeTool === "starter" || editingStarter ? <div hidden={activeTool !== "starter"}>
-            <StarterComposer key={editingStarter?.id ?? "new-starter"} compact={variant === "compact-console"} editingSlide={editingStarter} onEndEdit={() => setEditingStarterId(null)} />
+            <StarterComposer key={editingStarter?.id ?? "new-starter"} compact={variant === "compact-console"} editingSlide={editingStarter} onEndEdit={closeSlideEditor} />
           </div> : null}
           <div hidden={activeTool !== "units"}>
-            <div className={styles.toolPanel}><UnitOfWorkEditor compact={variant === "compact-console"} /></div>
+            <div className={styles.toolPanel}><UnitOfWorkEditor ref={unitEditor} compact={variant === "compact-console"} /></div>
           </div>
           {activeTool === "saved-lessons" ? (
             <div className={styles.toolPanel}>
@@ -910,16 +973,20 @@ function BuilderShellWorkspace({
               refreshing={retrievalRefreshing}
             />
           ) : null}
-          {activeTool === "example" ? (
-            <ExampleComposer compact={variant === "compact-console"} />
-          ) : null}
-          {activeTool === "worksheet" ? <WorksheetComposer /> : null}
+          {activeTool === "example" || editingSlide?.type === "example" ? <div hidden={activeTool !== "example"}>
+            <ExampleComposer key={editingSlide?.type === "example" ? editingSlide.id : "new-example"} compact={variant === "compact-console"} editingSlide={editingSlide} {...slideEditProps} />
+          </div> : null}
+          {activeTool === "worksheet" || editingSlide?.type === "worksheet" ? <div hidden={activeTool !== "worksheet"}>
+            <WorksheetComposer key={editingSlide?.type === "worksheet" ? editingSlide.id : "new-worksheet"} editingSlide={editingSlide} {...slideEditProps} />
+          </div> : null}
           {activeTool === "pdf" ? <PdfComposer /> : null}
-          {activeTool === "cfu" ? <CfuComposer /> : null}
+          {activeTool === "cfu" || editingSlide?.type === "cfu" ? <div hidden={activeTool !== "cfu"}>
+            <CfuComposer key={editingSlide?.type === "cfu" ? editingSlide.id : "new-cfu"} editingSlide={editingSlide} {...slideEditProps} />
+          </div> : null}
           {activeTool === "draw" ? (
             <DrawComposer compact={variant === "compact-console"} />
           ) : null}
-          {activeTool === "templates" ? (
+          {activeTool === "templates" && !textSlide ? (
             <div className={styles.toolPanel}>
               <GlobalDataEditor
                 embedded
@@ -941,7 +1008,7 @@ function BuilderShellWorkspace({
               />
             </div>
           ) : null}
-          {activeTool === "placeholder" ? (
+          {activeTool === "placeholder" && !textSlide ? (
             <section className={styles.toolPanel}>
               <div className={styles.panelHead}>
                 <h3>Placeholder slide</h3>
@@ -981,8 +1048,27 @@ function BuilderShellWorkspace({
               </div>
             </section>
           ) : null}
-          {activeTool === "math" ? (
+          {activeTool === "math" && !textSlide ? (
             <LatexComposer compact={variant === "compact-console"} />
+          ) : null}
+          {editingSlide?.type === "placeholder" || editingSlide?.type === "math" || editingSlide?.type === "template" ? (
+            <div hidden={!textSlide}>
+              <TextSlideEditor
+                key={editingSlide.id}
+                type={editingSlide.type}
+                title={editingSlide.title}
+                text={editingSlide.type === "template"
+                  ? (Array.isArray(editingSlide.bullets) ? editingSlide.bullets.join("\n") : "")
+                  : String((editingSlide.type === "math" ? editingSlide.latex : editingSlide.text) ?? "")}
+                onCancel={closeSlideEditor}
+                onSave={(text, title) => {
+                  const patch = editingSlide.type === "math" ? { type: "math" as const, latex: text }
+                    : editingSlide.type === "template" ? { type: "template" as const, title, bullets: text.split("\n").map(line => line.trim()).filter(Boolean) }
+                    : { type: "placeholder" as const, text };
+                  if (updateSlideContent(editingSlide.id, patch)) finishSlideEdit();
+                }}
+              />
+            </div>
           ) : null}
           </div>
         </section>
@@ -1096,7 +1182,10 @@ function BuilderShellWorkspace({
           )}
 
           <ol id="v2-slide-list" className={styles.slideList}>
-            {previewSlides.map((slide, index) => (
+            {previewSlides.map((slide, index) => {
+              const slideTool = variant === "compact-console" ? deckSlideTool(document.slides[index] ?? slide) : null;
+              const managed = slideTool === "units" || slideTool === "retrieval";
+              return (
               <li
                 key={slide.id}
                 className={`${styles.slideItem} ${
@@ -1217,11 +1306,10 @@ function BuilderShellWorkspace({
                       </>
                     )}
                   </div>
-                  {variant === "compact-console" && slide.type === "starter" ? <button type="button" className={styles.editStarterButton} onClick={() => {
-                    setEditingStarterId(slide.id);
-                    selectSlide(slide.id);
-                    selectCompactTool("starter");
-                  }}>Edit starter</button> : null}
+                  {slideTool ? <button type="button" className={styles.editSlideButton} onClick={() => void openDeckSlide(slide, slideTool)}>
+                    {managed ? <Library size={14} aria-hidden /> : <Pencil size={14} aria-hidden />}
+                    {slideTool === "units" ? "Manage unit resources" : slideTool === "retrieval" ? "Open retrieval bank" : "Edit slide"}
+                  </button> : null}
                 </div>
                 <button
                   className={styles.slidePreviewButton}
@@ -1233,7 +1321,7 @@ function BuilderShellWorkspace({
                   <SlidePreview slide={slide} />
                 </button>
               </li>
-            ))}
+            );})}
           </ol>
         </aside>
 

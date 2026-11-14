@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useImperativeHandle, useRef, useState, type Ref } from "react";
 import { useAppNotifications } from "./AppNotifications";
 import { type UnitOfWork, type UnitResourceLinks, createBuilderId } from "./schema";
 import { useBuilderStore } from "./store";
@@ -20,7 +20,11 @@ function emptyUnit(): UnitOfWork {
     slides: [{ id: createBuilderId("resource"), title: "Unit resources", bullets: [], resources: emptyUnitResources() }] };
 }
 
-export function UnitOfWorkEditor({ compact = false }: { compact?: boolean } = {}) {
+export type UnitOfWorkEditorHandle = {
+  openResource: (unitId: string, resourceId: string) => void;
+};
+
+export function UnitOfWorkEditor({ compact = false, ref }: { compact?: boolean; ref?: Ref<UnitOfWorkEditorHandle> } = {}) {
   const units = useBuilderStore(state => state.document.unitsOfWork);
   const saveUnit = useBuilderStore(state => state.saveUnitOfWork);
   const { confirmDialog } = useAppNotifications();
@@ -28,6 +32,7 @@ export function UnitOfWorkEditor({ compact = false }: { compact?: boolean } = {}
   const [baseline, setBaseline] = useState(() => JSON.stringify(draft));
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const editor = useRef<HTMLElement>(null);
   const association = useUnitAssociation();
   const savedUnit = units.find(unit => unit.id === draft.id);
   const isAttached = association.currentUnitId === draft.id;
@@ -36,14 +41,33 @@ export function UnitOfWorkEditor({ compact = false }: { compact?: boolean } = {}
     if (JSON.stringify(draft) !== baseline && !await confirmDialog({
       title: "Discard unit changes?", description: "Your unsaved unit edits will be lost.",
       confirmLabel: "Discard changes", tone: "warning",
-    })) return;
+    })) return false;
     const next = units.find(unit => unit.id === id);
     const value = next ? prepareDraft(next) : emptyUnit();
     setDraft(value);
     setBaseline(JSON.stringify(value));
     setError("");
     setMessage("");
+    return true;
   }
+
+  useImperativeHandle(ref, () => ({
+    openResource: (unitId, resourceId) => {
+      void (async () => {
+        if (!units.some(unit => unit.id === unitId)) {
+          setError("The source unit is no longer in your library. This lesson keeps its saved resource slide.");
+          requestAnimationFrame(() => editor.current?.querySelector<HTMLElement>("h3")?.focus());
+          return;
+        }
+        if (unitId !== draft.id && !await chooseUnit(unitId)) return;
+        requestAnimationFrame(() => {
+          const heading = Array.from(editor.current?.querySelectorAll<HTMLElement>("[data-resource-heading]") ?? [])
+            .find(element => element.dataset.resourceHeading === resourceId);
+          (heading ?? editor.current?.querySelector<HTMLElement>("h3"))?.focus();
+        });
+      })();
+    },
+  }));
 
   function moveResource(index: number, direction: -1 | 1) {
     const slides = [...draft.slides];
@@ -58,12 +82,13 @@ export function UnitOfWorkEditor({ compact = false }: { compact?: boolean } = {}
   }
 
   return (
-    <section className={styles.editor} aria-label="Unit library">
+    <section ref={editor} className={styles.editor} aria-label="Unit library">
       <header className={styles.heading}>
-        <div><span className={styles.eyebrow}>Reusable resources</span><h3>Units of work</h3></div>
+        <div><span className={styles.eyebrow}>Reusable resources</span><h3 tabIndex={-1}>Units of work</h3></div>
         <button type="button" onClick={() => void chooseUnit("")}>New unit</button>
       </header>
       <p className={styles.note}>Create once, then attach to any lesson. All resource content and links are student-visible. Editing a unit does not change saved lesson slides until you update them.</p>
+      {error ? <p role="alert" className={styles.error}>{error}</p> : null}
       <label className={styles.field}>Edit unit
         <select value={units.some(unit => unit.id === draft.id) ? draft.id : ""} onChange={event => void chooseUnit(event.target.value)}>
           <option value="">New unit</option>
@@ -100,7 +125,7 @@ export function UnitOfWorkEditor({ compact = false }: { compact?: boolean } = {}
           {draft.slides.map((slide, index) => (
             <article key={slide.id} className={styles.resource}>
               <div className={styles.heading}>
-                <h4>Resource slide {index + 1}</h4>
+                <h4 data-resource-heading={slide.id} tabIndex={-1}>Resource slide {index + 1}</h4>
                 <div className={styles.actions}>
                   <button type="button" aria-label={`Move resource ${index + 1} up`} disabled={index === 0} onClick={() => moveResource(index, -1)}>↑</button>
                   <button type="button" aria-label={`Move resource ${index + 1} down`} disabled={index === draft.slides.length - 1} onClick={() => moveResource(index, 1)}>↓</button>
@@ -166,7 +191,6 @@ export function UnitOfWorkEditor({ compact = false }: { compact?: boolean } = {}
             </article>
           ))}
         </div>
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         {message ? <p role="status" className={styles.note}>{message}</p> : null}
         <div className={styles.actions}>
           <button type="button" onClick={() => setDraft({ ...draft, slides: [...draft.slides, { id: createBuilderId("resource"), title: "More resources", bullets: [], resources: emptyUnitResources() }] })}>Add resource slide</button>

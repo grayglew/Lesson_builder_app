@@ -4,16 +4,19 @@ import { Eraser, Plus } from "lucide-react";
 import { useState } from "react";
 import { BuilderFileInput } from "./BuilderFileInput";
 import styles from "./BuilderShell.module.css";
-import type { BuilderAsset } from "./schema";
+import { type BuilderAsset, worksheetSlideSchema } from "./schema";
+import { SlideEditActions, SlideEditHeading, type SlideEditProps } from "./SlideEditForm";
 import { useBuilderStore } from "./store";
 import { createWorksheetSlide } from "./worksheet";
 
-export function WorksheetComposer() {
+export function WorksheetComposer({ editingSlide, onUpdate, onCancel }: SlideEditProps = {}) {
+  const [existing] = useState(() => editingSlide ? worksheetSlideSchema.safeParse(editingSlide).data : undefined);
   const addSlides = useBuilderStore((state) => state.addSlides);
+  const updateSlideContent = useBuilderStore((state) => state.updateSlideContent);
   const setStatus = useBuilderStore((state) => state.setStatus);
-  const [title, setTitle] = useState("");
-  const [worksheet, setWorksheet] = useState<BuilderAsset | null>(null);
-  const [answers, setAnswers] = useState<BuilderAsset | null>(null);
+  const [title, setTitle] = useState(existing?.title ?? "");
+  const [worksheet, setWorksheet] = useState<BuilderAsset | null>(existing?.worksheet ?? null);
+  const [answers, setAnswers] = useState<BuilderAsset | null>(existing?.answers ?? null);
 
   function updateFile(
     role: "worksheet" | "answers",
@@ -29,6 +32,10 @@ export function WorksheetComposer() {
   function addWorksheetSlide() {
     if (!worksheet) {
       setStatus({ tone: "error", message: "Choose a worksheet file first." });
+      return;
+    }
+    if (existing) {
+      if (updateSlideContent(existing.id, { type: "worksheet", title: title.trim() || "Worksheet", worksheet, answers })) onUpdate?.();
       return;
     }
     addSlides([
@@ -49,7 +56,7 @@ export function WorksheetComposer() {
   return (
     <section className={styles.toolPanel} data-testid="worksheet-panel">
       <div className={styles.panelHead}>
-        <h3>Worksheet slide</h3>
+        {existing ? <SlideEditHeading>Edit worksheet slide</SlideEditHeading> : <h3>Worksheet slide</h3>}
       </div>
 
       <label className={styles.fieldLabel} htmlFor="v2-worksheet-title">
@@ -79,7 +86,7 @@ export function WorksheetComposer() {
         />
       </div>
 
-      <div className={styles.actionRow}>
+      {existing ? <SlideEditActions onCancel={onCancel} onSave={addWorksheetSlide} /> : <div className={styles.actionRow}>
         <button
           className={styles.primaryButton}
           type="button"
@@ -96,7 +103,7 @@ export function WorksheetComposer() {
           <Eraser className="size-4" aria-hidden />
           Clear files
         </button>
-      </div>
+      </div>}
     </section>
   );
 }

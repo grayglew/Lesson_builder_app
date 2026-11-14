@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import {
+  type BuilderAsset,
   type BuilderDocument,
   type BuilderSlide,
   type RetrievalItem,
@@ -19,6 +20,14 @@ import { applyUnitToLesson } from "./unit-of-work";
 type MetadataPatch = Partial<
   Pick<BuilderDocument, "title" | "className" | "teachingDate" | "overallLessonLo">
 >;
+
+export type SlideContentUpdate =
+  | { type: "example"; lo: string; image1: BuilderAsset | null; image2: BuilderAsset | null; answerImage1: BuilderAsset | null; answerImage2: BuilderAsset | null }
+  | { type: "cfu"; placement: string; image: BuilderAsset }
+  | { type: "worksheet"; title: string; worksheet: BuilderAsset; answers: BuilderAsset | null }
+  | { type: "placeholder"; text: string }
+  | { type: "math"; latex: string }
+  | { type: "template"; title: string; bullets: string[] };
 
 type SavedLessonMetadata = {
   id: string;
@@ -62,6 +71,7 @@ export type BuilderStore = {
   addPlaceholderSlide: (text?: string) => void;
   addStarterSlide: (slots: StarterSlot[]) => void;
   updateStarterSlide: (id: string, slots: StarterSlot[]) => void;
+  updateSlideContent: (id: string, update: SlideContentUpdate) => boolean;
   addSlides: (slides: BuilderSlide[]) => void;
   insertTemplateSlide: (template: SlideTemplate) => void;
   duplicateSlide: (slideId: string) => void;
@@ -77,7 +87,7 @@ const idleStatus: BuilderStatus = {
 };
 
 export const useBuilderStore = create<BuilderStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     document: createInitialBuilderDocument(),
     selectedSlideId: null,
     hydrated: false,
@@ -285,6 +295,17 @@ export const useBuilderStore = create<BuilderStore>()(
         slide.slots = clonePlain(slots).slice(0, 4);
         touchDocument(state.document);
       }),
+
+    updateSlideContent: (id, update) => {
+      const target = get().document.slides.find(slide => slide.id === id);
+      if (!target || target.type !== update.type || target.unitOfWorkId || target.unitResourceId) return false;
+      set((state) => {
+        const slide = state.document.slides.find(entry => entry.id === id)!;
+        Object.assign(slide, clonePlain(update));
+        touchDocument(state.document);
+      });
+      return true;
+    },
 
     addSlides: (slides) =>
       set((state) => {

@@ -20,11 +20,13 @@ import {
   getExampleRetrievalBankStatus,
 } from "./example";
 import { normalizeImageSlots } from "./retrieval";
+import { SlideEditActions, SlideEditHeading, type SlideEditProps } from "./SlideEditForm";
 import {
   type BuilderAsset,
   type BuilderSlide,
   type RetrievalItem,
   createBuilderId,
+  exampleSlideSchema,
 } from "./schema";
 import { selectDocument, useBuilderStore } from "./store";
 
@@ -45,18 +47,20 @@ type LiveLookupState =
 const emptyImageDrafts = () =>
   Array.from({ length: 8 }, (): ImageDraft => ({ asset: null }));
 
-export function ExampleComposer({ compact = false }: { compact?: boolean }) {
+export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCancel }: SlideEditProps & { compact?: boolean }) {
+  const [existing] = useState(() => editingSlide ? exampleSlideSchema.safeParse(editingSlide).data : undefined);
   const document = useBuilderStore(selectDocument);
   const addSlides = useBuilderStore((state) => state.addSlides);
+  const updateSlideContent = useBuilderStore((state) => state.updateSlideContent);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const setStatus = useBuilderStore((state) => state.setStatus);
   const { confirmDialog } = useAppNotifications();
-  const [lo, setLo] = useState("");
+  const [lo, setLo] = useState(existing?.lo ?? "");
   const [spacingFactor, setSpacingFactor] = useState(1.3);
-  const [image1, setImage1] = useState<BuilderAsset | null>(null);
-  const [image2, setImage2] = useState<BuilderAsset | null>(null);
-  const [answerImage1, setAnswerImage1] = useState<BuilderAsset | null>(null);
-  const [answerImage2, setAnswerImage2] = useState<BuilderAsset | null>(null);
+  const [image1, setImage1] = useState<BuilderAsset | null>(existing?.image1 ?? null);
+  const [image2, setImage2] = useState<BuilderAsset | null>(existing?.image2 ?? null);
+  const [answerImage1, setAnswerImage1] = useState<BuilderAsset | null>(existing?.answerImage1 ?? null);
+  const [answerImage2, setAnswerImage2] = useState<BuilderAsset | null>(existing?.answerImage2 ?? null);
   const [questions, setQuestions] = useState<ImageDraft[]>(emptyImageDrafts);
   const [answers, setAnswers] = useState<ImageDraft[]>(emptyImageDrafts);
   const [retrievalImagesExpanded, setRetrievalImagesExpanded] =
@@ -84,7 +88,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     const trimmedLo = lo.trim();
-    if (!trimmedLo) return;
+    if (!trimmedLo || existing) return;
 
     let cancelled = false;
     const controller = new AbortController();
@@ -110,7 +114,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [document.className, lo]);
+  }, [document.className, existing, lo]);
 
   function updateRetrievalImage(
     role: "questions" | "answers",
@@ -201,7 +205,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
     if (!trimmedLo) {
       setStatus({
         tone: "error",
-        message: "Add a learning objective before creating the example slide.",
+        message: existing ? "Add a learning objective before updating the example slide." : "Add a learning objective before creating the example slide.",
       });
       return;
     }
@@ -210,6 +214,10 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
       return;
     }
 
+    if (existing) {
+      if (updateSlideContent(existing.id, { type: "example", lo: trimmedLo, image1, image2, answerImage1, answerImage2 })) onUpdate?.();
+      return;
+    }
     const slide: BuilderSlide = {
       id: createBuilderId("slide"),
       type: "example",
@@ -372,7 +380,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
   return (
     <section className={styles.toolPanel} data-testid="example-panel">
       <div className={styles.panelHead}>
-        <h3>Example slide</h3>
+        {existing ? <SlideEditHeading>Edit example slide</SlideEditHeading> : <h3>Example slide</h3>}
       </div>
 
       <label className={styles.fieldLabel} htmlFor="v2-example-lo">
@@ -385,6 +393,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
         value={lo}
         onChange={(event) => setLo(event.target.value)}
       />
+      {existing ? <p className={styles.fieldNote}>These changes only affect this slide, not the retrieval bank.</p> : <>
       <p className={`${styles.fieldNote} ${bankStatusClass}`}>
         {databaseStatus.message}
       </p>
@@ -409,6 +418,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
           }
         />
       </label>
+      </>}
 
       <div className={styles.exampleMainGrid}>
         <div className={styles.exampleMainColumn}>
@@ -443,6 +453,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
+      {existing ? <SlideEditActions onCancel={onCancel} onSave={addExampleSlide} /> : <>
       <div className={styles.subsectionHead}>
         <div>
           <h4>Retrieval images</h4>
@@ -548,6 +559,7 @@ export function ExampleComposer({ compact = false }: { compact?: boolean }) {
           Add LO to retrieval bank
         </button>
       </div>
+      </>}
     </section>
   );
 }

@@ -2419,7 +2419,6 @@
 }
 
 @media (min-width: 1280px) {
-  .editStarterButton { min-height: 2rem; }
 }
 
 @media (max-width: 1279px) {
@@ -3437,11 +3436,15 @@
   font-weight: 750;
 }
 
-.editStarterButton {
+.editSlideButton {
   grid-row: 2;
-  grid-column: 3 / 5;
+  grid-column: 1 / -1;
   justify-self: end;
   min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  text-align: start;
+  gap: .35rem;
   border: 0;
   border-radius: .25rem;
   padding: 0 .5rem;
@@ -3452,7 +3455,8 @@
   cursor: pointer;
 }
 
-.editStarterButton:hover { background: var(--builder-accent-soft); }
+.editSlideButton:hover { background: var(--builder-accent-soft); }
+.editSlideButton svg { flex: none; }
 .compactDeckActions > button > small { font-size: .7rem; font-weight: 600; }
 
 @media (max-width: 1279px) {

@@ -87,7 +87,7 @@ const revisionSlideSchema = z
   })
   .passthrough();
 
-const exampleSlideSchema = z
+export const exampleSlideSchema = z
   .object({
     ...slideBaseShape,
     type: z.literal("example"),
@@ -99,7 +99,7 @@ const exampleSlideSchema = z
   })
   .passthrough();
 
-const worksheetSlideSchema = z
+export const worksheetSlideSchema = z
   .object({
     ...slideBaseShape,
     type: z.literal("worksheet"),
@@ -123,7 +123,7 @@ const pdfPageSlideSchema = z
   })
   .passthrough();
 
-const cfuSlideSchema = z
+export const cfuSlideSchema = z
   .object({
     ...slideBaseShape,
     type: z.literal("cfu"),
