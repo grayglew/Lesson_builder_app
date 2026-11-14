@@ -25,6 +25,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -78,6 +79,7 @@ export function SavedLessonLibrary({
   const [lessons, setLessons] = useState<SavedLessonSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
+  const openRequest = useRef<AbortController | null>(null);
   const bundleDownloads = useBundleDownloads();
   const [titleFilter, setTitleFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
@@ -130,6 +132,8 @@ export function SavedLessonLibrary({
       cancelled = true;
     };
   }, [setStatus]);
+
+  useEffect(() => () => openRequest.current?.abort(), []);
 
   const classNames = useMemo(
     () =>
@@ -204,29 +208,38 @@ export function SavedLessonLibrary({
   }
 
   async function openLessonById(lesson: SavedLessonSummary) {
-    if (isLessonDirty(document)) {
-      const approved = await confirmDialog({
-        title: `Open "${lesson.title}"?`,
-        description: "Unsaved changes in the current workspace will be replaced.",
-        confirmLabel: "Open lesson",
-        cancelLabel: "Keep current lesson",
-        tone: "warning",
-      });
-      if (!approved) return;
-    }
-    setBusyId(lesson.id);
-    setStatus({ tone: "working", message: `Opening "${lesson.title}"…` });
+    if (openRequest.current) return;
+    const request = new AbortController();
+    openRequest.current = request;
+    const { editingSlideId } = useBuilderStore.getState();
     try {
+      if (editingSlideId || isLessonDirty(document)) {
+        const approved = await confirmDialog({
+          title: `Open "${lesson.title}"?`,
+          description: editingSlideId
+            ? "Opening this lesson will discard the current slide edit and any unsaved workspace changes."
+            : "Unsaved changes in the current workspace will be replaced.",
+          confirmLabel: "Open lesson",
+          cancelLabel: "Keep current lesson",
+          tone: "warning",
+        });
+        if (!approved) return;
+      }
+      if (request.signal.aborted) return;
+      setBusyId(lesson.id);
       const opened = await fetchSavedLesson(lesson.id);
+      if (request.signal.aborted) return;
       openLesson(opened.document, opened.lesson);
       onBack();
     } catch (error) {
+      if (request.signal.aborted) return;
       setStatus({
         tone: "error",
         message: errorMessage(error, "Could not open the saved lesson."),
       });
     } finally {
-      setBusyId("");
+      openRequest.current = null;
+      if (!request.signal.aborted) setBusyId("");
     }
   }
 

@@ -27,6 +27,37 @@ const html = buildStandaloneLessonHtml(lesson, {
   },
 });
 
+test("advancing a linked Starter updates only the images still sourced from the bank", async ({ page }) => {
+  const lesson = createInitialBuilderDocument();
+  const replacement = { ...picture, dataUrl: picture.dataUrl.replace("width='200'", "width='220'") };
+  const next = { ...picture, dataUrl: picture.dataUrl.replace("width='200'", "width='240'") };
+  const lo = "101a: Expand";
+  lesson.slides = [{ id: "starter", type: "starter", title: "Starter", slots: [
+    { lo, image: replacement, overrideQuestionImage: true, answerImage: picture },
+    { lo, image: picture, answerImage: null, overrideAnswerImage: true },
+    { lo, image: replacement, overrideQuestionImage: true, answerImage: null, overrideAnswerImage: true },
+  ] }];
+  await page.route("https://presenter.test/next", (route) => route.fulfill({
+    json: { ok: true, result: { questionImage: next, answerImage: next, currentImageSlot: 2 } },
+    headers: { "access-control-allow-origin": "*" },
+  }));
+  await page.setContent(buildStandaloneLessonHtml(lesson, {
+    liveRetrieval: {
+      enabled: true, endpoint: "https://presenter.test/log", nextEndpoint: "https://presenter.test/next",
+      lessonId: "lesson", className: "Year 7", teachingDate: "2026-11-14",
+    },
+  }));
+  const cells = page.locator(".starter-cell");
+  await cells.nth(0).getByRole("button", { name: "Next retrieval question" }).click();
+  await expect(cells.nth(0).locator(".qa-answer-layer img")).toHaveAttribute("src", next.dataUrl);
+  await expect(cells.nth(0).locator(".qa-question-layer img")).toHaveAttribute("src", replacement.dataUrl);
+  await cells.nth(1).getByRole("button", { name: "Next retrieval question" }).click();
+  await expect(cells.nth(1).locator("[data-live-image-host] > img")).toHaveAttribute("src", next.dataUrl);
+  await expect(cells.nth(1).locator(".qa-answer-layer img")).toHaveCount(0);
+  await expect(cells.nth(2).getByRole("button", { name: "Next retrieval question" })).toHaveCount(0);
+  await expect(cells.nth(2).getByRole("button", { name: "Seen +1" })).toBeVisible();
+});
+
 test("tablet controls remain in bounds and session actions do not require sideways scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.setContent(html);

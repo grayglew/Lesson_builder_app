@@ -3511,7 +3511,6 @@
 @media (min-width: 1280px) {
   .compactConsole .slideToolbar { padding-block: .3rem; gap: 0 .35rem; }
   .compactConsole .slideTitleButton { min-height: 2.25rem; }
-  .compactConsole .handoutSlideToggle { min-height: 2rem; height: 2rem; }
   .compactConsole .assetPairGrid > * .imageDrop { min-height: 7rem; }
   .compactConsole .exampleMainColumn .imageDrop { min-height: 8rem; }
   .compactConsole :is([data-testid="starter-panel"], [data-testid="example-panel"]) > .actionRow {

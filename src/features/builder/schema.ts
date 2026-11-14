@@ -45,6 +45,8 @@ export const starterSlotSchema = z
     retrievalItemId: z.string().optional(),
     currentImageSlot: z.number().int().min(1).max(8).optional(),
     lockImageSlot: z.boolean().optional(),
+    overrideQuestionImage: z.boolean().optional(),
+    overrideAnswerImage: z.boolean().optional(),
     ...imagePairShape,
   })
   .passthrough();

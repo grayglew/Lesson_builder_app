@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   hydrateLiveStarterSlots,
+  hydrateStarterSlotsFromRetrievalItems,
   type LiveStarterImageResolver,
 } from "@/features/builder/live-starter";
 import { buildStandaloneLessonHtml } from "@/features/builder/lesson-export";
@@ -12,6 +13,42 @@ import {
 } from "@/features/builder/schema";
 
 describe("live starter hydration", () => {
+  it("keeps a slide-only replacement and a cleared answer while other slides use the bank", async () => {
+    const document = createInitialBuilderDocument();
+    const replacement = asset("slide-question.png");
+    const bankQuestion = asset("bank-question.png");
+    const bankAnswer = asset("bank-answer.png");
+    const item = retrievalItem("item-1", "101a: Expand", 1);
+    item.images = [bankQuestion];
+    item.answerImages = [bankAnswer];
+    const linked = { lo: item.lo, retrievalItemId: item.id };
+    document.slides = [
+      { id: "edited", type: "starter", title: "Edited", slots: [{
+        ...linked, image: replacement, answerImage: null, overrideQuestionImage: true, overrideAnswerImage: true,
+      }, { ...linked, image: replacement, overrideQuestionImage: true }] },
+      { id: "untouched", type: "starter", title: "Untouched", slots: [linked] },
+    ];
+    const resolver = vi.fn(async (items: RetrievalItem[]) =>
+      items.map((entry) => ({
+        itemId: entry.id,
+        currentImageSlot: 1,
+        questionImage: bankQuestion,
+        answerImage: bankAnswer,
+      })));
+    const expected = [
+      { slots: [
+        expect.objectContaining({ ...linked, image: replacement, answerImage: null }),
+        expect.objectContaining({ ...linked, image: replacement, answerImage: bankAnswer }),
+      ] },
+      { slots: [expect.objectContaining({ ...linked, image: bankQuestion, answerImage: bankAnswer })] },
+    ].map((slide) => expect.objectContaining(slide));
+    expect(hydrateStarterSlotsFromRetrievalItems(document, [item]).slides).toEqual(expected);
+    const hydrated = await hydrateLiveStarterSlots(document, [item], resolver);
+    expect(hydrated.slides).toEqual(expected);
+    expect(item.images).toEqual([bankQuestion]);
+    expect(item.answerImages).toEqual([bankAnswer]);
+  });
+
   it("hydrates all four presenter quadrants from the global retrieval bank", async () => {
     const document = createInitialBuilderDocument();
     document.className = "Year 7";

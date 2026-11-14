@@ -13,9 +13,11 @@ import { BuilderShell } from "@/features/builder/BuilderShell";
 import { AppNotificationsProvider } from "@/features/builder/AppNotifications";
 import {
   archiveClassName,
+  listSavedLessons,
   loadBuilderDocument,
   loadBuilderGlobalState,
   logRetrievalItems,
+  openSavedLesson,
   renameClassName,
   resolveRetrievalImages,
   saveCurrentLesson,
@@ -37,6 +39,8 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
     await importOriginal<typeof import("@/features/builder/api-client")>();
   return {
     ...original,
+    listSavedLessons: vi.fn().mockResolvedValue({ ok: true, lessons: [], totalByteSize: 0 }),
+    openSavedLesson: vi.fn(),
     loadBuilderDocument: vi.fn().mockResolvedValue(null),
     logRetrievalItems: vi.fn().mockResolvedValue([]),
     loadBuilderGlobalState: vi.fn().mockResolvedValue({
@@ -608,6 +612,66 @@ describe("BuilderShell Compact Console action parity", () => {
     await user.click(screen.getByRole("button", { name: "Cancel edit" }));
     expect(useBuilderStore.getState().document.slides[1]).toMatchObject({ lo: "Factorise one bracket" });
   });
+
+  it("keeps the edit on cancel, failed open, or leaving the library and starts fresh after reopening the same slide ID", async () => {
+    const user = userEvent.setup();
+    const snapshot = createInitialBuilderDocument("2026-07-18T06:00:00.000Z");
+    const lesson = {
+      id: "saved-example", title: "Saved example", className: "Year 7",
+      teachingDate: "2026-07-18", byteSize: 100, isTaught: false, taughtAt: "",
+      createdAt: snapshot.updatedAt, updatedAt: snapshot.updatedAt,
+    };
+    Object.assign(snapshot, {
+      title: lesson.title, className: lesson.className, teachingDate: lesson.teachingDate,
+      activeLessonId: lesson.id, activeLessonSavedAt: lesson.updatedAt,
+      lessonUpdatedAt: lesson.updatedAt,
+      slides: [{ id: "same-slide", type: "example", title: "Example", lo: "Original objective" }],
+    });
+    vi.mocked(loadBuilderDocument).mockResolvedValue(snapshot);
+    const library = { ok: true as const, lessons: [lesson], totalByteSize: 100 };
+    vi.mocked(listSavedLessons).mockResolvedValueOnce(library)
+      .mockResolvedValueOnce(library).mockResolvedValueOnce(library);
+    const reopened = {
+      lesson,
+      document: { ...snapshot, slides: [{ ...snapshot.slides[0], lo: "Reopened objective" }] },
+    };
+    let finishDownload!: (value: typeof reopened) => void;
+    const pendingDownload = new Promise<typeof reopened>((resolve) => { finishDownload = resolve; });
+    const fetchLesson = vi.mocked(openSavedLesson).mockReset()
+      .mockRejectedValueOnce(new Error("Download failed"))
+      .mockReturnValueOnce(pendingDownload)
+      .mockResolvedValueOnce(reopened);
+    render(
+      <AppNotificationsProvider>
+        <BuilderShell userEmail="teacher@example.com" variant="compact-console" />
+      </AppNotificationsProvider>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Edit slide" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Learning objective" }), {
+      target: { value: "Unsaved slide draft" },
+    });
+    await user.click(screen.getByRole("button", { name: /^Lessons$/ }));
+    const open = async () => {
+      await user.click(await screen.findByRole("button", { name: "Open lesson" }));
+      return screen.findByRole("dialog");
+    };
+    await user.click(within(await open()).getByRole("button", { name: "Keep current lesson" }));
+    expect(fetchLesson).not.toHaveBeenCalled();
+    await user.click(within(await open()).getByRole("button", { name: "Open lesson" }));
+    await screen.findByText("Download failed");
+    await user.click(screen.getByRole("button", { name: "Edit slide" }));
+    expect(screen.getByRole("textbox", { name: "Learning objective" })).toHaveValue("Unsaved slide draft");
+    await user.click(screen.getByRole("button", { name: /^Lessons$/ }));
+    await user.click(within(await open()).getByRole("button", { name: "Open lesson" }));
+    await user.click(screen.getByRole("button", { name: "Edit slide" }));
+    await act(async () => { finishDownload(reopened); });
+    expect(screen.getByRole("textbox", { name: "Learning objective" })).toHaveValue("Unsaved slide draft");
+    await user.click(screen.getByRole("button", { name: /^Lessons$/ }));
+    await user.click(within(await open()).getByRole("button", { name: "Open lesson" }));
+    await screen.findByText('Opened "Saved example" from the lesson library.');
+    await user.click(screen.getByRole("button", { name: "Edit slide" }));
+    expect(screen.getByRole("textbox", { name: "Learning objective" })).toHaveValue("Reopened objective");
+  }, 15000);
 
   it("offers in-place editing only for supported lesson content and opens the exact shared unit source", async () => {
     const user = userEvent.setup();

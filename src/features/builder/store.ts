@@ -52,6 +52,7 @@ export type BuilderStatus = {
 export type BuilderStore = {
   document: BuilderDocument;
   selectedSlideId: string | null;
+  editingSlideId: string | null;
   hydrated: boolean;
   status: BuilderStatus;
   hydrate: (document: unknown) => void;
@@ -66,6 +67,7 @@ export type BuilderStore = {
   refreshUnitOfWork: () => void;
   updateMetadata: (patch: MetadataPatch) => void;
   selectSlide: (slideId: string | null) => void;
+  setEditingSlideId: (slideId: string | null) => void;
   toggleHandoutSlide: (slideId: string) => void;
   addBlankSlide: () => void;
   addPlaceholderSlide: (text?: string) => void;
@@ -90,6 +92,7 @@ export const useBuilderStore = create<BuilderStore>()(
   immer((set, get) => ({
     document: createInitialBuilderDocument(),
     selectedSlideId: null,
+    editingSlideId: null,
     hydrated: false,
     status: idleStatus,
 
@@ -97,6 +100,7 @@ export const useBuilderStore = create<BuilderStore>()(
       set((state) => {
         state.document = normalizeBuilderDocument(input);
         state.selectedSlideId = null;
+        state.editingSlideId = null;
         state.hydrated = true;
         state.status = idleStatus;
       }),
@@ -122,6 +126,7 @@ export const useBuilderStore = create<BuilderStore>()(
           updatedAt: new Date().toISOString(),
         };
         state.selectedSlideId = null;
+        state.editingSlideId = null;
         state.status = {
           tone: "success",
           message: `Opened "${state.document.title}" from the lesson library.`,
@@ -190,6 +195,7 @@ export const useBuilderStore = create<BuilderStore>()(
         const unitsOfWork = state.document.unitsOfWork;
         state.document = { ...createInitialBuilderDocument(), unitsOfWork };
         state.selectedSlideId = null;
+        state.editingSlideId = null;
         state.hydrated = true;
         state.status = {
           tone: "success",
@@ -240,6 +246,8 @@ export const useBuilderStore = create<BuilderStore>()(
       set((state) => {
         state.selectedSlideId = slideId;
       }),
+
+    setEditingSlideId: (slideId) => set({ editingSlideId: slideId }),
 
     toggleHandoutSlide: (slideId) =>
       set((state) => {
@@ -373,6 +381,7 @@ export const useBuilderStore = create<BuilderStore>()(
         const index = state.document.slides.findIndex((slide) => slide.id === slideId);
         if (index < 0) return;
         state.document.slides.splice(index, 1);
+        if (state.editingSlideId === slideId) state.editingSlideId = null;
         state.document.handoutSlideIds = state.document.handoutSlideIds.filter(
           (id) => id !== slideId,
         );

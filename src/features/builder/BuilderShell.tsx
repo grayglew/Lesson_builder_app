@@ -207,9 +207,13 @@ function BuilderShellWorkspace({
   const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
-  const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
+  const editingSlideId = useBuilderStore((state) => state.editingSlideId);
+  const setEditingSlideId = useBuilderStore((state) => state.setEditingSlideId);
   const editingSlide = document.slides.find(slide => slide.id === editingSlideId);
   const editingStarter = editingSlide?.type === "starter" ? editingSlide : undefined;
+  const editingStarterPreview = editingStarter
+    ? previewSlides.find((slide) => slide.id === editingStarter.id)
+    : undefined;
   const unitEditor = useRef<UnitOfWorkEditorHandle>(null);
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
@@ -577,7 +581,6 @@ function BuilderShellWorkspace({
     });
     if (approved) {
       reset();
-      setEditingSlideId(null);
       setActiveTool("starter");
     }
   }
@@ -604,7 +607,6 @@ function BuilderShellWorkspace({
       };
 
       hydrate(savedDocument);
-      setEditingSlideId(null);
       setActiveTool("starter");
       setNewLessonDialogOpen(false);
 
@@ -953,7 +955,13 @@ function BuilderShellWorkspace({
           <h2 className={styles.srOnly} tabIndex={-1}>{toolLabels[activeTool]}</h2>
           {variant === "compact-console" ? <CompactWorkspaceTools activeTool={activeTool} onSelect={selectCompactTool} busy={Boolean(busyAction)} onNewLesson={() => setNewLessonDialogOpen(true)} /> : null}
           {activeTool === "starter" || editingStarter ? <div hidden={activeTool !== "starter"}>
-            <StarterComposer key={editingStarter?.id ?? "new-starter"} compact={variant === "compact-console"} editingSlide={editingStarter} onEndEdit={closeSlideEditor} />
+            <StarterComposer
+              key={editingStarter?.id ?? "new-starter"}
+              compact={variant === "compact-console"}
+              editingSlide={editingStarter}
+              previewSlide={editingStarterPreview}
+              onEndEdit={closeSlideEditor}
+            />
           </div> : null}
           <div hidden={activeTool !== "units"}>
             <div className={styles.toolPanel}><UnitOfWorkEditor ref={unitEditor} compact={variant === "compact-console"} /></div>

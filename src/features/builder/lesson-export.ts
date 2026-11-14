@@ -379,7 +379,7 @@ function renderStandaloneSlide(
             return `<article class="starter-cell">
             <span class="cell-number">${slotIndex + 1}</span>
             ${keySkillCode ? `<span class="starter-key-skill">${escapeHtml(keySkillCode)}</span>` : ""}
-            <div class="live-starter-image-host" data-live-image-host>
+            <div class="live-starter-image-host" data-live-image-host${slot.overrideQuestionImage === true ? " data-override-question-image" : ""}${slot.overrideAnswerImage === true ? " data-override-answer-image" : ""}>
               ${toggleableImage(
                 slot.image,
                 slot.answerImage,
@@ -565,7 +565,7 @@ function liveRetrievalControl(
   return `<div class="live-retrieval-controls" data-ignore-annotation>
     <button class="live-retrieval-button" type="button" aria-label="Seen +1" title="Seen +1" data-live-retrieval data-live-delta="1" ${attributes}>+1</button>
     <button class="live-retrieval-button" type="button" aria-label="Seen -1" title="Seen -1" data-live-retrieval data-live-delta="-1" ${attributes}>-1</button>
-    <button class="live-retrieval-button" type="button" aria-label="Next retrieval question" title="Next retrieval question" data-live-retrieval-next ${attributes}>&#8635;</button>
+    ${slot.overrideQuestionImage === true && slot.overrideAnswerImage === true ? "" : `<button class="live-retrieval-button" type="button" aria-label="Next retrieval question" title="Next retrieval question" data-live-retrieval-next ${attributes}>&#8635;</button>`}
   </div>`;
 }
 
@@ -1435,10 +1435,12 @@ function standaloneInteractionScript() {
     const host = cell?.querySelector("[data-live-image-host]");
     if (!host) return;
     const slotIndex = Number(button.dataset.liveSlotIndex || 0);
+    const question = host.querySelector(".qa-question-layer img") || host.querySelector(":scope > img");
+    const answer = host.querySelector(".qa-answer-layer img");
     host.replaceChildren(
       createLiveImageNode(
-        result.questionImage,
-        result.answerImage,
+        host.hasAttribute("data-override-question-image") ? (question ? { dataUrl: question.src } : null) : result.questionImage,
+        host.hasAttribute("data-override-answer-image") ? (answer ? { dataUrl: answer.src } : null) : result.answerImage,
         "starter-answer-" + Math.max(0, Math.min(3, Math.round(slotIndex))),
       ),
     );

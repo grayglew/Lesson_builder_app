@@ -17,9 +17,10 @@ const emptySlot = (): StarterSlot => ({
   answerImage: null,
 });
 
-export function StarterComposer({ compact = false, editingSlide, onEndEdit }: {
+export function StarterComposer({ compact = false, editingSlide, previewSlide, onEndEdit }: {
   compact?: boolean;
   editingSlide?: BuilderSlide;
+  previewSlide?: BuilderSlide;
   onEndEdit?: () => void;
 } = {}) {
   const document = useBuilderStore(selectDocument);
@@ -36,6 +37,8 @@ export function StarterComposer({ compact = false, editingSlide, onEndEdit }: {
   const [isLogging, setIsLogging] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const editingId = editingSlide?.id;
+  const originalSlots = Array.isArray(editingSlide?.slots) ? editingSlide.slots : [];
+  const previewSlots = Array.isArray(previewSlide?.slots) ? previewSlide.slots : [];
 
   useEffect(() => {
     if (!editingId) return;
@@ -227,7 +230,7 @@ export function StarterComposer({ compact = false, editingSlide, onEndEdit }: {
       ...slot,
       lo: slot.lo.trim(),
     }));
-    if (!prepared.some((slot) => slot.lo || slot.image)) {
+    if (!editingSlide && !prepared.some((slot) => slot.lo || slot.image)) {
       setStatus({
         tone: "error",
         message: "Add at least one learning objective or question image.",
@@ -272,22 +275,33 @@ export function StarterComposer({ compact = false, editingSlide, onEndEdit }: {
         <button type="button" className={styles.secondaryButton} onClick={onEndEdit}>Cancel edit</button>
       </div> : null}
 
-      <label className={styles.fieldLabel} htmlFor="v2-overall-lesson-lo">
-        Overall lesson LO
-      </label>
-      <textarea
-        id="v2-overall-lesson-lo"
-        className={`${styles.textArea} ${styles.overallLessonLo}`}
-        rows={2}
-        placeholder="Enter the main learning objective for the lesson"
-        value={document.overallLessonLo}
-        onChange={(event) =>
-          updateMetadata({ overallLessonLo: event.target.value })
-        }
-      />
+      {editingSlide ? (
+        <p>Image changes apply only to this slide, not the retrieval bank.</p>
+      ) : (
+        <>
+          <label className={styles.fieldLabel} htmlFor="v2-overall-lesson-lo">
+            Overall lesson LO
+          </label>
+          <textarea
+            id="v2-overall-lesson-lo"
+            className={`${styles.textArea} ${styles.overallLessonLo}`}
+            rows={2}
+            placeholder="Enter the main learning objective for the lesson"
+            value={document.overallLessonLo}
+            onChange={(event) =>
+              updateMetadata({ overallLessonLo: event.target.value })
+            }
+          />
+        </>
+      )}
 
       <div className={styles.starterEditorGrid}>
-        {slots.map((slot, index) => (
+        {slots.map((slot, index) => {
+          const original = originalSlots[index];
+          const preview = original && original.lo === slot.lo &&
+            (original.retrievalItemId ?? "") === slot.retrievalItemId &&
+            (original.currentImageSlot ?? 1) === slot.currentImageSlot ? previewSlots[index] : undefined;
+          return (
           <article
             key={index}
             className={styles.slotEditor}
@@ -298,7 +312,12 @@ export function StarterComposer({ compact = false, editingSlide, onEndEdit }: {
                 className={`${styles.miniButton} ${styles.clearSlotButton}`}
                 type="button"
                 aria-label={`Clear LO ${index + 1}`}
-                onClick={() => updateSlot(index, emptySlot())}
+                onClick={() => updateSlot(index, {
+                  ...emptySlot(),
+                  lockImageSlot: undefined,
+                  overrideQuestionImage: undefined,
+                  overrideAnswerImage: undefined,
+                })}
               >
                 <Trash2 className="size-3.5" aria-hidden />
               </button>
@@ -318,20 +337,27 @@ export function StarterComposer({ compact = false, editingSlide, onEndEdit }: {
             </label>
             <div className={styles.assetPairGrid}>
               <BuilderImageInput
-                asset={slot.image}
+                asset={!slot.overrideQuestionImage && !original?.overrideQuestionImage && (original?.image ?? null) === slot.image ? preview?.image ?? slot.image : slot.image}
                 label={`Question ${index + 1} image`}
-                onChange={(asset) => updateSlot(index, { image: asset })}
+                onChange={(asset) => updateSlot(index, {
+                  image: asset,
+                  ...(editingSlide ? { overrideQuestionImage: true } : {}),
+                })}
                 onError={(message) => setStatus({ tone: "error", message })}
               />
               <BuilderImageInput
-                asset={slot.answerImage}
+                asset={!slot.overrideAnswerImage && !original?.overrideAnswerImage && (original?.answerImage ?? null) === slot.answerImage ? preview?.answerImage ?? slot.answerImage : slot.answerImage}
                 label={`Answer ${index + 1} image`}
-                onChange={(asset) => updateSlot(index, { answerImage: asset })}
+                onChange={(asset) => updateSlot(index, {
+                  answerImage: asset,
+                  ...(editingSlide ? { overrideAnswerImage: true } : {}),
+                })}
                 onError={(message) => setStatus({ tone: "error", message })}
               />
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
 
       {!editingSlide ? <div className={styles.actionRow}>

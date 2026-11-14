@@ -42,14 +42,8 @@ export function hydrateStarterSlotsFromRetrievalItems(
             slot.retrievalItemId || item.id || "",
           ).trim(),
           currentImageSlot,
-          image:
-            usableAsset(item.images[currentImageSlot - 1]) ||
-            slot.image ||
-            null,
-          answerImage:
-            usableAsset(item.answerImages[currentImageSlot - 1]) ||
-            slot.answerImage ||
-            null,
+          image: resolveSlotImage(slot.image, item.images[currentImageSlot - 1], slot.overrideQuestionImage),
+          answerImage: resolveSlotImage(slot.answerImage, item.answerImages[currentImageSlot - 1], slot.overrideAnswerImage),
         };
       }),
     } as BuilderSlide;
@@ -78,7 +72,7 @@ export async function hydrateLiveStarterSlots(
         slot,
         hydrated.className,
       );
-      if (!item) return;
+      if (!item || (slot.overrideQuestionImage && slot.overrideAnswerImage)) return;
 
       references.push({ slideIndex, slotIndex, item });
       requests.push({
@@ -115,9 +109,8 @@ export async function hydrateLiveStarterSlots(
           slot.currentImageSlot ||
           reference.item.currentImageSlot ||
           1,
-        image: usableAsset(resolved.questionImage) || slot.image || null,
-        answerImage:
-          usableAsset(resolved.answerImage) || slot.answerImage || null,
+        image: resolveSlotImage(slot.image, resolved.questionImage, slot.overrideQuestionImage),
+        answerImage: resolveSlotImage(slot.answerImage, resolved.answerImage, slot.overrideAnswerImage),
       };
     });
   } catch {
@@ -125,6 +118,14 @@ export async function hydrateLiveStarterSlots(
   }
 
   return hydrated;
+}
+
+function resolveSlotImage(
+  saved: StarterSlot["image"],
+  bank: StarterSlot["image"],
+  override?: boolean,
+) {
+  return (override ? saved : usableAsset(bank) || saved) ?? null;
 }
 
 function starterSlots(slide: BuilderSlide): StarterSlot[] {
