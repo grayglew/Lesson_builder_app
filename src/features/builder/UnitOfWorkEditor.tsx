@@ -7,6 +7,7 @@ import { useBuilderStore } from "./store";
 import styles from "./UnitOfWorkEditor.module.css";
 import { UNIT_RESOURCE_GROUPS, emptyUnitResources, safeUnitResourceHref } from "./unit-resources";
 import { UnitResourceSlide } from "./UnitResourceSlide";
+import { useUnitAssociation } from "./UnitOfWorkSelector";
 
 function prepareDraft(unit: UnitOfWork): UnitOfWork {
   const draft = structuredClone(unit);
@@ -19,7 +20,7 @@ function emptyUnit(): UnitOfWork {
     slides: [{ id: createBuilderId("resource"), title: "Unit resources", bullets: [], resources: emptyUnitResources() }] };
 }
 
-export function UnitOfWorkEditor() {
+export function UnitOfWorkEditor({ compact = false }: { compact?: boolean } = {}) {
   const units = useBuilderStore(state => state.document.unitsOfWork);
   const saveUnit = useBuilderStore(state => state.saveUnitOfWork);
   const { confirmDialog } = useAppNotifications();
@@ -27,6 +28,9 @@ export function UnitOfWorkEditor() {
   const [baseline, setBaseline] = useState(() => JSON.stringify(draft));
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const association = useUnitAssociation();
+  const savedUnit = units.find(unit => unit.id === draft.id);
+  const isAttached = association.currentUnitId === draft.id;
 
   async function chooseUnit(id: string) {
     if (JSON.stringify(draft) !== baseline && !await confirmDialog({
@@ -66,6 +70,15 @@ export function UnitOfWorkEditor() {
           {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
         </select>
       </label>
+      {compact && savedUnit ? <div className={styles.attachmentRow}>
+        {isAttached ? <p className={styles.note}>Attached to this lesson · {savedUnit.slides.length} resource slide{savedUnit.slides.length === 1 ? "" : "s"}</p> : <>
+          <button type="button" disabled={association.busy} onClick={async () => {
+            if (await association.update(savedUnit.id)) setMessage(`Added ${savedUnit.slides.length} resource slide${savedUnit.slides.length === 1 ? "" : "s"} from ${savedUnit.name}.`);
+          }}>Attach to this lesson</button>
+          <p className={styles.note}>Uses the saved unit. Save any edits before attaching.</p>
+        </>}
+        {association.error ? <p role="alert" className={styles.error}>{association.error}</p> : null}
+      </div> : null}
       <form onSubmit={event => {
         event.preventDefault();
         try {

@@ -61,6 +61,7 @@ export type BuilderStore = {
   addBlankSlide: () => void;
   addPlaceholderSlide: (text?: string) => void;
   addStarterSlide: (slots: StarterSlot[]) => void;
+  updateStarterSlide: (id: string, slots: StarterSlot[]) => void;
   addSlides: (slides: BuilderSlide[]) => void;
   insertTemplateSlide: (template: SlideTemplate) => void;
   duplicateSlide: (slideId: string) => void;
@@ -275,6 +276,14 @@ export const useBuilderStore = create<BuilderStore>()(
           createdAt: new Date().toISOString(),
         };
         insertAfterSelection(state, slide);
+      }),
+
+    updateStarterSlide: (id, slots) =>
+      set((state) => {
+        const slide = state.document.slides.find(entry => entry.id === id && entry.type === "starter");
+        if (!slide) return;
+        slide.slots = clonePlain(slots).slice(0, 4);
+        touchDocument(state.document);
       }),
 
     addSlides: (slides) =>

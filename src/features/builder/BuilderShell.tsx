@@ -31,6 +31,7 @@ import {
   CompactDeckHeader,
   CompactMobileDock,
   CompactToolNavigation,
+  CompactWorkspaceTools,
   type CompactMobilePanel,
   type BuilderShellVariant,
   type BuilderThemePreference,
@@ -183,12 +184,15 @@ function BuilderShellWorkspace({
     useState<CompactMobilePanel>("build");
   const lessonDockButtonRef = useRef<HTMLButtonElement>(null);
   const deckDockButtonRef = useRef<HTMLButtonElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
   const [draggedSlideId, setDraggedSlideId] = useState("");
   const [dragOverSlideId, setDragOverSlideId] = useState("");
   const [busyAction, setBusyAction] = useState("");
   const [retrievalRefreshing, setRetrievalRefreshing] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Add lesson content here");
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
+  const [editingStarterId, setEditingStarterId] = useState<string | null>(null);
+  const editingStarter = document.slides.find(slide => slide.id === editingStarterId && slide.type === "starter");
   const lessonActions = useLessonExportActions();
   const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
   const lessonDrawerRef = useActiveDialogFocus<HTMLElement>(
@@ -196,12 +200,14 @@ function BuilderShellWorkspace({
     variant === "compact-console" &&
       compactMobileViewport &&
       compactMobilePanel === "lesson",
+    lessonDockButtonRef,
   );
   const deckDrawerRef = useActiveDialogFocus<HTMLElement>(
     () => setCompactMobilePanel("build"),
     variant === "compact-console" &&
       compactMobileViewport &&
       compactMobilePanel === "deck",
+    deckDockButtonRef,
   );
 
   const compactDrawerOpen =
@@ -325,10 +331,7 @@ function BuilderShellWorkspace({
             timestampValue(remote.updatedAt) >= timestampValue(current.updatedAt));
         if (shouldUseRemote) {
           hydrate(remote);
-          setStatus({
-            tone: "success",
-            message: "Loaded the latest workspace from Supabase.",
-          });
+          setStatus({ tone: "idle", message: "" });
         } else if (cached) {
           setStatus({
             tone: "warning",
@@ -599,6 +602,7 @@ function BuilderShellWorkspace({
         className={`${styles.appShell} ${
           previewCollapsed ? styles.previewCollapsed : ""
         } ${lessonRailCollapsed ? styles.lessonRailCollapsed : ""}`}
+        inert={newLessonDialogOpen || undefined}
       >
         {variant === "compact-console" ? (
           <CompactAppBar
@@ -795,14 +799,14 @@ function BuilderShellWorkspace({
               {busyAction === "save" ? "Saving..." : "Save"}
             </button>
             ) : null}
-            <button
+            {variant === "classic" ? <button
               className={`${styles.primaryButton} ${styles.compactButton}`}
               type="button"
               disabled={Boolean(busyAction)}
               onClick={() => setNewLessonDialogOpen(true)}
             >
               New lesson
-            </button>
+            </button> : null}
             <button
               className={`${styles.secondaryButton} ${styles.compactButton}`}
               type="button"
@@ -872,6 +876,7 @@ function BuilderShellWorkspace({
 
         <section
           className={styles.workspace}
+          ref={workspaceRef}
           aria-label={toolLabels[activeTool]}
           inert={compactDrawerOpen ? true : undefined}
         >
@@ -883,9 +888,12 @@ function BuilderShellWorkspace({
             }
           >
           <h2 className={styles.srOnly}>{toolLabels[activeTool]}</h2>
-          {activeTool === "starter" ? <StarterComposer /> : null}
+          {variant === "compact-console" ? <CompactWorkspaceTools activeTool={activeTool} onSelect={selectCompactTool} busy={Boolean(busyAction)} onNewLesson={() => setNewLessonDialogOpen(true)} /> : null}
+          {activeTool === "starter" || editingStarter ? <div hidden={activeTool !== "starter"}>
+            <StarterComposer key={editingStarter?.id ?? "new-starter"} compact={variant === "compact-console"} editingSlide={editingStarter} onEndEdit={() => setEditingStarterId(null)} />
+          </div> : null}
           <div hidden={activeTool !== "units"}>
-            <div className={styles.toolPanel}><UnitOfWorkEditor /></div>
+            <div className={styles.toolPanel}><UnitOfWorkEditor compact={variant === "compact-console"} /></div>
           </div>
           {activeTool === "saved-lessons" ? (
             <div className={styles.toolPanel}>
@@ -1145,6 +1153,7 @@ function BuilderShellWorkspace({
                       checked={document.handoutSlideIds.includes(slide.id)}
                       onChange={() => toggleHandoutSlide(slide.id)}
                     />
+                    {variant === "compact-console" ? <span>Handout</span> : null}
                   </label>
                   <button
                     className={styles.slideTitleButton}
@@ -1153,7 +1162,8 @@ function BuilderShellWorkspace({
                     aria-pressed={slide.id === selectedSlideId}
                     onClick={() => selectSlide(slide.id)}
                   >
-                    {index + 1}. {slide.title || slide.type}
+                    <span>{index + 1}. {slide.title || slide.type}</span>
+                    {variant === "compact-console" && slide.id === selectedSlideId ? <small className={styles.insertionBadge}>Insert after</small> : null}
                   </button>
                   <div
                     className={styles.slideActions}
@@ -1172,9 +1182,9 @@ function BuilderShellWorkspace({
                             </>
                           }
                         >
-                          <button type="button" disabled={index === 0} onClick={() => moveSlide(slide.id, -1)}>Move up</button>
-                          <button type="button" disabled={index === document.slides.length - 1} onClick={() => moveSlide(slide.id, 1)}>Move down</button>
-                          <button type="button" style={{ color: "#b42318" }} onClick={() => removeSlide(slide.id)}><Trash2 size={15} aria-hidden /> Delete slide</button>
+                          <button type="button" role="menuitem" disabled={index === 0} onClick={() => moveSlide(slide.id, -1)}>Move up</button>
+                          <button type="button" role="menuitem" disabled={index === document.slides.length - 1} onClick={() => moveSlide(slide.id, 1)}>Move down</button>
+                          <button type="button" role="menuitem" className={styles.menuDangerAction} onClick={() => removeSlide(slide.id)}><Trash2 size={15} aria-hidden /> Delete slide</button>
                       </BuilderActionMenu>
                     ) : (
                       <>
@@ -1207,6 +1217,11 @@ function BuilderShellWorkspace({
                       </>
                     )}
                   </div>
+                  {variant === "compact-console" && slide.type === "starter" ? <button type="button" className={styles.editStarterButton} onClick={() => {
+                    setEditingStarterId(slide.id);
+                    selectSlide(slide.id);
+                    selectCompactTool("starter");
+                  }}>Edit starter</button> : null}
                 </div>
                 <button
                   className={styles.slidePreviewButton}
@@ -1228,6 +1243,7 @@ function BuilderShellWorkspace({
               <button
                 className={styles.compactDrawerScrim}
                 type="button"
+                tabIndex={-1}
                 aria-label={`Dismiss ${compactMobilePanel} drawer`}
                 onClick={() => setCompactMobilePanel("build")}
               />
@@ -1235,9 +1251,15 @@ function BuilderShellWorkspace({
             <CompactMobileDock
               activePanel={compactMobilePanel}
               available={compactMobileViewport}
+              backgroundInert={compactDrawerOpen}
               lessonButtonRef={lessonDockButtonRef}
               deckButtonRef={deckDockButtonRef}
-              onSelect={setCompactMobilePanel}
+              onSelect={(panel) => {
+                if (panel === "build" && compactMobilePanel === "build") {
+                  workspaceRef.current?.scrollTo({ top: 0 });
+                }
+                setCompactMobilePanel(panel);
+              }}
             />
           </>
         ) : null}

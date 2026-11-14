@@ -113,3 +113,17 @@
     color: var(--builder-danger);
   }
 }
+
+@media (max-width: 1279px) {
+  :global([data-builder-variant="compact-console"]) .actions {
+    position: static;
+    justify-content: flex-end;
+    margin-top: .3rem;
+  }
+  :global([data-builder-variant="compact-console"]) .drawButton,
+  :global([data-builder-variant="compact-console"]) .removeButton {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}

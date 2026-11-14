@@ -71,12 +71,12 @@ export function NewLessonDialog({
           </button>
         </div>
 
-        <p id="new-lesson-description" className={styles.newLessonDescription}>
+        <form className={styles.newLessonForm} onSubmit={handleSubmit}>
+          <div className={styles.newLessonFields}>
+          <p id="new-lesson-description" className={styles.newLessonDescription}>
           Choose a title, class and teaching date, and optionally a unit. Your current workspace will
           only be replaced after the new lesson has saved successfully.
-        </p>
-
-        <form className={styles.newLessonForm} onSubmit={handleSubmit}>
+          </p>
           <label htmlFor="new-lesson-name">
             <span className={styles.fieldLabel}>Lesson title</span>
             <input
@@ -147,6 +147,7 @@ export function NewLessonDialog({
               onChange={event => setNewUnitName(event.target.value)} />
           </label> : null}
           {unitError && (unit.mode === "existing" || newUnitName.trim()) ? <p id="new-lesson-unit-error" role="alert" className={styles.newLessonUnitError}>{unitError}</p> : null}
+          </div>
 
           <div className={styles.newLessonActions}>
             <button

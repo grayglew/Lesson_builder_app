@@ -5,30 +5,39 @@ import { useAppNotifications } from "./AppNotifications";
 import { useBuilderStore } from "./store";
 import styles from "./UnitOfWorkEditor.module.css";
 
-export function UnitOfWorkSelector() {
-  const document = useBuilderStore(state => state.document);
+export function useUnitAssociation() {
+  const currentUnitId = useBuilderStore(state => state.document.unitOfWorkId);
   const associate = useBuilderStore(state => state.associateUnitOfWork);
   const refresh = useBuilderStore(state => state.refreshUnitOfWork);
   const { confirmDialog } = useAppNotifications();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const source = document.unitsOfWork.find(unit => unit.id === document.unitOfWorkId);
 
   async function update(id: string, refreshing = false) {
-    if (busy) return;
+    if (busy || (!refreshing && id === currentUnitId)) return false;
     setBusy(true);
     try {
-      if ((refreshing || document.unitOfWorkId) && !await confirmDialog({
+      if ((refreshing || currentUnitId) && !await confirmDialog({
         title: refreshing ? "Update unit resource slides?" : "Change the lesson unit?",
         description: "This replaces this lesson’s linked unit slides, including local edits and annotations on those slides. Other lesson slides and detached copies are kept.",
         confirmLabel: refreshing ? "Update unit slides" : "Change unit", tone: "warning",
-      })) return;
+      })) return false;
       if (refreshing) refresh(); else associate(id);
       setError("");
+      return true;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Could not update the unit slides.");
+      return false;
     } finally { setBusy(false); }
   }
+
+  return { currentUnitId, update, busy, error };
+}
+
+export function UnitOfWorkSelector() {
+  const document = useBuilderStore(state => state.document);
+  const { update, busy, error } = useUnitAssociation();
+  const source = document.unitsOfWork.find(unit => unit.id === document.unitOfWorkId);
 
   return (
     <div className={styles.selector}>
@@ -38,6 +47,7 @@ export function UnitOfWorkSelector() {
           {document.unitOfWorkId && !source ? <option value={document.unitOfWorkId}>{document.unitOfWorkName || "Saved unit"} (source unavailable)</option> : null}
           {document.unitsOfWork.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
         </select>
+      {document.unitsOfWork.length ? <p className={styles.note}>Choosing a unit adds its resource slides to this deck.</p> : null}
       {source && source.updatedAt !== document.unitOfWorkVersion ? (
         <button type="button" disabled={busy} onClick={() => void update(source.id, true)}>Update unit slides</button>
       ) : null}

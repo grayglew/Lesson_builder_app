@@ -180,8 +180,9 @@ function buildStudentSnapshotHtml() {
     node.removeAttribute("draggable");
     node.removeAttribute("usemap");
     node.removeAttribute("ismap");
+    node.removeAttribute("tabindex");
+    node.removeAttribute("aria-current");
     if (!node.hasAttribute("data-student-qa-toggle")) {
-      node.removeAttribute("tabindex");
       if (node.getAttribute("role") === "button") node.removeAttribute("role");
     }
   });

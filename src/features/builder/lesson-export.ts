@@ -16,6 +16,7 @@ import { normalizeBuilderDocument } from "./schema";
 import { renderStaticAnnotationSvg } from "./static-annotations";
 import { extractRetrievalLoCode } from "./example";
 import { studentSnapshotRuntimeSource } from "./student-snapshot-runtime";
+import { TABLET_PRESENTER_CSS } from "../presenter/tablet-styles";
 
 export type StandaloneLessonOptions = {
   runtimeCss?: string;
@@ -51,6 +52,29 @@ export type StandaloneLessonOptions = {
   } | null;
 };
 
+const presenterIcons = {
+  previous: '<path d="m15 18-6-6 6-6"/>',
+  next: '<path d="m9 18 6-6-6-6"/>',
+  pan: '<path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3m14-6 3 3-3 3"/>',
+  pen: '<path d="m13 6 5 5M4 20l4.5-1 11-11a2 2 0 0 0-4-4l-11 11L4 20Z"/>',
+  highlighter: '<path d="m9 11 4 4m-8 3-2 3m3-4 4 4 3-3v-3l7-7-4-4-7 7H6l-3 3 3 3Z"/>',
+  erase: '<path d="m6 11 8 8m-4 0-6-6a2 2 0 0 1 0-3l6-6a2 2 0 0 1 3 0l7 7a2 2 0 0 1 0 3l-5 5H10Zm5 0h6"/>',
+  undo: '<path d="M9 6l-5 5 5 5m-5-5h10a5 5 0 0 1 0 10"/>',
+  zoom: '<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5m-13-10h6m-3-3v6"/>',
+  fit: '<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M9 12h6"/>',
+  full: '<path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/>',
+  exitFull: '<path d="M4 9h5V4m11 5h-5V4M4 15h5v5m11-5h-5v5"/>',
+  ink: '<path d="M12 3c2 3 6 7 6 11a6 6 0 1 1-12 0c0-4 4-8 6-11Z"/>',
+  save: '<path d="M5 3h12l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M7 3v6h9V3M7 21v-8h10v8"/>',
+  student: '<path d="M3 12V5h18v7M8 21h8m-4-4v4M3 16h18m-9-2V8m-3 3 3-3 3 3"/>',
+  busy: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+};
+
+function presenterIcon(icon: keyof typeof presenterIcons, state = "") {
+  return `<span class="presenter-tool-icon ${state}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">${presenterIcons[icon]}</svg></span>`;
+}
+
 export function buildStandaloneLessonHtml(
   document: BuilderDocument,
   options: StandaloneLessonOptions = {},
@@ -77,6 +101,20 @@ export function buildStandaloneLessonHtml(
     .join("");
   const title = escapeHtml(document.title || "Lesson");
   const handoutClass = options.handout ? " handout-mode" : "";
+  const classroom = Boolean(presenterConfig && !options.handout);
+  const studentCode = '<button id="presenter-student-code" class="presenter-student-code" type="button" aria-pressed="false" hidden></button>';
+  const sessionTool = (id: string, label: string, description: string, icon: "save" | "student", offlineLabel: string) =>
+    `<button id="presenter-${id}" class="presenter-tool${classroom ? " presenter-session-tool" : icon === "save" ? " primary" : ""}" type="button" hidden${classroom ? ` aria-label="${label}" title="${description}"` : ""}>${classroom ? presenterIcon(icon, "presenter-idle-icon") + presenterIcon("busy", "presenter-busy-icon") : offlineLabel}</button>`;
+  const saveTaught = sessionTool("save-builder", "Save to Builder", "Save to Builder (taught copy)", "save", "Save to Builder");
+  const publishStudent = sessionTool("student-upload", "Update student view", "Update student view", "student", "Upload");
+  const swatches = `<div class="presenter-colors" aria-label="Pen colours" role="group">
+    <button class="presenter-color" type="button" aria-label="Black pen colour" title="Black" data-presenter-color data-color="#111827" style="--swatch-color:#111827"></button>
+    <button class="presenter-color is-active" type="button" aria-label="Blue pen colour" title="Blue" data-presenter-color data-color="#2563eb" style="--swatch-color:#2563eb"></button>
+    <button class="presenter-color" type="button" aria-label="Red pen colour" title="Red" data-presenter-color data-color="#dc2626" style="--swatch-color:#dc2626"></button>
+    <button class="presenter-color" type="button" aria-label="Green pen colour" title="Green" data-presenter-color data-color="#16a34a" style="--swatch-color:#16a34a"></button>
+  </div>`;
+  const tool = (id: string, label: string, icon: keyof typeof presenterIcons, active?: boolean) =>
+    `<button id="presenter-${id}" class="presenter-tool${active ? " is-active" : ""}" type="button"${active === undefined ? "" : ` aria-pressed="${active}"`}>${classroom ? `<span class="presenter-tool-label">${label}</span>${presenterIcon(icon)}` : label}</button>`;
   const annotations = Object.fromEntries(
     document.slides.flatMap((slide, index) => {
       const slideAnnotations = Array.isArray(slide.annotations)
@@ -94,47 +132,82 @@ export function buildStandaloneLessonHtml(
 <title>${title}</title>
 <style data-lesson-builder-style>${standaloneLessonCss()}${options.runtimeCss || ""}</style>
 </head>
-<body class="annotation-pan${handoutClass}">
+<body class="annotation-pan${handoutClass}${classroom ? " presenter-classroom" : ""}">
 <header class="lesson-header">
   <div><span>${escapeHtml(document.className || "Class")}</span><h1>${title}</h1></div>
   <div>${escapeHtml(document.teachingDate || "")}</div>
 </header>
-<main class="lesson-deck" aria-label="Lesson slides">
+<section class="presenter-tools" ${classroom ? 'aria-label="Presenter controls"' : 'aria-label="Presenter tools" role="toolbar"'}>
+  ${classroom ? `
+    <div class="presenter-pager" role="group" aria-label="Slide navigation">
+      <button id="presenter-previous" class="presenter-tool" type="button" aria-label="Previous slide" title="Previous slide">${presenterIcon("previous")}</button>
+      <div id="presenter-slide-position" aria-live="polite" aria-atomic="true"></div>
+      <button id="presenter-next" class="presenter-tool" type="button" aria-label="Next slide" title="Next slide">${presenterIcon("next")}</button>
+    </div>` : ""}
+  <div class="presenter-command-row">
+  <div class="presenter-modes" role="group" aria-label="Annotation mode">
+  ${tool("pan", "Pan", "pan", true)}
+  ${tool("pen", "Pen", "pen", false)}
+  ${tool("highlighter", "Highlighter", "highlighter", false)}
+  ${tool("eraser", "Erase", "erase", false)}
+  </div>
+  ${classroom ? swatches : ""}
+  <div class="presenter-disclosure">
+  ${classroom ? `<button class="presenter-tool presenter-ink-trigger" type="button" aria-label="Ink settings" title="Ink settings" aria-expanded="false" aria-controls="presenter-ink">${presenterIcon("ink")}</button>` : ""}
+  <div id="presenter-ink" class="presenter-popover presenter-ink" ${classroom ? "hidden" : ""}>
+  ${classroom ? "" : swatches}
+  <button id="presenter-color-picker" class="presenter-tool presenter-color-picker" type="button" aria-label="Choose a custom pen colour">${classroom ? "Custom colour" : "Pick"}</button>
+  <input id="presenter-custom-color" class="presenter-custom-color" type="color" value="#2563eb" aria-hidden="true" tabindex="-1">
+  <input id="presenter-color" type="hidden" value="#2563eb">
+  ${classroom ? '<label class="presenter-size-label" for="presenter-size">Stroke size</label>' : ""}
+  <input id="presenter-size" class="presenter-size" type="range" min="0.5" max="4" step="0.5" value="2" aria-label="Stroke size">
+  ${classroom ? '<div id="presenter-compact-ink-tools"></div>' : ""}
+  </div>
+  </div>
+  ${tool("undo", "Undo", "undo")}
+  ${classroom ? `<div class="presenter-lesson-title" title="${escapeAttr(document.title || "Lesson")}">${title}</div>` : ""}
+  <div class="presenter-view-tools" role="group" aria-label="Slide view">
+  <button id="presenter-zoom" class="presenter-tool" type="button" aria-label="Zoom in 60 percent" title="Zoom in 60 percent" aria-pressed="false">${classroom ? presenterIcon("zoom", "presenter-off-icon") + presenterIcon("fit", "presenter-on-icon") : "60%"}</button>
+  <button id="presenter-fullscreen" class="presenter-tool" type="button" aria-label="${classroom ? "Enter full screen" : "Toggle full screen"}" title="Enter full screen" aria-pressed="false">${classroom ? presenterIcon("full", "presenter-off-icon") + presenterIcon("exitFull", "presenter-on-icon") : "Full"}</button>
+  </div>
+  ${classroom ? `${saveTaught}${publishStudent}<div class="presenter-code-slot">${studentCode}</div>` : ""}
+  <div class="presenter-disclosure presenter-lesson-actions">
+  ${classroom ? `<button class="presenter-tool" type="button" aria-label="Lesson actions" title="Lesson actions" aria-expanded="false" aria-controls="presenter-actions">${presenterIcon("more")}</button>` : ""}
+  <div id="presenter-actions" class="presenter-popover presenter-actions" ${classroom ? "hidden" : ""}>
+  ${classroom ? `<div class="presenter-action-heading presenter-menu-title" title="${escapeAttr(document.title || "Lesson")}">${title}</div>` : ""}
+  <div class="presenter-action-group" role="group" aria-label="Insert slide">
+  ${classroom ? '<div class="presenter-action-heading" aria-hidden="true">Insert slide</div>' : ""}
+  <button id="presenter-blank-slide" class="presenter-tool" type="button" aria-label="Add blank slide">${classroom ? "Add blank slide" : "+"}</button>
+  <button id="presenter-camera" class="presenter-tool" type="button" aria-label="${classroom ? "Add photo to slide" : "Take a photo and add it as a slide"}">${classroom ? "Add photo" : "Camera"}</button>
+  <input id="presenter-camera-input" class="presenter-camera-input" type="file" accept="image/*" capture="environment" aria-hidden="true" tabindex="-1">
+  </div>
+  <div class="presenter-action-group" role="group" aria-label="Classroom">
+  ${classroom ? '<div class="presenter-action-heading" aria-hidden="true">Classroom</div>' : ""}
+  <button id="presenter-poll" class="presenter-tool" type="button" hidden>${classroom ? "Confidence poll" : "Poll"}</button>
+  ${classroom ? "" : saveTaught + publishStudent}
+  </div>
+  ${classroom ? '<div class="presenter-action-group presenter-compact-view" role="group" aria-label="View"><div class="presenter-action-heading" aria-hidden="true">View</div><button id="presenter-fullscreen-compact" class="presenter-tool" type="button" aria-pressed="false">Enter full screen</button></div>' : ""}
+  <div class="presenter-action-group" role="group" aria-label="Export">
+  ${classroom ? '<div class="presenter-action-heading" aria-hidden="true">Export</div>' : ""}
+  <button id="presenter-download" class="presenter-tool" type="button" aria-label="Download annotated HTML" title="Download annotated HTML">${classroom ? "Download annotated HTML" : "&#x2B07;"}</button>
+  <button id="presenter-pdf" class="presenter-tool" type="button" aria-label="${classroom ? "Print / save PDF (open print view)" : "Open print view"}" title="Open print view">${classroom ? "Print / save PDF" : '<span class="presenter-tool-icon presenter-print-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/></svg></span>'}</button>
+  </div>
+  <div class="presenter-action-group" role="group" aria-label="Annotations">
+  ${classroom ? '<div class="presenter-action-heading" aria-hidden="true">Annotations</div>' : ""}
+  <button id="presenter-clear" class="presenter-tool" type="button">${classroom ? "Clear all ink" : "Clear"}</button>
+  </div>
+  </div>
+  </div>
+  </div>
+</section>
+<main class="lesson-deck" aria-label="Lesson slides"${classroom ? ' tabindex="0"' : ""}>
   ${slides || '<section class="lesson-slide empty-slide" aria-label="Empty lesson"><p>No slides exported.</p></section>'}
 </main>
-<nav class="presenter-tools" aria-label="Presenter tools" role="toolbar">
-  <button id="presenter-pan" class="presenter-tool is-active" type="button" aria-pressed="true">Pan</button>
-  <button id="presenter-pen" class="presenter-tool" type="button" aria-pressed="false">Pen</button>
-  <button id="presenter-highlighter" class="presenter-tool" type="button" aria-pressed="false">Highlighter</button>
-  <button id="presenter-eraser" class="presenter-tool" type="button" aria-pressed="false">Erase</button>
-  <button id="presenter-blank-slide" class="presenter-tool" type="button" aria-label="Add blank slide">+</button>
-  <button id="presenter-camera" class="presenter-tool" type="button" aria-label="Take a photo and add it as a slide">Camera</button>
-  <input id="presenter-camera-input" class="presenter-camera-input" type="file" accept="image/*" capture="environment" aria-label="Take a photo">
-  <button id="presenter-poll" class="presenter-tool primary" type="button" hidden>Poll</button>
-  <button id="presenter-zoom" class="presenter-tool" type="button" aria-label="Zoom in 60 percent" aria-pressed="false">60%</button>
-  <button id="presenter-fullscreen" class="presenter-tool" type="button" aria-label="Toggle full screen" aria-pressed="false">Full</button>
-  <div class="presenter-colors" aria-label="Pen colours" role="group">
-    <button class="presenter-color" type="button" aria-label="Black pen colour" data-presenter-color data-color="#111827" style="--swatch-color:#111827"></button>
-    <button class="presenter-color is-active" type="button" aria-label="Blue pen colour" data-presenter-color data-color="#2563eb" style="--swatch-color:#2563eb"></button>
-    <button class="presenter-color" type="button" aria-label="Red pen colour" data-presenter-color data-color="#dc2626" style="--swatch-color:#dc2626"></button>
-    <button class="presenter-color" type="button" aria-label="Green pen colour" data-presenter-color data-color="#16a34a" style="--swatch-color:#16a34a"></button>
-  </div>
-  <button id="presenter-color-picker" class="presenter-tool presenter-color-picker" type="button" aria-label="Choose a custom pen colour">Pick</button>
-  <input id="presenter-custom-color" class="presenter-custom-color" type="color" value="#2563eb" aria-label="Custom pen colour" tabindex="-1">
-  <input id="presenter-color" type="hidden" value="#2563eb">
-  <input id="presenter-size" class="presenter-size" type="range" min="0.5" max="4" step="0.5" value="2" aria-label="Stroke size">
-  <button id="presenter-undo" class="presenter-tool" type="button">Undo</button>
-  <button id="presenter-clear" class="presenter-tool" type="button">Clear</button>
-  <button id="presenter-save-builder" class="presenter-tool primary" type="button" hidden>Save to Builder</button>
-  <button id="presenter-student-upload" class="presenter-tool primary" type="button" hidden>Upload</button>
-  <button id="presenter-download" class="presenter-tool primary" type="button" aria-label="Download annotated HTML" title="Download annotated HTML">&#x2B07;</button>
-  <button id="presenter-pdf" class="presenter-tool primary" type="button" aria-label="Open print view" title="Open print view"><span class="presenter-tool-icon presenter-print-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/><path d="M17 12h.01"/></svg></span></button>
-</nav>
 ${options.offlineCapabilities ? `<details class="presenter-capability-note" open>
   <summary>Offline copy</summary>
   <p>Drawing, reveal, print and local download still work. Save to Builder, Poll and live retrieval require the hosted presenter. Open the saved lesson and choose Present to use them.</p>
 </details>` : ""}
-<button id="presenter-student-code" class="presenter-student-code" type="button" aria-pressed="false" hidden></button>
+${classroom ? "" : studentCode}
 <span id="presenter-student-code-status" role="status" aria-live="polite"></span>
 <script type="application/json" id="lesson-builder-state">${escapeJsonForHtml(JSON.stringify(document))}</script>
 <script type="application/json" id="lesson-live-retrieval">${escapeJsonForHtml(JSON.stringify(liveRetrieval))}</script>
@@ -552,6 +625,7 @@ body.focus-mode .lesson-header,body.fullscreen-mode .lesson-header{display:none}
 @media (max-width:560px){.presenter-dialog-backdrop{align-items:end;padding:12px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @page{size:16in 10in;margin:0}@media print{.lesson-header,.presenter-tools,.presenter-capability-note{display:none!important}body:not(.handout-mode) .lesson-deck{display:block;padding:0!important;scroll-padding:0!important}.lesson-slide{display:block!important;width:16in;height:10in;aspect-ratio:auto;border:0;box-shadow:none;break-after:page;page-break-after:always}.handout-mode .lesson-deck{display:grid;grid-template-columns:1fr 1fr;gap:6mm;padding:8mm}.handout-mode .lesson-slide{width:100%;height:auto;aspect-ratio:16/10;border:1px solid #555;break-after:auto;page-break-after:auto}}
+${TABLET_PRESENTER_CSS}
 `;
 }
 
@@ -563,14 +637,25 @@ function standaloneInteractionScript() {
   let zoomScale = 1;
   let activePinchZoom = null;
   const deck = document.querySelector(".lesson-deck");
+  const classroom = document.body.classList.contains("presenter-classroom");
+  const previousSlide = document.getElementById("presenter-previous");
+  const nextSlide = document.getElementById("presenter-next");
+  const slidePosition = document.getElementById("presenter-slide-position");
+  let displayedSlide = 0;
+  let navigationFrame = 0;
+  let layoutFrame = 0;
+  let classroomFocus = false;
+  const slideTabStops = new WeakMap();
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
   const zoomButton = document.getElementById("presenter-zoom");
   const fullscreenButton = document.getElementById("presenter-fullscreen");
+  const compactFullscreenButton = document.getElementById("presenter-fullscreen-compact");
   const cameraInput = document.getElementById("presenter-camera-input");
   const cameraButton = document.getElementById("presenter-camera");
   const pdfButton = document.getElementById("presenter-pdf");
   const pollButton = document.getElementById("presenter-poll");
   const saveBuilderButton = document.getElementById("presenter-save-builder");
+  const saveBuilderLabel = saveBuilderButton?.innerHTML || "";
   const studentUploadButton = document.getElementById("presenter-student-upload");
   const studentCodeBadge = document.getElementById("presenter-student-code");
   const builderStateElement = document.getElementById("lesson-builder-state");
@@ -582,6 +667,7 @@ function standaloneInteractionScript() {
   const confidencePoll = {
     counts: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
     completedAt: "",
+    locked: false,
   };
   const presenterNotifications = createPresenterNotifications();
   window.__lessonPresenterNotifications = presenterNotifications;
@@ -593,10 +679,22 @@ function standaloneInteractionScript() {
       if (studentUploadButton) studentUploadButton.hidden = false;
       if (studentCodeBadge) {
         studentCodeBadge.hidden = false;
-        studentCodeBadge.textContent =
-          "Student code: " + (presenterConfig.studentSession.code || "");
+        const code = presenterConfig.studentSession.code || "";
+        const codeLabel = "Student code: " + code;
+        if (classroom) {
+          const label = document.createElement("span");
+          const value = document.createElement("strong");
+          const hint = document.createElement("small");
+          label.textContent = "Student code";
+          value.textContent = code;
+          hint.textContent = "Tap to shrink · Esc";
+          studentCodeBadge.replaceChildren(label, value, hint);
+          studentCodeBadge.setAttribute("aria-label", codeLabel);
+        } else {
+          studentCodeBadge.textContent = codeLabel;
+        }
         const studentCodeStatus = document.getElementById("presenter-student-code-status");
-        if (studentCodeStatus) studentCodeStatus.textContent = studentCodeBadge.textContent;
+        if (studentCodeStatus) studentCodeStatus.textContent = codeLabel;
         studentCodeBadge.setAttribute("aria-pressed", "false");
         studentCodeBadge.addEventListener("click", () => {
           studentCodeBadge.setAttribute(
@@ -755,7 +853,12 @@ function standaloneInteractionScript() {
     slides = Array.from(document.querySelectorAll(".lesson-slide"));
     slides.forEach((slide, index) => {
       slide.setAttribute("data-annotation-slide", String(index));
-      if (!slide.getAttribute("aria-label")) {
+      if (classroom) {
+        const existing = slide.getAttribute("aria-label")?.replace(/^Slide \d+:\s*/, "");
+        const generated = { blank: "Blank slide", drawing: "Photo", "confidence-poll": "Confidence poll" };
+        const label = "Slide " + (index + 1) + ": " + (existing || generated[slide.dataset.builderSlideType] || "Slide");
+        if (slide.getAttribute("aria-label") !== label) slide.setAttribute("aria-label", label);
+      } else if (!slide.getAttribute("aria-label")) {
         slide.setAttribute("aria-label", "Slide " + (index + 1));
       }
     });
@@ -771,6 +874,25 @@ function standaloneInteractionScript() {
 
   function currentSlideIndex() {
     refreshSlides();
+    return classroom ? displayedSlide : visibleSlideIndex();
+  }
+
+  function visibleSlideIndex() {
+    if (classroom) {
+      const deckBottom = deck?.getBoundingClientRect().bottom || window.innerHeight;
+      const barBottom = document.querySelector(".presenter-tools")?.getBoundingClientRect().bottom || 0;
+      let best = 0;
+      let visibleHeight = -1;
+      slides.forEach((slide, index) => {
+        const rect = slide.getBoundingClientRect();
+        const overlap = Math.min(deckBottom, rect.bottom) - Math.max(barBottom, rect.top);
+        if (overlap > visibleHeight) {
+          best = index;
+          visibleHeight = overlap;
+        }
+      });
+      return visibleHeight > 0 ? best : Math.min(displayedSlide, slides.length - 1);
+    }
     const centerX = window.innerWidth / 2;
     const centerY = window.innerHeight / 2;
     let bestIndex = 0;
@@ -785,6 +907,87 @@ function standaloneInteractionScript() {
       }
     });
     return bestIndex;
+  }
+
+  function updateSlideNavigation(index = visibleSlideIndex()) {
+    if (!slidePosition || !slides[index]) return;
+    displayedSlide = index;
+    const title = slides[index].getAttribute("aria-label")?.replace(/^Slide \d+:\s*/, "") || "Slide";
+    const count = (index + 1) + " / " + slides.length;
+    if (slidePosition.firstElementChild?.textContent !== count || slidePosition.lastElementChild?.textContent !== title) {
+      const position = document.createElement("span");
+      const name = document.createElement("strong");
+      position.textContent = count;
+      name.textContent = title;
+      slidePosition.replaceChildren(position, name);
+    }
+    previousSlide?.setAttribute("aria-disabled", String(index === 0));
+    nextSlide?.setAttribute("aria-disabled", String(index >= slides.length - 1));
+    slides.forEach((slide, i) => {
+      if (i === index) slide.setAttribute("aria-current", "true");
+      else slide.removeAttribute("aria-current");
+      slide.querySelectorAll("a[href],button,input,select,textarea,summary,[tabindex]").forEach((element) => {
+        if (i === index && slideTabStops.has(element)) {
+          const original = slideTabStops.get(element);
+          if (original === null) element.removeAttribute("tabindex");
+          else element.setAttribute("tabindex", original);
+          slideTabStops.delete(element);
+        } else if (i !== index && element.tabIndex >= 0 && !slideTabStops.has(element)) {
+          slideTabStops.set(element, element.getAttribute("tabindex"));
+          element.tabIndex = -1;
+        }
+      });
+    });
+  }
+
+  function showSlide(index) {
+    const slide = slides[index];
+    if (!slide) return;
+    if (classroom && deck) {
+      const style = getComputedStyle(document.documentElement);
+      const padding = parseFloat(style.getPropertyValue("--presenter-toolbar-space")) || 0;
+      const edge = parseFloat(style.getPropertyValue("--presenter-edge-space")) || 0;
+      const margin = parseFloat(getComputedStyle(slide).marginTop) || 0;
+      const slideBounds = slide.getBoundingClientRect();
+      const deckBounds = deck.getBoundingClientRect();
+      deck.scrollTo({
+        top: deck.scrollTop + slideBounds.top - deckBounds.top - padding - margin,
+        left: zoomScale > 1 ? deck.scrollLeft + slideBounds.left - deckBounds.left - edge : 0,
+        behavior: "instant",
+      });
+    } else {
+      slide.scrollIntoView({ block: "start", inline: "start", behavior: "instant" });
+    }
+    updateSlideNavigation(index);
+  }
+
+  function refreshAnswerLabel(toggle) {
+    const showing = toggle.classList.contains("is-showing-answer");
+    const label = toggle.querySelector("[data-qa-toggle-label]");
+    if (label) {
+      const action = showing ? "Hide answer" : "Show answer";
+      label.textContent = classroom ? action : (showing ? "Answer" : "Question");
+      if (classroom) {
+        label.title = action;
+        const imageLabel = toggle.querySelector(".qa-question-layer img")?.alt;
+        toggle.setAttribute("aria-label", imageLabel ? "Answer: " + imageLabel : "Answer");
+      }
+    }
+  }
+
+  function reflowPresentation() {
+    if (!classroom) {
+      updatePresentationLayout();
+      return;
+    }
+    if (layoutFrame) return;
+    if (navigationFrame) cancelAnimationFrame(navigationFrame);
+    navigationFrame = 0;
+    layoutFrame = requestAnimationFrame(() => {
+      updatePresentationLayout();
+      showSlide(displayedSlide);
+      layoutFrame = requestAnimationFrame(() => { layoutFrame = 0; });
+    });
   }
 
   function updatePresentationLayout() {
@@ -816,7 +1019,9 @@ function standaloneInteractionScript() {
   }
 
   function setZoom(nextScale, anchor = null) {
-    const index = currentSlideIndex();
+    const currentIndex = currentSlideIndex();
+    const anchorIndex = anchor?.slide ? slides.indexOf(anchor.slide) : -1;
+    const index = classroom && anchorIndex >= 0 ? anchorIndex : currentIndex;
     const numericScale = Number(nextScale);
     zoomScale = Number.isFinite(numericScale)
       ? Math.max(1, Math.min(3, numericScale))
@@ -827,19 +1032,23 @@ function standaloneInteractionScript() {
       document.body.classList.add("focus-mode");
       window.__lessonPresenterRuntimeController?.setMode("pan");
     }
+    if (classroom) document.body.classList.toggle("focus-mode", classroomFocus || zoomScale > 1);
     zoomButton?.classList.toggle("is-active", zoomScale > 1);
     zoomButton?.setAttribute("aria-pressed", String(zoomScale > 1));
     if (zoomButton) {
-      zoomButton.textContent = zoomScale > 1 ? "Fit" : "60%";
+      if (!classroom) zoomButton.textContent = zoomScale > 1 ? "Fit" : "60%";
       zoomButton.setAttribute("aria-label", zoomScale > 1 ? "Fit slide to screen" : "Zoom in 60 percent");
+      zoomButton.title = zoomButton.getAttribute("aria-label");
     }
     updatePresentationLayout();
     if (anchor?.slide && deck) {
       const rect = anchor.slide.getBoundingClientRect();
       deck.scrollLeft += rect.left + rect.width * anchor.xRatio - anchor.clientX;
       deck.scrollTop += rect.top + rect.height * anchor.yRatio - anchor.clientY;
+      if (classroom) updateSlideNavigation(index);
     } else {
-      slides[index]?.scrollIntoView({ block: "center", inline: "center" });
+      if (classroom) showSlide(index);
+      else slides[index]?.scrollIntoView({ block: "center", inline: "center" });
     }
   }
 
@@ -869,20 +1078,32 @@ function standaloneInteractionScript() {
   function updateFullscreenUi() {
     const isFullscreen = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
     document.body.classList.toggle("fullscreen-mode", isFullscreen);
-    const presentationMode = isFullscreen || document.body.classList.contains("focus-mode");
+    const presentationMode = isFullscreen || (classroom ? classroomFocus : document.body.classList.contains("focus-mode"));
     fullscreenButton?.classList.toggle("is-active", presentationMode);
     fullscreenButton?.setAttribute("aria-pressed", String(presentationMode));
     if (fullscreenButton) {
-      fullscreenButton.textContent = presentationMode ? "Exit" : "Full";
+      if (!classroom) fullscreenButton.textContent = presentationMode ? "Exit" : "Full";
       fullscreenButton.setAttribute("aria-label", presentationMode ? "Exit full screen" : "Enter full screen");
+      fullscreenButton.title = fullscreenButton.getAttribute("aria-label");
     }
-    updatePresentationLayout();
+    if (compactFullscreenButton) {
+      compactFullscreenButton.textContent = presentationMode ? "Exit full screen" : "Enter full screen";
+      compactFullscreenButton.setAttribute("aria-pressed", String(presentationMode));
+    }
+    reflowPresentation();
   }
 
   async function toggleFullscreen() {
     if (document.fullscreenElement || document.webkitFullscreenElement) {
       await (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
-      document.body.classList.remove("focus-mode");
+      classroomFocus = false;
+      document.body.classList.toggle("focus-mode", classroom && zoomScale > 1);
+      updateFullscreenUi();
+      return;
+    }
+    if (classroom && classroomFocus) {
+      classroomFocus = false;
+      document.body.classList.toggle("focus-mode", zoomScale > 1);
       updateFullscreenUi();
       return;
     }
@@ -891,12 +1112,19 @@ function standaloneInteractionScript() {
       try {
         await request.call(document.documentElement);
       } catch {
-        document.body.classList.toggle("focus-mode");
+        toggleFocusView();
       }
     } else {
-      document.body.classList.toggle("focus-mode");
+      toggleFocusView();
     }
     updateFullscreenUi();
+  }
+
+  function toggleFocusView() {
+    if (classroom) {
+      classroomFocus = !classroomFocus;
+      document.body.classList.toggle("focus-mode", classroomFocus || zoomScale > 1);
+    } else document.body.classList.toggle("focus-mode");
   }
 
   function insertSlideAfterCurrent(slide) {
@@ -914,7 +1142,8 @@ function standaloneInteractionScript() {
     }
     refreshSlides();
     updatePresentationLayout();
-    slide.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center", inline: "center" });
+    if (classroom) showSlide(insertIndex);
+    else slide.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center", inline: "center" });
   }
 
   function addBlankSlide() {
@@ -1241,7 +1470,7 @@ function standaloneInteractionScript() {
     const label = document.createElement("span");
     label.className = "qa-toggle-label";
     label.dataset.qaToggleLabel = "";
-    label.textContent = "Question";
+    label.textContent = classroom ? "Show answer" : "Question";
     button.appendChild(label);
 
     const questionLayer = document.createElement("span");
@@ -1255,6 +1484,7 @@ function standaloneInteractionScript() {
       createLiveImage(answerImage, "Starter image answer"),
     );
     button.appendChild(answerLayer);
+    if (classroom) refreshAnswerLabel(button);
     return button;
   }
 
@@ -1276,7 +1506,8 @@ function standaloneInteractionScript() {
     if (!presenterConfig?.enabled) return;
     const existing = deck?.querySelector('[data-generated-poll="true"]');
     if (existing) {
-      existing.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+      if (classroom) showSlide(slides.indexOf(existing));
+      else existing.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
       return;
     }
     const slide = document.createElement("section");
@@ -1306,8 +1537,8 @@ function standaloneInteractionScript() {
         )
         .join(""),
       "</div>",
-      '<div class="confidence-poll-total" data-confidence-total>0 responses</div>',
-      '<button class="confidence-end-lesson" type="button" data-confidence-end>End lesson</button>',
+      '<div class="confidence-poll-total" data-confidence-total role="status">0 responses</div>',
+      '<button class="confidence-end-lesson" type="button" data-confidence-end>' + (classroom ? 'End poll and save' : 'End lesson') + '</button>',
       "</div>",
     ].join("");
     insertSlideAfterCurrent(slide);
@@ -1497,7 +1728,8 @@ function standaloneInteractionScript() {
     }
     if (saveBuilderButton) {
       saveBuilderButton.disabled = true;
-      saveBuilderButton.textContent = "Saving...";
+      if (classroom) saveBuilderButton.setAttribute("aria-busy", "true");
+      else saveBuilderButton.textContent = "Saving...";
     }
     try {
       const state = syncBuilderStateForSave();
@@ -1595,7 +1827,8 @@ function standaloneInteractionScript() {
     } finally {
       if (saveBuilderButton) {
         saveBuilderButton.disabled = false;
-        saveBuilderButton.textContent = "Save to Builder";
+        if (classroom) saveBuilderButton.removeAttribute("aria-busy");
+        else saveBuilderButton.innerHTML = saveBuilderLabel;
       }
     }
   }
@@ -1640,7 +1873,8 @@ function standaloneInteractionScript() {
     }
     if (studentUploadButton) {
       studentUploadButton.disabled = true;
-      studentUploadButton.textContent = "Publishing...";
+      if (classroom) studentUploadButton.setAttribute("aria-busy", "true");
+      else studentUploadButton.textContent = "Publishing...";
     }
     try {
       const snapshot = studentSnapshotDocument();
@@ -1724,7 +1958,8 @@ function standaloneInteractionScript() {
     } finally {
       if (studentUploadButton) {
         studentUploadButton.disabled = false;
-        studentUploadButton.textContent = "Update students";
+        if (classroom) studentUploadButton.removeAttribute("aria-busy");
+        else studentUploadButton.textContent = "Update students";
       }
     }
   }
@@ -1784,6 +2019,7 @@ function standaloneInteractionScript() {
     }
     const confidenceChoice = event.target.closest("[data-confidence-score]");
     if (confidenceChoice) {
+      if (confidencePoll.locked) return;
       const score = String(
         Math.max(
           1,
@@ -1798,16 +2034,24 @@ function standaloneInteractionScript() {
     }
     const confidenceEnd = event.target.closest("[data-confidence-end]");
     if (confidenceEnd) {
+      if (confidencePoll.locked) return;
+      confidencePoll.locked = true;
+      const choices = confidenceEnd.closest(".lesson-slide")?.querySelectorAll("[data-confidence-score]") || [];
+      choices.forEach(choice => { choice.disabled = true; });
       confidenceEnd.disabled = true;
       confidenceEnd.textContent = "Saving...";
       confidencePoll.completedAt = new Date().toISOString();
       void savePresentedLesson()
-        .then(() => {
+        .then((saved) => {
+          if (!saved) throw new Error("The poll was not saved.");
           confidenceEnd.textContent = "Saved";
         })
         .catch(() => {
+          confidencePoll.locked = false;
+          confidencePoll.completedAt = "";
+          choices.forEach(choice => { choice.disabled = false; });
           confidenceEnd.disabled = false;
-          confidenceEnd.textContent = "End lesson";
+          confidenceEnd.textContent = classroom ? "End poll and save" : "End lesson";
         });
       return;
     }
@@ -1815,8 +2059,7 @@ function standaloneInteractionScript() {
     if (toggle) {
       const showing = toggle.classList.toggle("is-showing-answer");
       toggle.setAttribute("aria-pressed", String(showing));
-      const label = toggle.querySelector("[data-qa-toggle-label]");
-      if (label) label.textContent = showing ? "Answer" : "Question";
+      refreshAnswerLabel(toggle);
       return;
     }
     const reveal = event.target.closest("[data-example-reveal]");
@@ -1832,7 +2075,7 @@ function standaloneInteractionScript() {
 
   document.getElementById("presenter-blank-slide")?.addEventListener("click", addBlankSlide);
   pollButton?.addEventListener("click", showConfidencePollSlide);
-  saveBuilderButton?.addEventListener("click", () => void savePresentedLesson());
+  saveBuilderButton?.addEventListener("click", () => void savePresentedLesson().catch(() => {}));
   studentUploadButton?.addEventListener("click", () => void uploadStudentSnapshot());
   if (hasStudentSessionConfig()) {
     window.setTimeout(
@@ -1852,6 +2095,7 @@ function standaloneInteractionScript() {
     setZoom(zoomScale > 1 ? 1 : 1.6);
   });
   fullscreenButton?.addEventListener("click", () => void toggleFullscreen());
+  compactFullscreenButton?.addEventListener("click", () => void toggleFullscreen());
   document.getElementById("presenter-download")?.addEventListener("click", downloadAnnotatedHtml);
   pdfButton?.addEventListener("click", openPrintView);
 
@@ -1861,6 +2105,94 @@ function standaloneInteractionScript() {
   customColor?.addEventListener("input", () => {
     window.__lessonPresenterRuntimeController?.setColor(customColor.value);
   });
+
+  if (classroom) {
+    const highlighter = document.getElementById("presenter-highlighter");
+    const eraser = document.getElementById("presenter-eraser");
+    const compactInkTools = document.getElementById("presenter-compact-ink-tools");
+    const compactToolbar = window.matchMedia("(width < 920px)");
+    function placeHighlighter() {
+      if (!highlighter || !eraser || !compactInkTools) return;
+      const wasFocused = document.activeElement === highlighter;
+      if (compactToolbar.matches) compactInkTools.append(highlighter);
+      else eraser.before(highlighter);
+      if (wasFocused) {
+        if (highlighter.closest("[hidden]")) document.querySelector(".presenter-ink-trigger")?.focus();
+        else highlighter.focus();
+      }
+    }
+    placeHighlighter();
+    compactToolbar.addEventListener("change", placeHighlighter);
+    document.querySelectorAll("[data-qa-toggle]").forEach(refreshAnswerLabel);
+    previousSlide?.addEventListener("click", () => showSlide(displayedSlide - 1));
+    nextSlide?.addEventListener("click", () => showSlide(displayedSlide + 1));
+    deck?.addEventListener("scroll", () => {
+      if (navigationFrame || layoutFrame || zoomScale > 1) return;
+      navigationFrame = requestAnimationFrame(() => {
+        navigationFrame = 0;
+        if (!layoutFrame && zoomScale === 1) updateSlideNavigation();
+      });
+    }, { passive: true });
+
+    const disclosures = Array.from(document.querySelectorAll(".presenter-disclosure > button[aria-controls]"));
+    const toolbar = document.querySelector(".presenter-tools");
+    if (toolbar && typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(reflowPresentation).observe(toolbar);
+    }
+    function closeDisclosure(trigger, returnFocus) {
+      const panel = document.getElementById(trigger.getAttribute("aria-controls"));
+      if (panel) panel.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      if (returnFocus) trigger.focus();
+    }
+    disclosures.forEach((trigger) => {
+      const panel = document.getElementById(trigger.getAttribute("aria-controls"));
+      if (!panel) return;
+      trigger.addEventListener("click", () => {
+        if (!panel.hidden) {
+          closeDisclosure(trigger, true);
+          return;
+        }
+        disclosures.filter(other => other !== trigger).forEach(other => closeDisclosure(other, false));
+        panel.hidden = false;
+        trigger.setAttribute("aria-expanded", "true");
+        panel.querySelector("button:not([hidden]):not([disabled])")?.focus();
+      });
+      panel.addEventListener("click", (event) => {
+        const action = event.target.closest("button");
+        if (panel.id === "presenter-actions" && action && action.id !== "presenter-clear") {
+          closeDisclosure(trigger, panel.contains(document.activeElement));
+        }
+      });
+    });
+    function closeCodeOutside(target) {
+      if (studentCodeBadge?.getAttribute("aria-pressed") === "true" && !studentCodeBadge.contains(target)) {
+        studentCodeBadge.setAttribute("aria-pressed", "false");
+      }
+    }
+    document.addEventListener("pointerdown", (event) => {
+      if (event.target.closest?.(".presenter-dialog-backdrop")) return;
+      disclosures.filter(trigger => !trigger.parentElement.contains(event.target)).forEach(trigger => closeDisclosure(trigger, false));
+      closeCodeOutside(event.target);
+    });
+    document.addEventListener("focusin", (event) => {
+      closeCodeOutside(event.target);
+      if (event.target.closest?.(".presenter-dialog")) return;
+      disclosures.filter(trigger => trigger.getAttribute("aria-expanded") === "true" &&
+        !trigger.parentElement.contains(event.target)).forEach(trigger => closeDisclosure(trigger, false));
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || document.querySelector(".presenter-dialog-backdrop")) return;
+      const trigger = disclosures.find(button => button.getAttribute("aria-expanded") === "true");
+      if (trigger) {
+        event.preventDefault();
+        closeDisclosure(trigger, true);
+      } else if (studentCodeBadge?.getAttribute("aria-pressed") === "true") {
+        studentCodeBadge.setAttribute("aria-pressed", "false");
+        studentCodeBadge.focus();
+      }
+    });
+  }
   document.addEventListener("lessonpresenterpinch", (event) => {
     const detail = event.detail || {};
     if (detail.phase === "end") {
@@ -1893,19 +2225,21 @@ function standaloneInteractionScript() {
 
   window.addEventListener("keydown", (event) => {
     if (event.key === "p" && (event.ctrlKey || event.metaKey)) return;
-    if (event.key === "f") {
-      document.body.classList.toggle("focus-mode");
+    if (event.key === "f" && !event.altKey && !event.ctrlKey && !event.metaKey &&
+        !event.target.closest?.("input,textarea,select,[contenteditable],.presenter-dialog")) {
+      toggleFocusView();
       updateFullscreenUi();
     }
   });
-  window.addEventListener("resize", updatePresentationLayout);
-  window.addEventListener("orientationchange", updatePresentationLayout);
-  window.visualViewport?.addEventListener("resize", updatePresentationLayout);
+  window.addEventListener("resize", reflowPresentation);
+  window.addEventListener("orientationchange", reflowPresentation);
+  window.visualViewport?.addEventListener("resize", reflowPresentation);
   document.addEventListener("fullscreenchange", updateFullscreenUi);
 
   refreshSlides();
   if (!document.body.classList.contains("handout-mode")) {
     updatePresentationLayout();
+    if (classroom) showSlide(0);
   }
 })();`;
 }

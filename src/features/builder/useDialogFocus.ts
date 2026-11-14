@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef } from "react";
 
 const focusableSelector = [
   "a[href]",
@@ -11,6 +11,26 @@ const focusableSelector = [
   "summary",
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
+
+function tabbableElements(dialog: HTMLElement) {
+  return Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(element =>
+    (element.tabIndex >= 0 || element.tagName === "SUMMARY") &&
+    !element.closest('[hidden], [inert], [aria-hidden="true"]') &&
+    element.checkVisibility?.({ visibilityProperty: true }) !== false,
+  );
+}
+
+function wrapTab(event: KeyboardEvent, dialog: HTMLElement) {
+  const elements = tabbableElements(dialog);
+  const first = elements[0];
+  const last = elements[elements.length - 1];
+  const active = document.activeElement;
+  if (!first || !dialog.contains(active) || active === dialog ||
+    (event.shiftKey ? active === first : active === last)) {
+    event.preventDefault();
+    ((event.shiftKey ? last : first) ?? dialog).focus();
+  }
+}
 
 export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
   const dialogRef = useRef<T>(null);
@@ -30,43 +50,18 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
     if (!dialog) return;
     const previousFocus = previousFocusRef.current;
 
-    function focusableElements() {
-      return Array.from(
-        dialog?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
-      ).filter(
-        (element) =>
-          !element.hidden && element.getAttribute("aria-hidden") !== "true",
-      );
-    }
-
     if (!dialog.contains(document.activeElement)) {
-      (focusableElements()[0] ?? dialog).focus();
+      (tabbableElements(dialog)[0] ?? dialog).focus();
     }
 
     function keepFocusInDialog(event: KeyboardEvent) {
+      if (event.defaultPrevented || !dialog) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
         return;
       }
-      if (event.key !== "Tab") return;
-
-      const elements = focusableElements();
-      if (!elements.length) {
-        event.preventDefault();
-        dialog?.focus();
-        return;
-      }
-
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      if (event.key === "Tab") wrapTab(event, dialog);
     }
 
     document.addEventListener("keydown", keepFocusInDialog);
@@ -82,6 +77,7 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
 export function useActiveDialogFocus<T extends HTMLElement>(
   onClose: () => void,
   active: boolean,
+  returnFocusRef?: RefObject<HTMLElement | null>,
 ) {
   const dialogRef = useRef<T>(null);
   const onCloseRef = useRef(onClose);
@@ -94,25 +90,15 @@ export function useActiveDialogFocus<T extends HTMLElement>(
     if (!active) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-
-    function focusableElements() {
-      return Array.from(
-        dialog?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
-      ).filter(
-        (element) =>
-          !element.hidden && element.getAttribute("aria-hidden") !== "true",
-      );
-    }
+    const focusReturn = returnFocusRef?.current ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
 
     if (!dialog.contains(document.activeElement)) {
-      (focusableElements()[0] ?? dialog).focus();
+      (tabbableElements(dialog)[0] ?? dialog).focus();
     }
 
     function keepFocusInDialog(event: KeyboardEvent) {
+      if (event.defaultPrevented || !dialog) return;
       const focusedModal =
         document.activeElement instanceof HTMLElement
           ? document.activeElement.closest<HTMLElement>('[aria-modal="true"]')
@@ -124,32 +110,15 @@ export function useActiveDialogFocus<T extends HTMLElement>(
         onCloseRef.current();
         return;
       }
-      if (event.key !== "Tab") return;
-
-      const elements = focusableElements();
-      if (!elements.length) {
-        event.preventDefault();
-        dialog?.focus();
-        return;
-      }
-
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      if (event.key === "Tab") wrapTab(event, dialog);
     }
 
     document.addEventListener("keydown", keepFocusInDialog);
     return () => {
       document.removeEventListener("keydown", keepFocusInDialog);
-      if (previousFocus?.isConnected) previousFocus.focus();
+      if (focusReturn?.isConnected) focusReturn.focus();
     };
-  }, [active]);
+  }, [active, returnFocusRef]);
 
   return dialogRef;
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import { LoaderCircle, Plus, Sparkles, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { logRetrievalItems, resolveStarterImages } from "./api-client";
 import { BuilderImageInput } from "./BuilderImageInput";
 import styles from "./BuilderShell.module.css";
-import { type RetrievalItem, type StarterSlot } from "./schema";
+import { type BuilderSlide, type RetrievalItem, type StarterSlot } from "./schema";
 import { selectDueStarterItems } from "./starter";
 import { selectDocument, useBuilderStore } from "./store";
 
@@ -17,17 +17,31 @@ const emptySlot = (): StarterSlot => ({
   answerImage: null,
 });
 
-export function StarterComposer() {
+export function StarterComposer({ compact = false, editingSlide, onEndEdit }: {
+  compact?: boolean;
+  editingSlide?: BuilderSlide;
+  onEndEdit?: () => void;
+} = {}) {
   const document = useBuilderStore(selectDocument);
   const addStarterSlide = useBuilderStore((state) => state.addStarterSlide);
+  const updateStarterSlide = useBuilderStore((state) => state.updateStarterSlide);
   const updateMetadata = useBuilderStore((state) => state.updateMetadata);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
   const setStatus = useBuilderStore((state) => state.setStatus);
-  const [slots, setSlots] = useState<StarterSlot[]>(() =>
-    Array.from({ length: 4 }, emptySlot),
-  );
+  const [slots, setSlots] = useState<StarterSlot[]>(() => {
+    const existing = Array.isArray(editingSlide?.slots) ? editingSlide.slots : [];
+    return Array.from({ length: 4 }, (_, index) => ({ ...emptySlot(), ...existing[index] }));
+  });
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const editingId = editingSlide?.id;
+
+  useEffect(() => {
+    if (!editingId) return;
+    const frame = requestAnimationFrame(() => heading.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [editingId]);
 
   function updateSlot(index: number, patch: Partial<StarterSlot>) {
     setSlots((current) =>
@@ -220,6 +234,12 @@ export function StarterComposer() {
       });
       return;
     }
+    if (editingSlide) {
+      updateStarterSlide(editingSlide.id, prepared);
+      onEndEdit?.();
+      setStatus({ tone: "success", message: "Starter slide updated." });
+      return;
+    }
     addStarterSlide(prepared);
     setSlots(Array.from({ length: 4 }, emptySlot));
     setStatus({
@@ -229,9 +249,9 @@ export function StarterComposer() {
   }
 
   return (
-    <section className={styles.toolPanel}>
+    <section className={styles.toolPanel} data-testid="starter-panel">
       <div className={styles.panelHead}>
-        <h3>Starter slide</h3>
+        <h3 ref={heading} tabIndex={-1}>{editingSlide ? "Edit starter" : compact ? "New starter" : "Starter slide"}</h3>
         <button
           className={`${styles.secondaryButton} ${styles.compactButton}`}
           type="button"
@@ -246,6 +266,11 @@ export function StarterComposer() {
           Suggest due LOs
         </button>
       </div>
+
+      {editingSlide ? <div className={styles.starterEditActions}>
+        <button type="button" className={styles.primaryButton} onClick={addToLesson}>Update starter slide</button>
+        <button type="button" className={styles.secondaryButton} onClick={onEndEdit}>Cancel edit</button>
+      </div> : null}
 
       <label className={styles.fieldLabel} htmlFor="v2-overall-lesson-lo">
         Overall lesson LO
@@ -309,7 +334,7 @@ export function StarterComposer() {
         ))}
       </div>
 
-      <div className={styles.actionRow}>
+      {!editingSlide ? <div className={styles.actionRow}>
         <button
           className={styles.primaryButton}
           type="button"
@@ -329,7 +354,7 @@ export function StarterComposer() {
           )}
           {isLogging ? "Logging..." : "Log retrieval"}
         </button>
-      </div>
+      </div> : null}
     </section>
   );
 }

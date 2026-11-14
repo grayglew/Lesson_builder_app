@@ -24,7 +24,8 @@ const itemSelector =
 function getMenuItems(
   menu: HTMLDivElement | null,
 ) {
-  return Array.from(menu?.querySelectorAll<HTMLElement>(itemSelector) ?? []);
+  return Array.from(menu?.querySelectorAll<HTMLElement>(itemSelector) ?? [])
+    .filter(item => !item.matches(":disabled"));
 }
 
 export function BuilderActionMenu({
@@ -36,7 +37,7 @@ export function BuilderActionMenu({
   const [menuPosition, setMenuPosition] = useState<CSSProperties>({
     left: 0,
     top: 0,
-    visibility: "hidden",
+    opacity: 0,
   });
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -84,12 +85,11 @@ export function BuilderActionMenu({
         below + menuRect.height <= window.innerHeight - viewportGap
           ? below
           : Math.max(viewportGap, triggerRect.top - menuRect.height - 6);
-      setMenuPosition({ left, top, visibility: "visible" });
+      setMenuPosition({ left, top });
     }
 
     const updatePosition = () => positionMenu(trigger, menu);
     updatePosition();
-    getMenuItems(menu)[0]?.focus();
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
     return () => {
@@ -98,12 +98,18 @@ export function BuilderActionMenu({
     };
   }, [open]);
 
+  // Measure the portal before painting without making its items unfocusable.
+  const positioned = menuPosition.opacity !== 0;
+  useLayoutEffect(() => {
+    if (open && positioned) getMenuItems(menuRef.current)[0]?.focus();
+  }, [open, positioned]);
+
   function menuItems() {
     return getMenuItems(menuRef.current);
   }
 
   function openMenu() {
-    setMenuPosition({ left: 0, top: 0, visibility: "hidden" });
+    setMenuPosition({ left: 0, top: 0, opacity: 0 });
     setPortalRoot(
       rootRef.current?.closest<HTMLElement>("[data-builder-variant]") ??
         document.body,
@@ -121,7 +127,7 @@ export function BuilderActionMenu({
     else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
     else if (event.key === "Home") nextIndex = 0;
     else if (event.key === "End") nextIndex = items.length - 1;
-    else if (event.key === "Escape") {
+    else if (event.key === "Escape" || event.key === "Tab") {
       event.preventDefault();
       setOpen(false);
       triggerRef.current?.focus();
@@ -165,7 +171,11 @@ export function BuilderActionMenu({
               style={menuPosition}
               role="menu"
               aria-label={label}
-              onClick={() => setOpen(false)}
+              onClick={(event) => {
+                if (!(event.target instanceof Element) || !event.target.closest(itemSelector)) return;
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
               onKeyDown={onMenuKeyDown}
             >
               {children}

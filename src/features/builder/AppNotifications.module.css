@@ -228,8 +228,18 @@
 
 .dialog button:focus-visible,
 .dialog input:focus-visible {
-  outline: 3px solid rgba(15, 118, 110, 0.3);
+  outline: 3px solid #15594d;
   outline-offset: 2px;
+}
+
+:global(html[data-builder-theme="dark"]) .dialog :is(button, input):focus-visible {
+  outline-color: #91d5c4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html[data-builder-theme="system"]) .dialog :is(button, input):focus-visible {
+    outline-color: #91d5c4;
+  }
 }
 
 @media (max-width: 560px) {
@@ -241,6 +251,8 @@
   .dialog form {
     padding: 18px;
   }
+
+  .closeButton { width: 2.75rem; height: 2.75rem; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

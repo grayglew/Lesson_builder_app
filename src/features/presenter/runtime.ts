@@ -482,6 +482,7 @@ export function mountPresenterRuntime(
     const deck = queryOne<Element>(root, selectors.deck);
     const body = documentRoot.body;
     const deckOwnsPresentationScroll =
+      body?.classList.contains("presenter-classroom") ||
       body?.classList.contains("focus-mode") ||
       body?.classList.contains("fullscreen-mode") ||
       body?.classList.contains("presenter-zoom-mode");
@@ -724,11 +725,11 @@ export function mountPresenterRuntime(
     color = nextColor || DEFAULT_COLOR;
     const input = queryOne<HTMLInputElement>(root, selectors.colorInput);
     if (input) input.value = color;
+    documentRoot.documentElement?.style.setProperty("--ink-colour", color);
     queryAll<HTMLElement>(root, selectors.colorButtons).forEach((button) => {
-      button.classList.toggle(
-        "is-active",
-        (button.dataset.color || (button as HTMLInputElement).value) === color,
-      );
+      const selected = (button.dataset.color || (button as HTMLInputElement).value) === color;
+      button.classList.toggle("is-active", selected);
+      button.setAttribute("aria-pressed", String(selected));
     });
   }
 

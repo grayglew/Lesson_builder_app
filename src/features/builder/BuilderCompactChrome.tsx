@@ -105,7 +105,7 @@ export function CompactAppBar({
       </div>
       <div className={styles.compactLessonIdentity}>
         <div className={styles.compactLessonTitleRow}>
-          <strong>{title.trim() || "Untitled lesson"}</strong>
+          <strong title={title.trim() || "Untitled lesson"}>{title.trim() || "Untitled lesson"}</strong>
           <output
             className={styles.compactOverdueBadge}
             aria-label="Overdue retrieval items"
@@ -116,7 +116,7 @@ export function CompactAppBar({
             {overdueCount} overdue
           </output>
         </div>
-        <span>{teachingDate || "No teaching date"}</span>
+        <span>{className || "No class"} · {teachingDate || "No teaching date"}</span>
       </div>
       <span className={styles.compactCloudStatus} title={cloudMessage}>
         <Cloud aria-hidden /> {cloudMessage}
@@ -180,11 +180,28 @@ const groups: Array<{
   label: string;
   tools: Array<{ name: BuilderToolName; label: string; icon: typeof BookOpen }>;
 }> = [
-  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "units", label: "Units of work", icon: BookOpen }, { name: "templates", label: "Templates", icon: LayoutTemplate }, { name: "shared-data", label: "Shared data", icon: Layers3 }] },
   { label: "Core slides", tools: [{ name: "starter", label: "Starter", icon: LayoutGrid }, { name: "retrieval", label: "Retrieval", icon: RefreshCw }, { name: "example", label: "Example", icon: BookOpenCheck }, { name: "cfu", label: "CFU", icon: ListChecks }] },
+  { label: "Library", tools: [{ name: "saved-lessons", label: "Saved lessons", icon: Archive }, { name: "units", label: "Units of work", icon: BookOpen }, { name: "templates", label: "Templates", icon: LayoutTemplate }, { name: "shared-data", label: "Shared data", icon: Layers3 }] },
   { label: "Resources", tools: [{ name: "worksheet", label: "Worksheet", icon: Files }, { name: "pdf", label: "PDF", icon: FileText }] },
   { label: "Create", tools: [{ name: "draw", label: "Draw", icon: PencilRuler }, { name: "placeholder", label: "Placeholder", icon: SquareDashed }, { name: "math", label: "LaTeX", icon: Sigma }] },
 ];
+
+export function CompactWorkspaceTools({ activeTool, onSelect, onNewLesson, busy }: CompactToolNavigationProps & {
+  onNewLesson: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div className={styles.compactWorkspaceTools}>
+      <label htmlFor="compact-build-tool">Build tool</label>
+      <select id="compact-build-tool" value={activeTool} onChange={event => onSelect(event.target.value as BuilderToolName)}>
+        {groups.map(group => <optgroup key={group.label} label={group.label}>
+          {group.tools.map(tool => <option key={tool.name} value={tool.name}>{tool.label}</option>)}
+        </optgroup>)}
+      </select>
+      <button type="button" className={styles.secondaryButton} disabled={busy} onClick={onNewLesson}>New lesson</button>
+    </div>
+  );
+}
 
 export function CompactToolNavigation({
   activeTool,
@@ -328,7 +345,7 @@ export function CompactDeckHeader({
           title={`Open handout (${selectedCount} selected)`}
           onClick={onHandout}
         >
-          <Printer aria-hidden /> <span>Handout</span>
+          <Printer aria-hidden /> <span>Handout <small>{selectedCount ? `${selectedCount} included` : "Choose slides"}</small></span>
         </button>
         {transferActions}
         <button className={styles.compactResetButton} type="button" aria-label="Reset lesson" title="Reset lesson" onClick={onReset}>
@@ -344,6 +361,7 @@ export type CompactMobilePanel = "lesson" | "build" | "deck";
 type CompactMobileDockProps = {
   activePanel: CompactMobilePanel;
   available: boolean;
+  backgroundInert?: boolean;
   lessonButtonRef: RefObject<HTMLButtonElement | null>;
   deckButtonRef: RefObject<HTMLButtonElement | null>;
   onSelect: (panel: CompactMobilePanel) => void;
@@ -352,6 +370,7 @@ type CompactMobileDockProps = {
 export function CompactMobileDock({
   activePanel,
   available,
+  backgroundInert = false,
   deckButtonRef,
   lessonButtonRef,
   onSelect,
@@ -361,7 +380,7 @@ export function CompactMobileDock({
       className={styles.compactMobileDock}
       aria-label="Builder workspace"
       hidden={!available}
-      inert={!available || undefined}
+      inert={!available || backgroundInert || undefined}
     >
       <button
         ref={lessonButtonRef}

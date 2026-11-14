@@ -28,6 +28,7 @@
 
 .menu {
   position: fixed;
+  transition-property: none;
   z-index: var(--builder-layer-menu, 60);
   display: grid;
   width: max-content;

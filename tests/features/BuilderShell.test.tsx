@@ -811,7 +811,7 @@ describe("BuilderShell Compact Console action parity", () => {
     await user.click(screen.getByRole("button", { name: "More actions for slide 2" }));
     await user.click(
       within(screen.getByRole("menu", { name: "More actions for slide 2" }))
-        .getByRole("button", { name: "Move up" }),
+        .getByRole("menuitem", { name: "Move up" }),
     );
     expect(useBuilderStore.getState().document.slides.map((slide) => slide.id)).toEqual([
       "third",

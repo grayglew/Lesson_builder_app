@@ -436,8 +436,8 @@ export function SavedLessonLibrary({
   ) {
     return (
       <div className="flex justify-end gap-1">
-        <IconAction label="Open lesson" disabled={Boolean(busyId)} onClick={() => void openLessonById(lesson)} icon={busyId === lesson.id ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />} />
-        <IconAction label="Present lesson" disabled={Boolean(busyId)} onClick={() => void presentLesson(lesson)} icon={<Presentation className="size-4" />} />
+        <IconAction label="Open lesson" caption={compact ? "Open" : undefined} disabled={Boolean(busyId)} onClick={() => void openLessonById(lesson)} icon={busyId === lesson.id ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />} />
+        <IconAction label="Present lesson" caption={compact ? "Present" : undefined} disabled={Boolean(busyId)} onClick={() => void presentLesson(lesson)} icon={<Presentation className="size-4" />} />
         {compact ? (
           <BuilderActionMenu
             label={`More actions for ${lesson.title}`}
@@ -470,11 +470,40 @@ export function SavedLessonLibrary({
     );
   }
 
+  const searchFilter = (
+    <label className={compact ? undefined : "xl:col-span-2"}>
+      <span className="field-title mb-1.5">Search title</span>
+      <input className={inputClass} value={titleFilter} onChange={(event) => setTitleFilter(event.target.value)} placeholder="Lesson title" />
+    </label>
+  );
+  const advancedFilters = (
+    <>
+      <FilterSelect label="Class" value={classFilter} onChange={setClassFilter}>
+        <option value="">All classes</option>
+        {classNames.map((className) => <option key={className} value={className}>{className}</option>)}
+      </FilterSelect>
+      <FilterSelect label="Status" value={taughtFilter} onChange={(value) => setTaughtFilter(value as typeof taughtFilter)}>
+        <option value="all">All lessons</option>
+        <option value="planned">Planned</option>
+        <option value="taught">Taught</option>
+      </FilterSelect>
+      <label>
+        <span className="field-title mb-1.5">From</span>
+        <input className={inputClass} type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+      </label>
+      <label>
+        <span className="field-title mb-1.5">To</span>
+        <input className={inputClass} type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+      </label>
+    </>
+  );
+  const activeAdvancedFilters = [classFilter, taughtFilter !== "all", dateFrom, dateTo].filter(Boolean).length;
+
   return (
     <>
-    <section className={embedded ? "" : "mx-auto max-w-[1500px] p-4"}>
+    <section className={compact ? styles.compactLibrary : embedded ? "" : "mx-auto max-w-[1500px] p-4"}>
       <div className={embedded ? "" : "rounded-xl border border-slate-200 bg-white shadow-sm"}>
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-5">
+        <div className={`${styles.libraryHeader} flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-5`}>
           <div>
             {!embedded ? (
               <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-teal-700 hover:text-teal-900" type="button" onClick={onBack}>
@@ -489,7 +518,7 @@ export function SavedLessonLibrary({
               </p>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className={`${styles.libraryHeaderActions} flex flex-wrap gap-2`}>
             <button
               className="secondary-action"
               type="button"
@@ -513,36 +542,28 @@ export function SavedLessonLibrary({
 
         <BundleDownloadQueuePanel inline />
 
-        <div className="grid gap-3 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
-          <label className="xl:col-span-2">
-            <span className="field-title mb-1.5">Search title</span>
-            <input className={inputClass} value={titleFilter} onChange={(event) => setTitleFilter(event.target.value)} placeholder="Lesson title" />
-          </label>
-          <FilterSelect label="Class" value={classFilter} onChange={setClassFilter}>
-            <option value="">All classes</option>
-            {classNames.map((className) => <option key={className} value={className}>{className}</option>)}
-          </FilterSelect>
-          <FilterSelect label="Status" value={taughtFilter} onChange={(value) => setTaughtFilter(value as typeof taughtFilter)}>
-            <option value="all">All lessons</option>
-            <option value="planned">Planned</option>
-            <option value="taught">Taught</option>
-          </FilterSelect>
-          <label>
-            <span className="field-title mb-1.5">From</span>
-            <input className={inputClass} type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          </label>
-          <label>
-            <span className="field-title mb-1.5">To</span>
-            <input className={inputClass} type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-          </label>
-        </div>
+        {compact ? (
+          <div className={`${styles.libraryFilters} border-b border-slate-200 bg-slate-50 p-4`}>
+            {searchFilter}
+            <details className={styles.libraryFilterDisclosure}>
+              <summary><span>Filters</span>{activeAdvancedFilters ? <small>{activeAdvancedFilters} active</small> : null}</summary>
+              <div className={styles.libraryFilterOptions}>{advancedFilters}</div>
+            </details>
+          </div>
+        ) : (
+          <div className="grid gap-3 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
+            {searchFilter}
+            {advancedFilters}
+          </div>
+        )}
 
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
+        <div className={`${styles.libraryResultBar} flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3`}>
           <p className="text-sm text-slate-600">
             {filteredLessonGroups.length} of {lessonGroups.length} lessons · {formatBytes(lessons.reduce((total, lesson) => total + lesson.byteSize, 0))}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <button
+              data-clear-filters
               className="secondary-action"
               type="button"
               disabled={!hasActiveFilters}
@@ -604,7 +625,7 @@ export function SavedLessonLibrary({
                     : group.hasBeenTaught
                       ? styles.savedLessonTaughtParentRow
                       : active
-                        ? "bg-teal-50/70"
+                        ? styles.savedLessonCurrentRow
                         : "bg-white";
                   return (
                   <Fragment key={lesson.id}>
@@ -731,12 +752,14 @@ function FilterSelect({
 
 function IconAction({
   label,
+  caption,
   icon,
   onClick,
   disabled,
   danger = false,
 }: {
   label: string;
+  caption?: string;
   icon: React.ReactNode;
   onClick: () => void;
   disabled: boolean;
@@ -744,7 +767,7 @@ function IconAction({
 }) {
   return (
     <button
-      className={`grid size-9 place-items-center rounded-md border transition ${danger ? "border-red-200 text-red-700 hover:bg-red-50" : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+      className={`${caption ? styles.libraryNamedAction : "grid size-9 place-items-center"} rounded-md border transition ${danger ? "border-red-200 text-red-700 hover:bg-red-50" : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
       type="button"
       title={label}
       aria-label={label}
@@ -752,6 +775,7 @@ function IconAction({
       onClick={onClick}
     >
       {icon}
+      {caption ? <span>{caption}</span> : null}
     </button>
   );
 }

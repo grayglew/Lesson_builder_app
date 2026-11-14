@@ -2256,6 +2256,172 @@
   }
 }
 
+.compactConsole .compactDeckActions {
+  grid-template-columns: minmax(0, 1fr) 2.75rem 2.75rem;
+  align-items: center;
+}
+.compactConsole .compactDeckActions > button { flex-direction: row; min-height: 2.75rem; }
+.compactConsole .compactDeckActions > button:first-child { justify-content: flex-start; padding-inline: .4rem; }
+.compactDeckActions > button > span { font-size: .76rem; white-space: nowrap; }
+.compactDeckActions > button small { margin-left: .2rem; color: var(--builder-muted); font-size: .67rem; }
+.compactDeckActions > button > svg { width: 1rem; height: 1rem; flex: none; }
+.compactConsole button.menuDangerAction { color: var(--builder-danger); }
+
+.starterEditActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-bottom: .85rem;
+}
+
+.newLessonDialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  padding: 0;
+}
+.newLessonDialog .modalHead { margin: 0; padding: .85rem 1rem; }
+.newLessonDialog .modalHead h2 { font-size: 1.15rem; line-height: 1.25; }
+.newLessonDialog .newLessonForm { min-height: 0; gap: 0; grid-template-rows: minmax(0, 1fr) auto; }
+.newLessonFields {
+  display: grid;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  gap: .8rem;
+  padding: .85rem 1rem;
+  scroll-padding-block: .6rem;
+}
+.newLessonFields .newLessonDescription { margin: 0; }
+.newLessonDialog .newLessonActions {
+  border-top: 1px solid var(--builder-line);
+  padding: .65rem 1rem;
+  background: var(--builder-surface-alt);
+}
+
+.compactLibrary { container: saved-library / inline-size; min-width: 0; }
+.savedLessonCurrentRow { background: var(--builder-accent-soft); }
+.compactConsole .compactLibrary :global(.field-title) { color: var(--builder-muted); font-size: .75rem; }
+.compactConsole .compactLibrary :global(.text-teal-700) { color: var(--builder-accent-dark); }
+.compactConsole .compactLibrary :global(.secondary-action) {
+  color: var(--builder-ink);
+  background: var(--builder-surface);
+  border-color: var(--builder-line-strong);
+}
+.compactConsole .compactLibrary :global(.secondary-action):hover { background: var(--builder-surface-alt); }
+.compactConsole .compactLibrary input,
+.compactConsole .compactLibrary select { min-width: 0; border-color: var(--builder-line-strong); }
+.libraryFilters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .65rem;
+}
+.libraryFilterDisclosure[open],
+.libraryFilters:has(.libraryFilterDisclosure[open]) > label { grid-column: 1 / -1; }
+.libraryFilterDisclosure > summary {
+  min-height: 2.75rem;
+  align-content: center;
+  width: fit-content;
+  border: 1px solid var(--builder-line-strong);
+  border-radius: .25rem;
+  padding-inline: .65rem;
+  color: var(--builder-ink);
+  background: var(--builder-surface);
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.libraryFilterDisclosure > summary small {
+  margin-inline-start: .35rem;
+  color: var(--builder-accent-dark);
+}
+.libraryFilterOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .65rem;
+  padding-top: .6rem;
+}
+@container saved-library (min-width: 43rem) {
+  .libraryFilterOptions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.compactLibrary table { min-width: 0; table-layout: fixed; }
+.compactLibrary :is(th, td) { padding: .65rem .6rem; overflow-wrap: anywhere; }
+.compactLibrary th:nth-child(2) { width: 4.5rem; }
+.compactLibrary th:nth-child(3) { width: 7.75rem; }
+.compactLibrary th:nth-child(4) { width: 5.25rem; }
+.compactLibrary th:nth-child(5) { width: 4.5rem; }
+.compactLibrary th:nth-child(6) { width: 14rem; }
+.compactLibrary :is(th, td):nth-child(n + 3) { white-space: nowrap; overflow-wrap: normal; }
+.compactLibrary :global(.truncate) { white-space: normal; }
+.libraryNamedAction {
+  display: inline-flex;
+  flex: none;
+  white-space: nowrap;
+  align-items: center;
+  gap: .25rem;
+  min-height: 2.75rem;
+  padding: 0 .42rem;
+  color: var(--builder-ink);
+  background: var(--builder-surface);
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+@container saved-library (max-width: 48rem) {
+  .compactLibrary thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .compactLibrary table,
+  .compactLibrary tbody { display: block; }
+  .compactLibrary tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: .55rem; }
+  .compactLibrary td { min-width: 0; padding: .3rem; }
+  .compactLibrary td:first-child,
+  .compactLibrary td:last-child { grid-column: 1 / -1; }
+  .compactLibrary .savedLessonHistorySpacer { display: none; }
+}
+
+@container saved-library (35rem <= width <= 48rem) {
+  .compactLibrary tbody tr { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@container saved-library (max-width: 19rem) {
+  .libraryFilterOptions { grid-template-columns: minmax(0, 1fr); }
+}
+
+@container saved-library (max-width: 27rem) {
+  .compactLibrary :is(.libraryHeader, .libraryFilters, .libraryResultBar) {
+    gap: .55rem;
+    padding: .65rem;
+  }
+  .compactLibrary .libraryHeaderActions button {
+    min-height: 2.75rem;
+    gap: .3rem;
+    padding-inline: .45rem;
+    font-size: .75rem;
+  }
+  .compactLibrary .libraryResultBar > p { font-size: .8rem; }
+  .compactLibrary [data-clear-filters]:disabled { display: none; }
+}
+
+@media (max-width: 639px) {
+  .compactConsole .toolPanel:has(> .compactLibrary) { padding: 0; }
+}
+
+@media (max-width: 639px) {
+  .compactConsole .compactAppBar > :is(.compactPresentButton, .compactSaveButton) span { display: inline; }
+  .compactConsole .compactAppBar > :is(.compactPresentButton, .compactSaveButton) { padding-inline: .45rem; gap: .25rem; }
+  .newLessonDialog .newLessonActions > button { flex: 1 1 100%; }
+}
+
+@media (min-width: 1280px) {
+  .editStarterButton { min-height: 2rem; }
+}
+
 @media (max-width: 1279px) {
   .compactConsole {
     height: auto;
@@ -2963,15 +3129,28 @@
     grid-row: 2;
     min-height: 0;
     overflow: auto;
+    margin-block-end: calc(var(--compact-mobile-dock-height) + env(safe-area-inset-bottom));
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
+    scroll-padding-block-end: .5rem;
+  }
+
+  .compactConsole .workspace:has(.starterEditActions:not([hidden] *)) {
+    scroll-padding-block-start: 6rem;
+  }
+
+  .compactConsole .starterEditActions {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    padding-block: .55rem;
+    border-bottom: 1px solid var(--builder-line);
+    background: var(--builder-surface);
   }
 
   .compactConsole .compactWorkspaceBody {
     min-height: 100%;
-    padding-bottom: calc(
-      var(--compact-mobile-dock-height) + env(safe-area-inset-bottom) + 0.8rem
-    );
+    padding-bottom: .8rem;
   }
 
   .compactConsole .sidebar,
@@ -3132,6 +3311,212 @@
   .compactConsole .compactPresentButton span,
   .compactConsole .compactSaveButton span {
     display: none;
+  }
+}
+
+/* Local design experiment: calm tool chrome around the working canvas. */
+.compactConsole {
+  --compact-app-bar-height: 3.5rem;
+  --builder-focus: var(--builder-accent-dark);
+}
+
+.compactConsole :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--builder-focus);
+  outline-offset: 2px;
+}
+
+.compactConsole :is(.primaryButton, .compactAppBar .compactSaveButton) {
+  color: var(--builder-surface);
+}
+
+.compactWorkspaceTools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .25rem .65rem;
+  min-width: 0;
+  margin-bottom: .75rem;
+}
+
+.compactWorkspaceTools > label {
+  grid-column: 1 / -1;
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--builder-muted);
+}
+
+.compactWorkspaceTools > select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  border: 1px solid var(--builder-line-strong);
+  border-radius: .35rem;
+  padding: 0 .6rem;
+  background: var(--builder-surface);
+  color: var(--builder-ink);
+  font: inherit;
+  font-weight: 650;
+}
+
+.compactWorkspaceTools > button { white-space: nowrap; }
+
+.compactConsole .panelHead h3 {
+  color: var(--builder-ink);
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  line-height: 1.16;
+  font-weight: 750;
+  letter-spacing: -.025em;
+}
+
+.compactConsole .toolPanel :is(.fieldLabel, .assetLabel) {
+  font-family: var(--font-builder-sans);
+  font-size: .8rem;
+  letter-spacing: .01em;
+}
+
+.compactConsole .toolPanel :is(.textInput, .textArea, .imageDrop) {
+  border-color: var(--builder-line-strong);
+}
+
+.compactConsole .slotEditor,
+.compactConsole .exampleMainColumn {
+  background: color-mix(in srgb, var(--builder-surface) 65%, var(--builder-surface-alt));
+}
+
+.compactConsole .classActions .dangerButton:not(:hover) {
+  background: transparent;
+  border-color: var(--builder-line);
+}
+
+.compactConsole .slideItemHandout { box-shadow: none; }
+.compactConsole .slideItemHandout:not(.slideItemActive) { border-color: var(--builder-line); }
+.compactConsole .slideItemHandout .slideToolbar {
+  background: color-mix(in srgb, var(--builder-accent-soft) 35%, var(--builder-surface-alt));
+  color: var(--builder-ink);
+}
+
+.compactConsole .slideToolbar {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: .15rem .4rem;
+}
+
+.compactConsole .slideDragHandle { grid-row: 1; grid-column: 1; }
+.compactConsole .slideActions { grid-row: 1; grid-column: 4; }
+.compactConsole .slideTitleButton {
+  grid-row: 1;
+  grid-column: 2 / 4;
+  display: grid;
+  align-content: center;
+  gap: .1rem;
+  min-height: 2.75rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--builder-ink);
+  font-size: .82rem;
+  line-height: 1.25;
+}
+
+.compactConsole .handoutSlideToggle {
+  grid-row: 2;
+  grid-column: 1 / 3;
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: .4rem;
+  color: var(--builder-muted);
+  padding: 0 .25rem;
+  font-size: .75rem;
+  font-weight: 650;
+}
+
+.insertionBadge {
+  color: var(--builder-accent-dark);
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.editStarterButton {
+  grid-row: 2;
+  grid-column: 3 / 5;
+  justify-self: end;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: .25rem;
+  padding: 0 .5rem;
+  color: var(--builder-accent-dark);
+  background: transparent;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.editStarterButton:hover { background: var(--builder-accent-soft); }
+.compactDeckActions > button > small { font-size: .7rem; font-weight: 600; }
+
+@media (max-width: 1279px) {
+  .compactConsole .miniButton { min-width: 2.75rem; min-height: 2.75rem; }
+  .compactConsole .notificationToast { z-index: var(--builder-layer-sticky); }
+}
+
+@media (max-width: 639px) {
+  .compactConsole { --compact-app-bar-height: 4.9rem; }
+  .compactConsole .appShell { grid-template-rows: var(--compact-app-bar-height) minmax(0, 1fr); }
+  .compactConsole .compactAppBar {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: 2.8rem minmax(0, 1fr);
+    row-gap: 0;
+    align-items: center;
+    padding-block: .2rem;
+  }
+  .compactConsole .compactBrand { grid-column: 1; grid-row: 1; }
+  .compactConsole .compactLessonIdentity {
+    display: contents;
+    padding: 0;
+    border: 0;
+  }
+  .compactConsole .compactLessonTitleRow { display: contents; }
+  .compactConsole .compactLessonTitleRow strong {
+    grid-row: 2;
+    grid-column: 1 / 5;
+    padding: 0 .2rem;
+    font-size: .9rem;
+  }
+  .compactConsole .compactOverdueBadge {
+    grid-row: 2;
+    grid-column: 5;
+    justify-self: end;
+    font-size: .73rem;
+  }
+  .compactConsole .compactAppBar > .compactPresentButton { grid-column: 3; grid-row: 1; }
+  .compactConsole .compactAppBar > .compactSaveButton { grid-column: 4; grid-row: 1; }
+  .compactConsole .compactAppBar > div:last-child { grid-column: 5; grid-row: 1; }
+  .compactConsole .sidebar,
+  .compactConsole .previewPane { top: var(--compact-app-bar-height); }
+  .compactConsole .compactDrawerScrim { top: var(--compact-app-bar-height); }
+  .compactConsole .panelHead { gap: .55rem; }
+}
+
+@media (min-width: 640px) {
+  .compactWorkspaceTools { grid-template-columns: auto minmax(0, 16rem) 1fr; align-items: center; }
+  .compactWorkspaceTools > label { grid-column: auto; }
+  .compactWorkspaceTools > button { justify-self: end; }
+}
+
+@media (min-width: 1280px) {
+  .compactConsole .slideToolbar { padding-block: .3rem; gap: 0 .35rem; }
+  .compactConsole .slideTitleButton { min-height: 2.25rem; }
+  .compactConsole .handoutSlideToggle { min-height: 2rem; height: 2rem; }
+  .compactConsole .assetPairGrid > * .imageDrop { min-height: 7rem; }
+  .compactConsole .exampleMainColumn .imageDrop { min-height: 8rem; }
+  .compactConsole :is([data-testid="starter-panel"], [data-testid="example-panel"]) > .actionRow {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-inline: -1rem;
+    padding: .65rem 1rem;
+    background: var(--builder-surface);
   }
 }
 
