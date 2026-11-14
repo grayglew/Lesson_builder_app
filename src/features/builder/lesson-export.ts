@@ -156,8 +156,14 @@ export function buildStandaloneLessonHtml(
   ${classroom ? `<button class="presenter-tool presenter-ink-trigger" type="button" aria-label="Ink settings" title="Ink settings" aria-expanded="false" aria-controls="presenter-ink">${presenterIcon("ink")}</button>` : ""}
   <div id="presenter-ink" class="presenter-popover presenter-ink" ${classroom ? "hidden" : ""}>
   ${classroom ? "" : swatches}
-  <button id="presenter-color-picker" class="presenter-tool presenter-color-picker" type="button" aria-label="Choose a custom pen colour">${classroom ? "Custom colour" : "Pick"}</button>
-  <input id="presenter-custom-color" class="presenter-custom-color" type="color" value="#2563eb" aria-hidden="true" tabindex="-1">
+  ${classroom ? `<fieldset id="presenter-colour-controls" class="presenter-colour-controls">
+    <legend>Custom colour</legend>
+    <div class="presenter-colour-preview"><span aria-hidden="true"></span><output id="presenter-colour-value" aria-live="off">#2563EB</output></div>
+    <label>Hue <input type="range" min="0" max="359" step="1" value="221" data-colour-hue></label>
+    <label>Saturation <input type="range" min="0" max="100" step="1" value="84" data-colour-saturation></label>
+    <label>Brightness <input type="range" min="0" max="100" step="1" value="92" data-colour-brightness></label>
+  </fieldset>` : `<button id="presenter-color-picker" class="presenter-tool presenter-color-picker" type="button" aria-label="Choose a custom pen colour">Pick</button>
+  <input id="presenter-custom-color" class="presenter-custom-color" type="color" value="#2563eb" aria-hidden="true" tabindex="-1">`}
   <input id="presenter-color" type="hidden" value="#2563eb">
   ${classroom ? '<label class="presenter-size-label" for="presenter-size">Stroke size</label>' : ""}
   <input id="presenter-size" class="presenter-size" type="range" min="0.5" max="4" step="0.5" value="2" aria-label="Stroke size">
@@ -2106,6 +2112,42 @@ function standaloneInteractionScript() {
     window.__lessonPresenterRuntimeController?.setColor(customColor.value);
   });
 
+  const colourControls = document.getElementById("presenter-colour-controls");
+  const hue = colourControls?.querySelector("[data-colour-hue]");
+  const saturation = colourControls?.querySelector("[data-colour-saturation]");
+  const brightness = colourControls?.querySelector("[data-colour-brightness]");
+  const colourValue = document.getElementById("presenter-colour-value");
+  function showCustomColour(hex) {
+    colourValue.textContent = hex.toUpperCase();
+    colourControls.style.setProperty("--picker-hue", hue.value);
+    colourControls.style.setProperty("--picker-saturation", saturation.value + "%");
+  }
+  function syncCustomColour() {
+    const hex = document.getElementById("presenter-color").value;
+    const [r, g, b] = hex.slice(1).match(/../g).map(channel => parseInt(channel, 16) / 255);
+    const high = Math.max(r, g, b);
+    const delta = high - Math.min(r, g, b);
+    if (delta) {
+      const sector = high === r ? (g - b) / delta : high === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+      hue.value = String(Math.round((sector * 60 + 360) % 360) % 360);
+    }
+    saturation.value = String(high ? Math.round(delta / high * 100) : 0);
+    brightness.value = String(Math.round(high * 100));
+    showCustomColour(hex);
+  }
+  colourControls?.addEventListener("input", () => {
+    const sat = Number(saturation.value) / 100;
+    const value = Number(brightness.value) / 100;
+    // HSV to sRGB, with the offsets corresponding to red, green and blue.
+    const hex = "#" + [5, 3, 1].map(offset => {
+      const k = (offset + Number(hue.value) / 60) % 6;
+      const channel = value * (1 - sat * Math.max(0, Math.min(k, 4 - k, 1)));
+      return Math.round(channel * 255).toString(16).padStart(2, "0");
+    }).join("");
+    window.__lessonPresenterRuntimeController?.setColor(hex);
+    showCustomColour(hex);
+  });
+
   if (classroom) {
     const highlighter = document.getElementById("presenter-highlighter");
     const eraser = document.getElementById("presenter-eraser");
@@ -2156,7 +2198,12 @@ function standaloneInteractionScript() {
         disclosures.filter(other => other !== trigger).forEach(other => closeDisclosure(other, false));
         panel.hidden = false;
         trigger.setAttribute("aria-expanded", "true");
-        panel.querySelector("button:not([hidden]):not([disabled])")?.focus();
+        if (panel.id === "presenter-ink" && colourControls) {
+          syncCustomColour();
+          hue.focus();
+        } else {
+          panel.querySelector("button:not([hidden]):not([disabled])")?.focus();
+        }
       });
       panel.addEventListener("click", (event) => {
         const action = event.target.closest("button");

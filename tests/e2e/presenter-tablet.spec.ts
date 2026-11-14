@@ -125,7 +125,7 @@ test("zooming a middle slide and fitting it again keeps its reveal below the too
   await expect(page.getByRole("button", { name: "Show second image" })).toBeInViewport({ ratio: 1 });
 });
 
-test("the ink panel reports colour selection and returns focus to its trigger", async ({ page }) => {
+test("opening Ink settings shows the custom colour controls and stroke size together", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.setContent(html);
   const ink = page.getByRole("button", { name: "Ink settings" });
@@ -134,12 +134,25 @@ test("the ink panel reports colour selection and returns focus to its trigger", 
   await expect(red).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Blue pen colour" })).toHaveAttribute("aria-pressed", "false");
   await ink.press("Enter");
-  const picker = page.getByRole("button", { name: "Choose a custom pen colour" });
-  await expect(picker).toBeFocused();
+  const picker = page.getByRole("group", { name: "Custom colour" });
+  const hue = picker.getByRole("slider", { name: "Hue" });
+  const stroke = page.getByRole("slider", { name: "Stroke size" });
+  await expect(hue).toBeFocused({ timeout: 2000 });
+  await expect(stroke).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Choose a custom pen colour" })).toHaveCount(0);
+  await expect(picker.getByText("#DC2626")).toBeVisible();
+  await hue.fill("120");
+  await picker.getByRole("slider", { name: "Saturation" }).fill("100");
+  await picker.getByRole("slider", { name: "Brightness" }).fill("100");
+  await expect(picker.getByText("#00FF00")).toBeVisible();
+  await expect(ink.locator("svg")).toHaveCSS("fill", "rgb(0, 255, 0)");
+  await expect(red).toHaveAttribute("aria-pressed", "false");
+  await stroke.press("ArrowRight");
+  await expect(stroke).toHaveValue("2.5");
   const highlighter = page.getByRole("button", { name: "Highlighter", exact: true });
   await highlighter.click();
   await expect(highlighter).toHaveAttribute("aria-pressed", "true");
-  await picker.press("Escape");
+  await highlighter.press("Escape");
   await expect(picker).toBeHidden();
   await expect(red).toBeVisible();
   await expect(ink).toBeFocused();

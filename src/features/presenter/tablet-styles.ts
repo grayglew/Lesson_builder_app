@@ -69,6 +69,25 @@ export const TABLET_PRESENTER_CSS = `
   .presenter-classroom .presenter-color.is-active{background:#e5f3ed;box-shadow:none}
   .presenter-classroom .presenter-color.is-active::before{outline:2px solid var(--console-accent);outline-offset:3px}
   .presenter-classroom .presenter-color:focus-visible{outline:3px solid var(--console-accent);outline-offset:3px}
+  .presenter-colour-controls{
+    display:grid;gap:0;min-inline-size:0;margin:0;padding:0;border:0;color:var(--console-ink)
+  }
+  .presenter-colour-controls legend,.presenter-colour-controls label{font-size:.84rem;font-weight:750}
+  .presenter-colour-controls legend{margin-block-end:.35rem;padding:0}
+  .presenter-colour-preview{
+    display:flex;align-items:center;gap:.5rem;padding:.3rem .45rem;margin-block-end:.55rem;
+    border:1px solid var(--console-line);border-radius:.38rem;background:white;font-size:.84rem;font-variant-numeric:tabular-nums
+  }
+  .presenter-colour-preview span{width:1.2rem;height:1.2rem;border:1px solid #153b323d;border-radius:50%;background:var(--ink-colour,#2563eb)}
+  .presenter-colour-controls label{display:grid;min-inline-size:0}
+  .presenter-colour-controls input{width:100%;height:44px;margin:0;cursor:pointer;accent-color:var(--console-accent)}
+  .presenter-colour-controls input:focus-visible{outline:2px solid var(--console-accent);outline-offset:-2px}
+  .presenter-colour-controls input::-webkit-slider-runnable-track{height:.45rem;border:1px solid var(--console-line);border-radius:1rem;background:var(--picker-track)}
+  .presenter-colour-controls input::-webkit-slider-thumb{margin-block-start:-.35rem}
+  .presenter-colour-controls input::-moz-range-track{height:.45rem;border:1px solid var(--console-line);border-radius:1rem;background:var(--picker-track)}
+  [data-colour-hue]{--picker-track:linear-gradient(to right,red,#ff0,lime,cyan,blue,magenta,red)}
+  [data-colour-saturation]{--picker-track:linear-gradient(to right,white,hsl(var(--picker-hue) 100% 50%))}
+  [data-colour-brightness]{--picker-track:linear-gradient(to right,black,hsl(var(--picker-hue) var(--picker-saturation) calc(100% - var(--picker-saturation) / 2)))}
   .presenter-size-label{font-size:.84rem;font-weight:750;margin-top:.2rem}
   .presenter-classroom .presenter-size{height:44px;width:100%;margin:0}
   .presenter-classroom #presenter-clear{color:#a12720}
