@@ -9,14 +9,19 @@ import {
   listSavedLessons,
   openSavedLesson,
   updateSavedLessonMetadata,
+  createPresenterStudentSession,
 } from "@/features/builder/api-client";
 import {
   buildLessonBundleZip,
   downloadBlob,
+  prepareSavedLessonHtml,
 } from "@/features/builder/saved-lesson-export";
 import { createInitialBuilderDocument } from "@/features/builder/schema";
 import { useBuilderStore } from "@/features/builder/store";
 import { BundleDownloadQueueProvider } from "@/features/builder/BundleDownloads";
+import { openRecoverablePresenter } from "@/features/presenter/session-launch";
+
+vi.mock("@/features/presenter/session-launch", () => ({ openRecoverablePresenter: vi.fn() }));
 
 function render(ui: ReactElement) {
   return renderUi(<BundleDownloadQueueProvider>{ui}</BundleDownloadQueueProvider>);
@@ -31,6 +36,7 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
     listSavedLessons: vi.fn(),
     openSavedLesson: vi.fn(),
     updateSavedLessonMetadata: vi.fn(),
+    createPresenterStudentSession: vi.fn(),
   };
 });
 
@@ -80,6 +86,25 @@ describe("SavedLessonLibrary production actions", () => {
       ],
       totalByteSize: 300,
     });
+  });
+
+  it.each([false, true])("uses durable presenter launch and closes the preparing window on failure=%s", async (fails) => {
+    const popup = { document: { write: vi.fn() }, close: vi.fn(), focus: vi.fn() } as unknown as Window;
+    const open = vi.spyOn(window, "open").mockReturnValue(popup);
+    vi.mocked(openSavedLesson).mockResolvedValue({ document: createInitialBuilderDocument(), lesson: lesson("active", "Active lesson", "2026-04-02", false) } as never);
+    vi.mocked(createPresenterStudentSession).mockResolvedValue({ sessionId: "session", code: "ABC-123" } as never);
+    vi.mocked(prepareSavedLessonHtml).mockResolvedValue("prepared-presenter");
+    vi.mocked(openRecoverablePresenter).mockReset();
+    if (fails) vi.mocked(openRecoverablePresenter).mockRejectedValue(new Error("Storage full"));
+    else vi.mocked(openRecoverablePresenter).mockResolvedValue();
+    try {
+      render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
+      const rows = await screen.findAllByRole("row");
+      await userEvent.click(within(rows[1]).getByRole("button", { name: "Present lesson" }));
+      await waitFor(() => expect(openRecoverablePresenter).toHaveBeenCalledWith(popup, "prepared-presenter"));
+      if (fails) await waitFor(() => expect(popup.close).toHaveBeenCalled());
+      else await waitFor(() => expect(popup.focus).toHaveBeenCalled());
+    } finally { open.mockRestore(); }
   });
 
   it("keeps primary actions visible and groups secondary actions without losing parity", async () => {

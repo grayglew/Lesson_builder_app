@@ -57,6 +57,7 @@ import {
 } from "./saved-lesson-parity";
 import { selectDocument, useBuilderStore } from "./store";
 import { BundleDownloadQueuePanel, useBundleDownloads } from "./BundleDownloads";
+import { openRecoverablePresenter } from "../presenter/session-launch";
 
 export function SavedLessonLibrary({
   onBack,
@@ -276,10 +277,8 @@ export function SavedLessonLibrary({
         studentSession: session,
         retrievalItems: document.retrievalItems,
       });
-      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-      previewWindow.location.replace(url);
+      await openRecoverablePresenter(previewWindow, html);
       previewWindow.focus();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       setStatus({
         tone: sessionWarning ? "warning" : "success",
         message: `Opened "${lesson.title}" in the presenter.${sessionWarning}`,

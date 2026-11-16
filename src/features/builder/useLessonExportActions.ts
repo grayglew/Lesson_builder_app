@@ -22,6 +22,7 @@ import {
 } from "./handout-export";
 import { prepareBuilderDocumentForExport } from "./prepare-export-document";
 import type { BuilderDocument, RetrievalItem } from "./schema";
+import { openRecoverablePresenter } from "../presenter/session-launch";
 
 type CurrentOutputDependencies = {
   prepareDocument?: (
@@ -341,11 +342,13 @@ export function useLessonExportActions() {
             ),
             warnings: [] as string[],
           };
-      const previewUrl = URL.createObjectURL(
-        new Blob([output.html], { type: "text/html" }),
-      );
-      previewWindow.location.replace(previewUrl);
-      window.setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
+      if (handout) {
+        const previewUrl = URL.createObjectURL(new Blob([output.html], { type: "text/html" }));
+        previewWindow.location.replace(previewUrl);
+        window.setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
+      } else {
+        await openRecoverablePresenter(previewWindow, output.html);
+      }
       previewWindow.focus();
       setStatus({
         tone: output.warnings.length ? "warning" : "success",

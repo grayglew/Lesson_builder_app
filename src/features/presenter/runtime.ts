@@ -934,6 +934,7 @@ export function autoMountPresenterRuntime(): PresenterRuntimeController | null {
     return null;
   }
   const controller = mountPresenterRuntime({
+    onAnnotationsChange: () => document.dispatchEvent(new Event("lessonpresenterchange")),
     confirmClear: () =>
       window.__lessonPresenterNotifications?.confirm({
         title: "Clear all annotations?",

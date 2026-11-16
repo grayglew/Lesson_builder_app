@@ -17,8 +17,10 @@ import { renderStaticAnnotationSvg } from "./static-annotations";
 import { extractRetrievalLoCode } from "./example";
 import { studentSnapshotRuntimeSource } from "./student-snapshot-runtime";
 import { TABLET_PRESENTER_CSS } from "../presenter/tablet-styles";
+import type { PresenterResume } from "../presenter/session-types";
 
 export type StandaloneLessonOptions = {
+  presenterResume?: PresenterResume;
   runtimeCss?: string;
   runtimeJavaScript?: string;
   handout?: boolean;
@@ -131,7 +133,8 @@ export function buildStandaloneLessonHtml(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
-<style data-lesson-builder-style>${standaloneLessonCss()}${options.runtimeCss || ""}</style>
+<style data-lesson-builder-style>${standaloneLessonCss()}</style>
+<style data-presenter-runtime-style>${options.runtimeCss || ""}</style>
 </head>
 <body class="annotation-pan${handoutClass}${classroom ? " presenter-classroom" : ""}">
 <header class="lesson-header">
@@ -220,8 +223,9 @@ ${classroom ? "" : studentCode}
 <script type="application/json" id="lesson-live-retrieval">${escapeJsonForHtml(JSON.stringify(liveRetrieval))}</script>
 <script type="application/json" id="lesson-presenter-config">${escapeJsonForHtml(JSON.stringify(presenterConfig))}</script>
 <script type="application/json" id="lesson-annotations-data">${escapeJsonForHtml(JSON.stringify(annotations))}</script>
+<script type="application/json" id="lesson-presenter-recovery">${escapeJsonForHtml(JSON.stringify(options.presenterResume || null))}</script>
 <script>${standaloneInteractionScript()}</script>
-<script>${options.runtimeJavaScript || ""}</script>
+<script data-presenter-runtime>${options.runtimeJavaScript || ""}</script>
 </body>
 </html>`;
 }
@@ -275,6 +279,7 @@ export function normalizeImportedBuilderDocument(
 export type EmbedRemoteBuilderAssetsOptions = {
   managedAssetFailure?: "preserve" | "throw";
   traversalScope?: "document" | "slides";
+  signal?: AbortSignal;
 };
 
 type EmbeddedAssetResult =
@@ -309,7 +314,7 @@ export async function embedRemoteBuilderAssets(
       if (!/^(?:https?:\/\/|blob:)/i.test(source)) return;
       let pending = dataUrlCache.get(source);
       if (!pending) {
-        pending = fetch(source, { cache: "no-store" })
+        pending = fetch(source, { cache: "no-store", ...(options.signal ? { signal: options.signal } : {}) })
           .then(async (response): Promise<EmbeddedAssetResult> => {
             const status = Number(response.status || 0);
             if (!response.ok && !(status >= 200 && status < 300)) {
@@ -668,16 +673,28 @@ function standaloneInteractionScript() {
   const builderStateElement = document.getElementById("lesson-builder-state");
   const liveRetrieval = readJsonScript("lesson-live-retrieval");
   const presenterConfig = readJsonScript("lesson-presenter-config");
-  const presentedAt = new Date().toISOString();
-  let presentedLessonId = "";
-  let presentedLessonTitle = "";
-  const confidencePoll = {
+  const presenterResume = readJsonScript("lesson-presenter-recovery");
+  const presentedAt = presenterResume?.presentedAt || new Date().toISOString();
+  let presentedLessonId = presenterResume?.presentedLessonId || "";
+  let presentedLessonTitle = presenterResume?.presentedLessonTitle || "";
+  const confidencePoll = presenterResume?.confidencePoll || {
     counts: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
     completedAt: "",
     locked: false,
+    saved: false,
   };
+  // A discarded page may have checkpointed an in-flight End poll request.
+  // Never turn that temporary lock into a false successful cloud save.
+  if (presenterResume && confidencePoll.locked && !confidencePoll.saved) {
+    confidencePoll.locked = false;
+    confidencePoll.completedAt = "";
+  }
   const presenterNotifications = createPresenterNotifications();
   window.__lessonPresenterNotifications = presenterNotifications;
+
+  function recoveryChanged() {
+    if (classroom) document.dispatchEvent(new Event("lessonpresenterchange"));
+  }
 
   if (presenterConfig?.enabled) {
     if (pollButton) pollButton.hidden = false;
@@ -911,6 +928,7 @@ function standaloneInteractionScript() {
 
   function updateSlideNavigation(index = visibleSlideIndex()) {
     if (!slidePosition || !slides[index]) return;
+    const changed = displayedSlide !== index;
     displayedSlide = index;
     const title = slides[index].getAttribute("aria-label")?.replace(/^Slide \d+:\s*/, "") || "Slide";
     const count = (index + 1) + " / " + slides.length;
@@ -938,6 +956,7 @@ function standaloneInteractionScript() {
         }
       });
     });
+    if (changed) recoveryChanged();
   }
 
   function showSlide(index) {
@@ -1411,6 +1430,7 @@ function standaloneInteractionScript() {
       const result = data?.result || {};
       replaceLiveStarterImage(button, result);
       updateLiveRetrievalControls(button, result);
+      recoveryChanged();
       setLiveControlStatus(button, "Loaded", "is-saved");
       window.setTimeout(() => {
         setLiveControlStatus(button, originalText, "", false);
@@ -1809,6 +1829,7 @@ function standaloneInteractionScript() {
         "Could not complete the taught lesson save.",
       );
       presentedLessonId = completed?.lesson?.id || ticket.id;
+      recoveryChanged();
       const taughtResponse = await fetch(presenterConfig.taughtEndpoint, {
         method: "POST",
         credentials: "same-origin",
@@ -1826,6 +1847,7 @@ function standaloneInteractionScript() {
       );
       throw error;
     } finally {
+      recoveryChanged();
       if (saveBuilderButton) {
         saveBuilderButton.disabled = false;
         if (classroom) saveBuilderButton.removeAttribute("aria-busy");
@@ -2031,12 +2053,14 @@ function standaloneInteractionScript() {
         (Number(confidencePoll.counts[score]) || 0) + 1;
       confidencePoll.completedAt = "";
       updateConfidencePoll();
+      recoveryChanged();
       return;
     }
     const confidenceEnd = event.target.closest("[data-confidence-end]");
     if (confidenceEnd) {
       if (confidencePoll.locked) return;
       confidencePoll.locked = true;
+      confidencePoll.saved = false;
       const choices = confidenceEnd.closest(".lesson-slide")?.querySelectorAll("[data-confidence-score]") || [];
       choices.forEach(choice => { choice.disabled = true; });
       confidenceEnd.disabled = true;
@@ -2045,7 +2069,9 @@ function standaloneInteractionScript() {
       void savePresentedLesson()
         .then((saved) => {
           if (!saved) throw new Error("The poll was not saved.");
+          confidencePoll.saved = true;
           confidenceEnd.textContent = "Saved";
+          recoveryChanged();
         })
         .catch(() => {
           confidencePoll.locked = false;
@@ -2053,6 +2079,7 @@ function standaloneInteractionScript() {
           choices.forEach(choice => { choice.disabled = false; });
           confidenceEnd.disabled = false;
           confidenceEnd.textContent = classroom ? "End poll and save" : "End lesson";
+          recoveryChanged();
         });
       return;
     }
@@ -2061,6 +2088,7 @@ function standaloneInteractionScript() {
       const showing = toggle.classList.toggle("is-showing-answer");
       toggle.setAttribute("aria-pressed", String(showing));
       refreshAnswerLabel(toggle);
+      recoveryChanged();
       return;
     }
     const reveal = event.target.closest("[data-example-reveal]");
@@ -2071,6 +2099,7 @@ function standaloneInteractionScript() {
       region?.setAttribute("aria-hidden", String(!shouldReveal));
       reveal.setAttribute("aria-expanded", String(shouldReveal));
       reveal.textContent = shouldReveal ? "Hide second image" : "Show second image";
+      recoveryChanged();
     }
   });
 
@@ -2078,7 +2107,7 @@ function standaloneInteractionScript() {
   pollButton?.addEventListener("click", showConfidencePollSlide);
   saveBuilderButton?.addEventListener("click", () => void savePresentedLesson().catch(() => {}));
   studentUploadButton?.addEventListener("click", () => void uploadStudentSnapshot());
-  if (hasStudentSessionConfig()) {
+  if (hasStudentSessionConfig() && !presenterResume) {
     window.setTimeout(
       () => void uploadStudentSnapshot({ silent: true }),
       350,
@@ -2280,9 +2309,50 @@ function standaloneInteractionScript() {
   document.addEventListener("fullscreenchange", updateFullscreenUi);
 
   refreshSlides();
+  if (classroom && presenterResume && Number.isInteger(presenterResume.pollIndex) && presenterResume.pollIndex >= 0) {
+    const index = Math.min(presenterResume.pollIndex, slides.length);
+    const before = slides[index];
+    showConfidencePollSlide();
+    const poll = deck?.querySelector('[data-generated-poll="true"]');
+    if (poll) {
+      if (before) deck.insertBefore(poll, before);
+      else deck.appendChild(poll);
+      updateConfidencePoll();
+      poll.querySelectorAll("[data-confidence-score],[data-confidence-end]").forEach(button => { button.disabled = confidencePoll.locked; });
+      if (confidencePoll.locked) poll.querySelector("[data-confidence-end]").textContent = "Saved";
+      // Runtime mounts after this script; shift ink indices around the transient poll.
+      const data = document.getElementById("lesson-annotations-data");
+      const annotations = readJsonScript("lesson-annotations-data") || {};
+      const shifted = {};
+      Object.entries(annotations).forEach(([key, value]) => { shifted[Number(key) >= index ? Number(key) + 1 : key] = value; });
+      shifted[index] = presenterResume.pollAnnotations || [];
+      if (data) data.textContent = JSON.stringify(shifted);
+      refreshSlides();
+    }
+  }
   if (!document.body.classList.contains("handout-mode")) {
     updatePresentationLayout();
-    if (classroom) showSlide(0);
+    if (classroom) {
+      const byId = slides.findIndex(slide => slide.dataset.builderSlideId === presenterResume?.slideId);
+      const index = byId >= 0 ? byId : Math.max(0, Math.min(slides.length - 1, Number(presenterResume?.slideIndex) || 0));
+      showSlide(index);
+    }
+  }
+  if (classroom) {
+    window.__lessonPresenterRecovery = {
+      capture() {
+        const state = syncBuilderStateForSave();
+        const pollIndex = slides.findIndex(slide => slide.dataset.generatedPoll === "true");
+        return {
+          document: state,
+          slideId: slides[displayedSlide]?.dataset.builderSlideId || "",
+          slideIndex: displayedSlide,
+          presentedAt, presentedLessonId, presentedLessonTitle,
+          confidencePoll: structuredClone(confidencePoll), pollIndex,
+          pollAnnotations: window.__lessonPresenterRuntimeController?.getAnnotations()?.[String(pollIndex)] || [],
+        };
+      },
+    };
   }
 })();`;
 }
