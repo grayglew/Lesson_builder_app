@@ -65,6 +65,7 @@ const presenterIcons = {
   full: '<path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/>',
   exitFull: '<path d="M4 9h5V4m11 5h-5V4M4 15h5v5m11-5h-5v5"/>',
   ink: '<path d="M12 3c2 3 6 7 6 11a6 6 0 1 1-12 0c0-4 4-8 6-11Z"/>',
+  blankSlide: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 12h8m-4-4v8"/>',
   save: '<path d="M5 3h12l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M7 3v6h9V3M7 21v-8h10v8"/>',
   student: '<path d="M3 12V5h18v7M8 21h8m-4-4v4M3 16h18m-9-2V8m-3 3 3-3 3 3"/>',
   busy: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
@@ -176,14 +177,14 @@ export function buildStandaloneLessonHtml(
   <button id="presenter-zoom" class="presenter-tool" type="button" aria-label="Zoom in 60 percent" title="Zoom in 60 percent" aria-pressed="false">${classroom ? presenterIcon("zoom", "presenter-off-icon") + presenterIcon("fit", "presenter-on-icon") : "60%"}</button>
   <button id="presenter-fullscreen" class="presenter-tool" type="button" aria-label="${classroom ? "Enter full screen" : "Toggle full screen"}" title="Enter full screen" aria-pressed="false">${classroom ? presenterIcon("full", "presenter-off-icon") + presenterIcon("exitFull", "presenter-on-icon") : "Full"}</button>
   </div>
-  ${classroom ? `${saveTaught}${publishStudent}<div class="presenter-code-slot">${studentCode}</div>` : ""}
+  ${classroom ? `<button id="presenter-blank-slide" class="presenter-tool presenter-insert-tool" type="button" aria-label="Add blank slide" title="Add blank slide">${presenterIcon("blankSlide")}</button>${saveTaught}${publishStudent}<div class="presenter-code-slot">${studentCode}</div>` : ""}
   <div class="presenter-disclosure presenter-lesson-actions">
   ${classroom ? `<button class="presenter-tool" type="button" aria-label="Lesson actions" title="Lesson actions" aria-expanded="false" aria-controls="presenter-actions">${presenterIcon("more")}</button>` : ""}
   <div id="presenter-actions" class="presenter-popover presenter-actions" ${classroom ? "hidden" : ""}>
   ${classroom ? `<div class="presenter-action-heading presenter-menu-title" title="${escapeAttr(document.title || "Lesson")}">${title}</div>` : ""}
   <div class="presenter-action-group" role="group" aria-label="Insert slide">
   ${classroom ? '<div class="presenter-action-heading" aria-hidden="true">Insert slide</div>' : ""}
-  <button id="presenter-blank-slide" class="presenter-tool" type="button" aria-label="Add blank slide">${classroom ? "Add blank slide" : "+"}</button>
+  ${classroom ? "" : '<button id="presenter-blank-slide" class="presenter-tool" type="button" aria-label="Add blank slide">+</button>'}
   <button id="presenter-camera" class="presenter-tool" type="button" aria-label="${classroom ? "Add photo to slide" : "Take a photo and add it as a slide"}">${classroom ? "Add photo" : "Camera"}</button>
   <input id="presenter-camera-input" class="presenter-camera-input" type="file" accept="image/*" capture="environment" aria-hidden="true" tabindex="-1">
   </div>
@@ -2146,19 +2147,20 @@ function standaloneInteractionScript() {
     const highlighter = document.getElementById("presenter-highlighter");
     const eraser = document.getElementById("presenter-eraser");
     const compactInkTools = document.getElementById("presenter-compact-ink-tools");
+    const annotationModes = document.querySelector(".presenter-modes");
     const compactToolbar = window.matchMedia("(width < 920px)");
-    function placeHighlighter() {
-      if (!highlighter || !eraser || !compactInkTools) return;
-      const wasFocused = document.activeElement === highlighter;
-      if (compactToolbar.matches) compactInkTools.append(highlighter);
-      else eraser.before(highlighter);
-      if (wasFocused) {
-        if (highlighter.closest("[hidden]")) document.querySelector(".presenter-ink-trigger")?.focus();
-        else highlighter.focus();
+    function placeCompactInkTools() {
+      if (!highlighter || !eraser || !compactInkTools || !annotationModes) return;
+      const focusedTool = [highlighter, eraser].find(tool => document.activeElement === tool);
+      if (compactToolbar.matches) compactInkTools.append(highlighter, eraser);
+      else annotationModes.append(highlighter, eraser);
+      if (focusedTool) {
+        if (focusedTool.closest("[hidden]")) document.querySelector(".presenter-ink-trigger")?.focus();
+        else focusedTool.focus();
       }
     }
-    placeHighlighter();
-    compactToolbar.addEventListener("change", placeHighlighter);
+    placeCompactInkTools();
+    compactToolbar.addEventListener("change", placeCompactInkTools);
     document.querySelectorAll("[data-qa-toggle]").forEach(refreshAnswerLabel);
     previousSlide?.addEventListener("click", () => showSlide(displayedSlide - 1));
     nextSlide?.addEventListener("click", () => showSlide(displayedSlide + 1));

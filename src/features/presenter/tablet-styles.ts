@@ -26,7 +26,7 @@ export const TABLET_PRESENTER_CSS = `
   .presenter-classroom .presenter-tool:is(:disabled,[aria-disabled="true"]){color:#647b74;background:#eef2f0;cursor:default}
   .presenter-classroom .presenter-tool.is-active,.presenter-classroom .presenter-tool.primary{background:var(--console-accent);border-color:var(--console-accent);color:white}
   .presenter-classroom .presenter-tools :is(.presenter-pager,.presenter-modes,.presenter-view-tools) .presenter-tool,
-  .presenter-classroom :is(#presenter-undo,.presenter-session-tool),
+  .presenter-classroom :is(#presenter-undo,.presenter-session-tool,.presenter-insert-tool),
   .presenter-classroom .presenter-disclosure > .presenter-tool{
     padding:0;width:44px;border-color:transparent;background:transparent
   }

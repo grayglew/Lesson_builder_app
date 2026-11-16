@@ -27,6 +27,46 @@ const html = buildStandaloneLessonHtml(lesson, {
   },
 });
 
+for (const viewport of [{ width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 1180, height: 820 }]) {
+  test(`Add blank slide is directly accessible on the ${viewport.width}px toolbar`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setContent(html);
+    const toolbar = page.getByRole("region", { name: "Presenter controls" });
+    const addBlank = toolbar.getByRole("button", { name: "Add blank slide", exact: true });
+    await expect(addBlank).toBeInViewport({ ratio: 1, timeout: 2000 });
+    await expect(addBlank.locator("svg")).toBeVisible();
+    await expect(page.locator("#presenter-actions")).toBeHidden();
+    const bounds = (await addBlank.boundingBox())!;
+    expect(bounds.width).toBeGreaterThanOrEqual(44);
+    expect(bounds.height).toBeGreaterThanOrEqual(44);
+    expect((await toolbar.boundingBox())!.height).toBeLessThanOrEqual(56);
+    for (const name of ["Save to Builder", "Update student view", "Lesson actions"]) {
+      await expect(toolbar.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+    }
+    await toolbar.getByRole("button", { name: "Next slide", exact: true }).click();
+    await expect(page.locator("#presenter-slide-position")).toContainText("2 / 5");
+    await addBlank.focus();
+    await page.keyboard.press("Enter");
+    const slides = page.locator(".lesson-deck > .lesson-slide");
+    await expect(slides).toHaveCount(6);
+    await expect(slides.nth(1)).toHaveAttribute("data-builder-slide-id", "practice");
+    await expect(slides.nth(2)).toHaveAttribute("data-builder-slide-type", "blank");
+    await expect(slides.nth(3)).toHaveAttribute("data-builder-slide-id", "work");
+    await expect(page.locator("#presenter-slide-position")).toContainText("3 / 6");
+    await expect(page.locator("#presenter-actions")).toBeHidden();
+    if (viewport.width < 920) {
+      await toolbar.getByRole("button", { name: "Ink settings" }).click();
+      for (const name of ["Highlighter", "Erase"]) {
+        await expect(page.locator("#presenter-ink").getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+      }
+      await toolbar.getByRole("button", { name: "Ink settings" }).click();
+      await page.setViewportSize({ width: 1024, height: 768 });
+      await expect(toolbar.getByRole("group", { name: "Annotation mode" }).getByRole("button", { name: "Erase", exact: true })).toBeInViewport({ ratio: 1 });
+    }
+  });
+}
+
 test("advancing a linked Starter updates only the images still sourced from the bank", async ({ page }) => {
   const lesson = createInitialBuilderDocument();
   const replacement = { ...picture, dataUrl: picture.dataUrl.replace("width='200'", "width='220'") };
