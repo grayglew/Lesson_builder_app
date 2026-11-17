@@ -7,7 +7,8 @@ const STUDENT_SHARED_VIEW_CSS =
   "body.student-shared-view .lesson-deck{display:grid;gap:16px;place-items:center;margin:0;padding:16px;box-sizing:border-box;touch-action:pan-y pinch-zoom}" +
   "body.student-shared-view .lesson-slide{display:block;width:min(1120px,calc(100vw - 32px));height:auto;max-height:none;aspect-ratio:var(--slide-aspect,1.6);margin:0;box-shadow:0 8px 22px rgba(19,37,42,.12);zoom:1!important}" +
   "body.student-shared-view .lesson-slide,body.student-shared-view .lesson-slide *{touch-action:pan-y pinch-zoom!important}" +
-  "body.student-shared-view .annotation-svg{pointer-events:none!important}" +
+  // Student snapshots deliberately omit the presenter's runtime stylesheet.
+  "body.student-shared-view .lesson-slide > svg.annotation-svg{position:absolute;inset:0;z-index:8;width:100%;height:100%;pointer-events:none!important}" +
   "@media(max-width:760px){body.student-shared-view .lesson-header{margin:8px 8px 0}body.student-shared-view .lesson-deck{padding:8px}body.student-shared-view .lesson-slide{width:calc(100vw - 16px)}}";
 
 export function studentSnapshotRuntimeSource() {

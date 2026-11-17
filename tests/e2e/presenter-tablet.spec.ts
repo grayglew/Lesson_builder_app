@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { buildSync } from "esbuild";
 import { readFileSync } from "node:fs";
 import { buildStandaloneLessonHtml } from "../../src/features/builder/lesson-export";
 import { createInitialBuilderDocument } from "../../src/features/builder/schema";
@@ -373,6 +374,90 @@ test("the toolbar publishes the student view without opening Lesson actions", as
   await expect(page.getByText("Student view updated. Code: ABC-123")).toBeVisible();
   await expect(update).toBeEnabled();
   await expect(page.getByRole("button", { name: "Lesson actions" })).toHaveAttribute("aria-expanded", "false");
+});
+
+test("an open student view displays teacher ink after the presenter publishes an update", async ({ page, context }) => {
+  const studentRuntime = buildSync({
+    stdin: {
+      contents: `import { createRoot } from "react-dom/client";
+        import StudentViewer from "./src/app/student/StudentViewer";
+        createRoot(document.getElementById("root")!).render(<StudentViewer initialCode="ABC-123" />);`,
+      loader: "tsx",
+      resolveDir: process.cwd(),
+    },
+    bundle: true,
+    jsx: "automatic",
+    write: false,
+  }).outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
+
+  let pendingSnapshot = "";
+  let snapshot = "";
+  let version = 0;
+  await context.route("https://presenter.test/**", async route => {
+    switch (new URL(route.request().url()).pathname) {
+      case "/": return route.fulfill({ contentType: "text/html", body: html });
+      case "/student": return route.fulfill({
+        contentType: "text/html",
+        body: `<!doctype html><div id="root"></div><script>${studentRuntime}</script>`,
+      });
+      case "/student-ticket": return route.fulfill({ json: { ok: true, signedUrl: "/student-upload", path: "snapshot.json" } });
+      case "/student-upload": {
+        const upload = await new Response(Uint8Array.from(route.request().postDataBuffer()!), {
+          headers: { "Content-Type": route.request().headers()["content-type"] },
+        }).formData();
+        const file = upload.get("");
+        if (!(file instanceof File)) throw new Error("Student snapshot was not uploaded as a file.");
+        pendingSnapshot = await file.text();
+        return route.fulfill({ status: 200, body: "" });
+      }
+      case "/student-complete":
+        snapshot = pendingSnapshot;
+        return route.fulfill({ json: { ok: true, version: ++version } });
+      case "/api/student/session/open": return route.fulfill({ json: { ok: true, version, snapshotUrl: "/snapshot.json" } });
+      case "/snapshot.json": return route.fulfill({ contentType: "application/json", body: snapshot });
+      default: return route.abort();
+    }
+  });
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  const firstPublish = page.waitForResponse(response => response.url().endsWith("/student-complete"));
+  await page.goto("https://presenter.test/");
+  await firstPublish;
+
+  const student = await context.newPage();
+  await student.goto("https://presenter.test/student");
+  const studentFrame = student.frameLocator("iframe");
+  await expect(student.getByText(/version 1/)).toBeVisible();
+  await expect(studentFrame.locator(".annotation-svg path")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Pen", exact: true }).click();
+  await page.mouse.move(220, 330);
+  await page.mouse.down();
+  await page.mouse.move(320, 380, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.locator(".annotation-svg path")).toHaveCount(1);
+  await page.getByRole("button", { name: "Update student view", exact: true }).click();
+  await expect(page.getByText("Student view updated. Code: ABC-123")).toBeVisible();
+
+  await expect(student.getByText(/version 2/)).toBeVisible({ timeout: 8_000 });
+  const starter = studentFrame.locator('[data-builder-slide-id="starter"]');
+  await expect(starter.locator(".annotation-svg path")).toHaveCount(1);
+  const geometry = await starter.locator(".annotation-svg").evaluate(svg => {
+    const ink = svg.getBoundingClientRect();
+    const slide = svg.parentElement!;
+    const box = slide.getBoundingClientRect();
+    return {
+      position: getComputedStyle(svg).position,
+      coversSlide: Math.abs(ink.width - slide.clientWidth) <= 1 &&
+        Math.abs(ink.height - slide.clientHeight) <= 1 &&
+        Math.abs(ink.top - box.top - slide.clientTop) <= 1,
+    };
+  });
+  expect(geometry).toEqual({ position: "absolute", coversSlide: true });
+  await expect(studentFrame.getByRole("button", { name: "Pen", exact: true })).toHaveCount(0);
+  const reveal = starter.locator("[data-student-qa-toggle]").first();
+  await reveal.click();
+  await expect(reveal).toHaveAttribute("aria-pressed", "true");
 });
 
 test.describe("teacher tablet touch", () => {
