@@ -70,6 +70,7 @@ import { UnitOfWorkSelector } from "./UnitOfWorkSelector";
 import { UnitResourceSlide } from "./UnitResourceSlide";
 import { hasUnitResources } from "./unit-resources";
 import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
+import { mergeWorkspaceUnitLibraries } from "./workspace-unit-library";
 import { type BuilderSlide } from "./schema";
 import {
   selectDocument,
@@ -216,7 +217,21 @@ function BuilderShellWorkspace({
     : undefined;
   const unitEditor = useRef<UnitOfWorkEditorHandle>(null);
   const lessonActions = useLessonExportActions();
-  const workspaceAutosave = useWorkspaceAutosave(document, hydrated);
+  const [startupAttempt, setStartupAttempt] = useState(0);
+  const [cloudStartup, setCloudStartup] = useState({ ready: false, syncedVersion: "" });
+  const [startupFailed, setStartupFailed] = useState(false);
+  const autosave = useWorkspaceAutosave(document, hydrated, {
+    cloudReady: cloudStartup.ready,
+    syncedVersion: cloudStartup.syncedVersion,
+  });
+  const workspaceAutosave = {
+    ...autosave,
+    ...(startupFailed ? {
+      phase: "error" as const,
+      message: "Cloud workspace check failed; browser copy is safe. Retry to reconnect.",
+    } : {}),
+    retry: cloudStartup.ready ? autosave.retry : async () => { setStartupAttempt(attempt => attempt + 1); },
+  };
   const lessonDrawerRef = useActiveDialogFocus<HTMLElement>(
     () => setCompactMobilePanel("build"),
     variant === "compact-console" &&
@@ -374,30 +389,45 @@ function BuilderShellWorkspace({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     async function boot() {
-      const cached = await loadV2CachedDocument();
+      setCloudStartup({ ready: false, syncedVersion: "" });
+      setStartupFailed(false);
+      const cached = startupAttempt === 0 ? await loadV2CachedDocument() : useBuilderStore.getState().document;
       if (cancelled) return;
-      if (cached) {
+      if (cached && startupAttempt === 0) {
         hydrate(cached);
         setStatus({
           tone: "working",
           message: "Loaded the browser recovery copy; checking Supabase...",
         });
       }
+      const baseline = useBuilderStore.getState().document;
 
       try {
-        const remote = await loadBuilderDocument();
+        const remote = await loadBuilderDocument(controller.signal);
         if (cancelled) return;
         const current = useBuilderStore.getState().document;
+        const editedDuringStartup = current.updatedAt !== baseline.updatedAt;
         const shouldUseRemote =
           remote &&
+          !editedDuringStartup &&
           (!cached ||
             timestampValue(remote.updatedAt) >= timestampValue(current.updatedAt));
+        const unitsOfWork = shouldUseRemote
+          ? mergeWorkspaceUnitLibraries(remote.unitsOfWork, current.unitsOfWork)
+          : mergeWorkspaceUnitLibraries(current.unitsOfWork, remote?.unitsOfWork ?? []);
+        const remoteUnitsChanged = remote && JSON.stringify(unitsOfWork) !== JSON.stringify(remote.unitsOfWork);
+        const localUnitsChanged = JSON.stringify(unitsOfWork) !== JSON.stringify(current.unitsOfWork);
         if (shouldUseRemote) {
-          hydrate(remote);
+          hydrate(remoteUnitsChanged ? { ...remote, unitsOfWork, updatedAt: new Date().toISOString() } : remote);
           setStatus({ tone: "idle", message: "" });
-        } else if (cached) {
+        } else if (cached || editedDuringStartup) {
+          if (remote) updateGlobalData(remote);
+          if (localUnitsChanged) {
+            useBuilderStore.setState(state => ({ document: { ...state.document, unitsOfWork, updatedAt: new Date().toISOString() } }));
+          }
           setStatus({
             tone: "warning",
             message: "Kept the newer browser recovery copy.",
@@ -405,9 +435,11 @@ function BuilderShellWorkspace({
         } else {
           hydrate(remote ?? undefined);
         }
+        setCloudStartup({ ready: true, syncedVersion: shouldUseRemote && !remoteUnitsChanged ? remote.updatedAt : "" });
       } catch (error) {
         if (cancelled) return;
-        if (!cached) hydrate(undefined);
+        setStartupFailed(true);
+        if (!cached && useBuilderStore.getState().document === baseline) hydrate(undefined);
         setStatus({
           tone: "warning",
           message: cached
@@ -420,8 +452,9 @@ function BuilderShellWorkspace({
     void boot();
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [hydrate, setStatus]);
+  }, [hydrate, setStatus, startupAttempt, updateGlobalData]);
 
   useEffect(() => {
     if (!hydrated || activeTool !== "retrieval") return;
@@ -451,6 +484,10 @@ function BuilderShellWorkspace({
   }, [activeTool, document.className, hydrated, setStatus, updateGlobalData]);
 
   async function saveLesson(copy: boolean) {
+    if (!cloudStartup.ready) {
+      setStatus({ tone: "warning", message: "Wait for the cloud workspace check before saving. Use Retry if the check failed." });
+      return;
+    }
     if (!document.className.trim()) {
       setStatus({ tone: "error", message: "Choose a class before saving." });
       return;
@@ -586,6 +623,10 @@ function BuilderShellWorkspace({
   }
 
   async function createAndSaveNewLesson(details: NewLessonDetails) {
+    if (!cloudStartup.ready) {
+      setStatus({ tone: "warning", message: "Wait for the cloud workspace check before creating a lesson. Use Retry if the check failed." });
+      return;
+    }
     setBusyAction("new-lesson");
 
     try {

@@ -183,4 +183,22 @@ describe("workspace autosave", () => {
 
     expect(event.defaultPrevented).toBe(true);
   });
+
+  it("keeps local recovery without uploading before the initial cloud comparison", async () => {
+    const document = createInitialBuilderDocument("2026-11-17T00:00:00.000Z");
+    renderHook(() => useWorkspaceAutosave(document, true, { cloudReady: false }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(saveV2CachedDocument).toHaveBeenCalledWith(document);
+    expect(syncBuilderDocument).not.toHaveBeenCalled();
+  });
+
+  it("does not reupload an unchanged workspace loaded from the cloud", async () => {
+    const document = createInitialBuilderDocument("2026-11-17T00:00:00.000Z");
+    const { result } = renderHook(() => useWorkspaceAutosave(document, true, {
+      cloudReady: true, syncedVersion: document.updatedAt,
+    }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(syncBuilderDocument).not.toHaveBeenCalled();
+    expect(result.current.phase).toBe("saved");
+  });
 });

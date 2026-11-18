@@ -151,6 +151,9 @@ type WorkspaceSyncListener = (result: WorkspaceSyncResult) => void;
 
 const workspaceSyncListeners = new Set<WorkspaceSyncListener>();
 let workspaceSyncQueue: Promise<void> = Promise.resolve();
+// Authority comes from the workspace actually loaded, never a later HEAD read.
+let loadedWorkspaceRevision: string | undefined;
+let workspaceLoadGeneration = 0;
 
 export function subscribeWorkspaceSync(listener: WorkspaceSyncListener) {
   workspaceSyncListeners.add(listener);
@@ -174,13 +177,21 @@ export async function getWorkspaceSyncHead() {
   };
 }
 
-export async function loadBuilderDocument(): Promise<BuilderDocument | null> {
+export async function loadBuilderDocument(signal?: AbortSignal): Promise<BuilderDocument | null> {
+  const generation = ++workspaceLoadGeneration;
+  loadedWorkspaceRevision = undefined;
   const [workspace, global] = await Promise.all([
-    loadWorkspaceDocument(),
-    getJson("/api/builder-global/bootstrap", globalBootstrapSchema),
+    loadWorkspaceDocument(signal),
+    getJson("/api/builder-global/bootstrap", globalBootstrapSchema, signal),
   ]);
-  if (!workspace && !global.state) return null;
-  return mergeWorkspaceAndGlobal(workspace ?? {}, global?.state ?? {});
+  if (signal?.aborted || generation !== workspaceLoadGeneration) {
+    throw new DOMException("Workspace load was superseded.", "AbortError");
+  }
+  const document = !workspace.document && !global.state
+    ? null
+    : mergeWorkspaceAndGlobal(workspace.document ?? {}, global.state ?? {});
+  loadedWorkspaceRevision = workspace.revision;
+  return document;
 }
 
 export async function loadBuilderGlobalState(signal?: AbortSignal) {
@@ -211,6 +222,15 @@ async function performWorkspaceSync(
   document: BuilderDocument,
   options: { expectedRevision?: string },
 ) {
+  const expectedRevision = loadedWorkspaceRevision;
+  if (expectedRevision === undefined) {
+    throw new Error("Wait for the cloud workspace check before saving; reload to retry.");
+  }
+  const head = await getWorkspaceSyncHead();
+  if (head.revision !== expectedRevision ||
+      (options.expectedRevision !== undefined && options.expectedRevision !== expectedRevision)) {
+    throw new BuilderApiError("The cloud workspace changed elsewhere. This browser copy is safe; reload to compare.", 409);
+  }
   const workspace = toWorkspaceDocument(document);
   const json = JSON.stringify(workspace);
   const blob = new Blob([json], { type: "application/json" });
@@ -242,12 +262,11 @@ async function performWorkspaceSync(
       path: ticket.path,
       byteSize: blob.size,
       updatedAt: workspace.updatedAt,
-      ...(options.expectedRevision === undefined
-        ? {}
-        : { expectedRevision: options.expectedRevision }),
+      expectedRevision,
     },
     syncCompleteSchema,
   );
+  loadedWorkspaceRevision = completed.revision;
   workspaceSyncListeners.forEach((listener) => listener(completed));
   return completed;
 }
@@ -729,26 +748,32 @@ export async function resetRetrievalImageOverride(
   );
 }
 
-async function loadWorkspaceDocument() {
+async function loadWorkspaceDocument(signal?: AbortSignal) {
   const latest = await getJson(
     "/api/builder-sync/latest?kind=workspace",
     syncLatestSchema,
+    signal,
   );
-  if (!latest.exists || !latest.signedUrl) return null;
-  const response = await fetch(latest.signedUrl, { cache: "no-store" });
+  if (!latest.exists) return { document: null, revision: "" };
+  if (!latest.signedUrl) throw new Error("The cloud workspace download URL is missing.");
+  const response = await fetch(latest.signedUrl, { cache: "no-store", signal });
   if (!response.ok) {
     throw new BuilderApiError(
       `Could not download the workspace (${response.status}).`,
       response.status,
     );
   }
-  return response.json() as Promise<unknown>;
+  return {
+    document: await response.json() as unknown,
+    revision: latest.revision || `legacy:${latest.kind || "workspace"}:${latest.updatedAt || ""}`,
+  };
 }
 
-async function getJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
+async function getJson<T>(url: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     credentials: "same-origin",
     cache: "no-store",
+    signal,
   });
   return readJson(response, schema);
 }

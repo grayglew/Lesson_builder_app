@@ -21,6 +21,7 @@ import {
   renameClassName,
   resolveRetrievalImages,
   saveCurrentLesson,
+  syncBuilderDocument,
 } from "@/features/builder/api-client";
 import {
   loadV2CachedDocument,
@@ -85,6 +86,51 @@ describe("BuilderShell legacy UI parity", () => {
     await user.click(screen.getByRole("button", { name: /^Starter$/ }));
     await user.click(screen.getByRole("button", { name: "Units of work" }));
     expect(screen.getByLabelText("Unit name")).toHaveValue("My unsaved unit");
+  });
+
+  it("preserves the cloud unit library alongside concurrent local lesson edits", async () => {
+    const cached = createInitialBuilderDocument("2026-11-01T00:00:00.000Z");
+    const remote = { ...cached, updatedAt: "2026-11-17T00:00:00.000Z", unitsOfWork: [
+      { id: "11-05", name: "11.05", updatedAt: "2026-11-17T00:00:00.000Z", slides: [{ id: "unit-resource", title: "Histograms resources", bullets: [] }] },
+    ] };
+    let finish!: (document: typeof remote) => void;
+    vi.mocked(loadV2CachedDocument).mockResolvedValue(cached);
+    vi.mocked(loadBuilderDocument).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    vi.mocked(syncBuilderDocument).mockClear();
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await screen.findByText("Loaded the browser recovery copy; checking Supabase...");
+    fireEvent.change(screen.getByLabelText("Lesson title"), { target: { value: "New local edit" } });
+    await act(async () => { finish(remote); });
+    expect(screen.getByLabelText("Lesson title")).toHaveValue("New local edit");
+    expect(useBuilderStore.getState().document.unitsOfWork.map(unit => unit.name)).toEqual(["11.05"]);
+    expect(syncBuilderDocument).not.toHaveBeenCalled();
+  });
+
+  it("offers startup Retry without replacing more recent in-memory edits", async () => {
+    const cached = createInitialBuilderDocument("2026-11-01T00:00:00.000Z");
+    vi.mocked(loadV2CachedDocument).mockResolvedValue(cached);
+    vi.mocked(loadBuilderDocument).mockRejectedValueOnce(new Error("Temporary startup outage")).mockResolvedValue(cached);
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    const retry = await screen.findByRole("button", { name: "Retry" });
+    fireEvent.change(screen.getByLabelText("Lesson title"), { target: { value: "Keep this memory edit" } });
+    await userEvent.setup().click(retry);
+    await waitFor(() => expect(loadBuilderDocument).toHaveBeenCalledTimes(2));
+    expect(screen.getByLabelText("Lesson title")).toHaveValue("Keep this memory edit");
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("does not start an explicit save before the cloud workspace has been reconciled", async () => {
+    const cached = { ...createInitialBuilderDocument("2026-11-01T00:00:00.000Z"), className: "11Ma2" };
+    let finish!: (document: typeof cached) => void;
+    vi.mocked(loadV2CachedDocument).mockResolvedValue(cached);
+    vi.mocked(loadBuilderDocument).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    vi.mocked(syncBuilderDocument).mockClear();
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await screen.findByText("Loaded the browser recovery copy; checking Supabase...");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
+    expect(saveCurrentLesson).not.toHaveBeenCalled();
+    expect(syncBuilderDocument).not.toHaveBeenCalled();
+    await act(async () => { finish(cached); });
   });
 
   it("uses the original three-region workflow and tool order", async () => {

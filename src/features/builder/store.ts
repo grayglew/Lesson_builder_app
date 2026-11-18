@@ -187,7 +187,6 @@ export const useBuilderStore = create<BuilderStore>()(
         if (patch.slideTemplates) {
           state.document.slideTemplates = patch.slideTemplates;
         }
-        state.document.updatedAt = patch.updatedAt || new Date().toISOString();
       }),
 
     reset: () =>

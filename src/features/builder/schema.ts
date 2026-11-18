@@ -433,7 +433,6 @@ export function mergeWorkspaceAndGlobal(
   const workspace = normalizeBuilderDocument(workspaceInput);
   const global = normalizeBuilderDocument(globalInput ?? {});
   const hasManagedClassList = Array.isArray(asRecord(globalInput).classNames);
-  const updatedAt = newestTimestamp(workspace.updatedAt, global.updatedAt);
 
   return builderDocumentSchema.parse({
     ...workspace,
@@ -449,7 +448,6 @@ export function mergeWorkspaceAndGlobal(
     ),
     retrievalItems: global.retrievalItems,
     slideTemplates: global.slideTemplates,
-    updatedAt,
   });
 }
 
@@ -514,14 +512,6 @@ function uniqueStrings(values: readonly unknown[]) {
   return Array.from(
     new Set(values.map((value) => String(value || "").trim()).filter(Boolean)),
   );
-}
-
-function newestTimestamp(left: string, right: string) {
-  const leftTime = Date.parse(left);
-  const rightTime = Date.parse(right);
-  if (Number.isNaN(leftTime)) return right;
-  if (Number.isNaN(rightTime)) return left;
-  return leftTime >= rightTime ? left : right;
 }
 
 function structuredCloneSafe<T>(value: T): T {

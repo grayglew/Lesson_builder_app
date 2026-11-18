@@ -29,9 +29,12 @@ const DIRTY_STATE: WorkspaceAutosaveState = {
 export function useWorkspaceAutosave(
   document: BuilderDocument,
   enabled: boolean,
+  { cloudReady = true, syncedVersion = "" }: { cloudReady?: boolean; syncedVersion?: string } = {},
 ) {
   const documentRef = useRef(document);
   const enabledRef = useRef(enabled);
+  const cloudReadyRef = useRef(cloudReady);
+  const initializedCloudRef = useRef(false);
   const mountedRef = useRef(true);
   const cloudTimerRef = useRef<number | null>(null);
   const localTimerRef = useRef<number | null>(null);
@@ -47,7 +50,12 @@ export function useWorkspaceAutosave(
   useEffect(() => {
     documentRef.current = document;
     enabledRef.current = enabled;
-  }, [document, enabled]);
+    cloudReadyRef.current = cloudReady;
+    if (cloudReady && !initializedCloudRef.current) {
+      initializedCloudRef.current = true;
+      lastSyncedVersionRef.current = syncedVersion;
+    }
+  }, [cloudReady, document, enabled, syncedVersion]);
 
   const updateState = useCallback((next: WorkspaceAutosaveState) => {
     stateRef.current = next;
@@ -83,7 +91,7 @@ export function useWorkspaceAutosave(
   const scheduleCloudSync = useCallback(
     (delay: number) => {
       clearCloudTimer();
-      if (!enabledRef.current || stateRef.current.phase === "conflict") return;
+      if (!enabledRef.current || !cloudReadyRef.current || stateRef.current.phase === "conflict") return;
       cloudTimerRef.current = window.setTimeout(() => {
         cloudTimerRef.current = null;
         void runSyncRef.current();
@@ -93,7 +101,7 @@ export function useWorkspaceAutosave(
   );
 
   const runSync = useCallback(async () => {
-    if (!enabledRef.current) return;
+    if (!enabledRef.current || !cloudReadyRef.current) return;
     clearCloudTimer();
 
     if (inFlightRef.current) {
@@ -205,6 +213,8 @@ export function useWorkspaceAutosave(
     if (document.updatedAt !== lastSyncedVersionRef.current) {
       if (stateRef.current.phase !== "conflict") updateState(DIRTY_STATE);
       scheduleCloudSync(WORKSPACE_AUTOSAVE_DELAY_MS);
+    } else if (stateRef.current.phase !== "saved") {
+      updateState({ phase: "saved", message: "Saved to the cloud.", savedAt: document.updatedAt });
     }
 
     if (localTimerRef.current !== null) {
@@ -224,6 +234,7 @@ export function useWorkspaceAutosave(
     };
   }, [
     clearCloudTimer,
+    cloudReady,
     document,
     enabled,
     persistLocal,

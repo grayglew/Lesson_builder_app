@@ -62,6 +62,9 @@ for (const theme of ["light", "dark"]) {
     await expect.poll(() => workspace.unitsOfWork.length).toBe(1);
     await page.reload();
     await expect(page.getByRole("combobox", { name: "Unit of work", exact: true })).toHaveValue(id);
+    // Opening a saved lesson only prompts when there are real unsaved edits.
+    // Merely reloading no longer creates an unnecessary dirty workspace.
+    await page.getByLabel("Lesson title", { exact: true }).fill("Unsaved unit round-trip draft");
     await page.getByRole("button", { name: "Lessons", exact: true }).click();
     await page.getByRole("button", { name: "Open lesson", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Open lesson", exact: true }).click();
