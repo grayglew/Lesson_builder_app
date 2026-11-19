@@ -321,6 +321,40 @@ describe("SavedLessonLibrary production actions", () => {
     await waitFor(() => expect(buildLessonBundleZip).toHaveBeenCalledTimes(3));
   });
 
+  it("keeps Class available while the additional filters are closed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listSavedLessons).mockResolvedValue({
+      ok: true,
+      lessons: [
+        lesson("year-9", "Year 9 lesson", "2026-04-02", false),
+        lesson("year-10", "Year 10 lesson", "2026-04-01", false, "Year 10"),
+      ],
+      totalByteSize: 200,
+    });
+    render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
+
+    await screen.findByText("Year 10 lesson");
+    const classSelect = screen.getByRole("combobox", { name: "Class" });
+    expect(classSelect).toBeVisible();
+    expect(screen.getByLabelText("Status")).not.toBeVisible();
+    await user.selectOptions(classSelect, "Year 10");
+
+    expect(screen.getByText(/1 of 2 lessons/)).toBeInTheDocument();
+    expect(screen.getByText("Year 10 lesson")).toBeInTheDocument();
+    expect(screen.queryByText("Year 9 lesson")).not.toBeInTheDocument();
+    expect(screen.queryByText("1 active")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Filters", { exact: true }));
+    expect(screen.getByRole("combobox", { name: "Status" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Class" })).toHaveValue("Year 10");
+    await user.click(screen.getByText("Filters", { exact: true }));
+    expect(screen.getByRole("combobox", { name: "Class" })).toHaveValue("Year 10");
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(classSelect).toHaveValue("");
+    expect(screen.getByText(/2 of 2 lessons/)).toBeInTheDocument();
+  });
+
   it("clears every saved-lesson filter in one action and restores newest-first order", async () => {
     const user = userEvent.setup();
     render(<SavedLessonLibrary compact embedded onBack={vi.fn()} />);
@@ -331,6 +365,7 @@ describe("SavedLessonLibrary production actions", () => {
 
     await user.type(screen.getByLabelText("Search title"), "already");
     await user.selectOptions(screen.getByLabelText("Class"), "Year 9");
+    await user.click(screen.getByText("Filters", { exact: true }));
     await user.selectOptions(screen.getByLabelText("Status"), "taught");
     await user.type(screen.getByLabelText("From"), "2026-01-01");
     await user.type(screen.getByLabelText("To"), "2026-01-01");

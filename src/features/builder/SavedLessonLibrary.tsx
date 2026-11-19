@@ -483,17 +483,19 @@ export function SavedLessonLibrary({
   }
 
   const searchFilter = (
-    <label className={compact ? undefined : "xl:col-span-2"}>
+    <label className={compact ? styles.librarySearchFilter : "xl:col-span-2"}>
       <span className="field-title mb-1.5">Search title</span>
       <input className={inputClass} value={titleFilter} onChange={(event) => setTitleFilter(event.target.value)} placeholder="Lesson title" />
     </label>
   );
+  const classFilterControl = (
+    <FilterSelect label="Class" value={classFilter} onChange={setClassFilter}>
+      <option value="">All classes</option>
+      {classNames.map((className) => <option key={className} value={className}>{className}</option>)}
+    </FilterSelect>
+  );
   const advancedFilters = (
     <>
-      <FilterSelect label="Class" value={classFilter} onChange={setClassFilter}>
-        <option value="">All classes</option>
-        {classNames.map((className) => <option key={className} value={className}>{className}</option>)}
-      </FilterSelect>
       <FilterSelect label="Status" value={taughtFilter} onChange={(value) => setTaughtFilter(value as typeof taughtFilter)}>
         <option value="all">All lessons</option>
         <option value="planned">Planned</option>
@@ -509,7 +511,7 @@ export function SavedLessonLibrary({
       </label>
     </>
   );
-  const activeAdvancedFilters = [classFilter, taughtFilter !== "all", dateFrom, dateTo].filter(Boolean).length;
+  const activeAdvancedFilters = [taughtFilter !== "all", dateFrom, dateTo].filter(Boolean).length;
 
   return (
     <>
@@ -557,6 +559,7 @@ export function SavedLessonLibrary({
         {compact ? (
           <div className={`${styles.libraryFilters} border-b border-slate-200 bg-slate-50 p-4`}>
             {searchFilter}
+            {classFilterControl}
             <details className={styles.libraryFilterDisclosure}>
               <summary><span>Filters</span>{activeAdvancedFilters ? <small>{activeAdvancedFilters} active</small> : null}</summary>
               <div className={styles.libraryFilterOptions}>{advancedFilters}</div>
@@ -565,6 +568,7 @@ export function SavedLessonLibrary({
         ) : (
           <div className="grid gap-3 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
             {searchFilter}
+            {classFilterControl}
             {advancedFilters}
           </div>
         )}

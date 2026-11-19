@@ -2317,8 +2317,10 @@
   align-items: end;
   gap: .65rem;
 }
-.libraryFilterDisclosure[open],
-.libraryFilters:has(.libraryFilterDisclosure[open]) > label { grid-column: 1 / -1; }
+.libraryFilters > label { min-width: 0; }
+.libraryFilters :is(input, select) { min-height: 2.75rem; }
+.librarySearchFilter,
+.libraryFilterDisclosure[open] { grid-column: 1 / -1; }
 .libraryFilterDisclosure > summary {
   min-height: 2.75rem;
   align-content: center;
@@ -2343,7 +2345,9 @@
   padding-top: .6rem;
 }
 @container saved-library (min-width: 43rem) {
-  .libraryFilterOptions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .libraryFilters { grid-template-columns: minmax(0, 1fr) minmax(9rem, .4fr) auto; }
+  .librarySearchFilter { grid-column: auto; }
+  .libraryFilterOptions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .compactLibrary table { min-width: 0; table-layout: fixed; }
 .compactLibrary :is(th, td) { padding: .65rem .6rem; overflow-wrap: anywhere; }
