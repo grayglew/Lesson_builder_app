@@ -74,6 +74,83 @@ test("recovers reveals, completed ink, added slides and position after the opene
   expect((await frame.locator(".presenter-tools").boundingBox())!.height).toBeLessThanOrEqual(56);
 });
 
+for (const mode of ["pen", "highlighter"] as const) {
+  test(`a recovery checkpoint keeps an in-progress ${mode} stroke visible`, async ({ page }) => {
+    const id = await seed(page);
+    await page.goto(`${origin}/?session=${id}`);
+    const frame = page.frameLocator("iframe");
+    await frame.getByRole("button", { name: "Next slide", exact: true }).click();
+    await page.clock.install();
+    await page.clock.pauseAt(new Date());
+    await frame.locator(".lesson-deck").evaluate((deck, mode) => {
+      const state = window as unknown as {
+        __lessonPresenterRuntimeController: { setMode: (mode: string) => void };
+        regressionStroke: SVGPathElement;
+        regressionBuilderState: string;
+      };
+      state.__lessonPresenterRuntimeController.setMode(mode);
+      const slide = deck.querySelectorAll(".lesson-slide")[1];
+      const rect = slide.getBoundingClientRect();
+      const pen = (type: string, x: number, y: number) =>
+        (type === "pointerdown" ? slide : document).dispatchEvent(new PointerEvent(type, {
+          bubbles: true, cancelable: true, pointerType: "pen", pointerId: 91,
+          isPrimary: true, button: type === "pointermove" ? -1 : 0,
+          buttons: type === "pointerup" ? 0 : 1, pressure: .5,
+          clientX: rect.left + x, clientY: rect.top + y,
+        }));
+      state.regressionBuilderState = document.getElementById("lesson-builder-state")!.textContent!;
+      pen("pointerdown", 100, 100);
+      pen("pointermove", 150, 120);
+      pen("pointerup", 150, 120);
+      pen("pointerdown", 220, 170);
+      pen("pointermove", 260, 180);
+      state.regressionStroke = slide.querySelector(".annotation-svg")!.lastElementChild as SVGPathElement;
+    }, mode);
+    const paths = frame.locator(".lesson-slide").nth(1).locator(".annotation-svg path");
+    await expect(paths).toHaveCount(2);
+
+    // The first completed stroke is checkpointed while the second is still being drawn.
+    await page.clock.fastForward(400);
+    await expect.poll(() => page.evaluate(async ({ id, owner }) => {
+      const store = (window as unknown as { recoveryStore: typeof import("../../src/features/presenter/session-storage") }).recoveryStore;
+      return (await store.readPresenterSession(owner, id))?.checkpoint?.document.slides[1].annotations?.length;
+    }, { id, owner })).toBe(1);
+    await expect(paths).toHaveCount(2);
+
+    const continued = await frame.locator(".lesson-deck").evaluate(deck => {
+      const state = window as unknown as { regressionStroke: SVGPathElement; regressionBuilderState: string };
+      const slide = deck.querySelectorAll(".lesson-slide")[1];
+      const rect = slide.getBoundingClientRect();
+      const path = state.regressionStroke;
+      const before = path.getAttribute("d");
+      document.dispatchEvent(new PointerEvent("pointermove", {
+        bubbles: true, cancelable: true, pointerType: "pen", pointerId: 91,
+        button: -1, buttons: 1, clientX: rect.left + 330, clientY: rect.top + 210,
+      }));
+      return {
+        connected: path.isConnected,
+        extended: path.getAttribute("d") !== before,
+        sourceUnchanged: document.getElementById("lesson-builder-state")!.textContent === state.regressionBuilderState,
+      };
+    });
+    expect(continued).toEqual({ connected: true, extended: true, sourceUnchanged: true });
+    await frame.locator(".lesson-deck").evaluate(deck => {
+      const rect = deck.querySelectorAll(".lesson-slide")[1].getBoundingClientRect();
+      document.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true, cancelable: true, pointerType: "pen", pointerId: 91,
+        button: 0, buttons: 0, clientX: rect.left + 330, clientY: rect.top + 210,
+      }));
+    });
+    await page.clock.fastForward(400);
+    await expect.poll(() => page.evaluate(async ({ id, owner }) => {
+      const store = (window as unknown as { recoveryStore: typeof import("../../src/features/presenter/session-storage") }).recoveryStore;
+      return (await store.readPresenterSession(owner, id))?.checkpoint?.document.slides[1].annotations?.map(stroke => stroke.mode);
+    }, { id, owner })).toEqual([mode, mode]);
+    await page.reload();
+    await expect(paths).toHaveCount(2);
+  });
+}
+
 test("account-scoped sessions cannot be opened by another teacher", async ({ page }) => {
   const id = await seed(page, "other:teacher");
   await page.goto(`${origin}/?session=${id}`);

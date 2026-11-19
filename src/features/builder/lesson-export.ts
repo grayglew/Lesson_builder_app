@@ -1602,7 +1602,7 @@ function standaloneInteractionScript() {
     };
   }
 
-  function syncBuilderStateForSave() {
+  function captureBuilderState(currentSlides) {
     let builderState = {};
     try {
       builderState = JSON.parse(builderStateElement?.textContent || "{}");
@@ -1619,8 +1619,8 @@ function standaloneInteractionScript() {
     );
     const annotations =
       window.__lessonPresenterRuntimeController?.getAnnotations() || {};
-    refreshSlides();
-    builderState.slides = slides
+    // Reading a snapshot must not refresh the runtime or replace an in-progress ink path.
+    builderState.slides = currentSlides
       .map((slide, index) => ({ slide, index }))
       .filter(({ slide }) => slide.dataset.generatedPoll !== "true")
       .map(({ slide, index }, saveIndex) => {
@@ -1636,6 +1636,11 @@ function standaloneInteractionScript() {
         return state;
       });
     builderState.updatedAt = new Date().toISOString();
+    return builderState;
+  }
+
+  function syncBuilderStateForSave() {
+    const builderState = captureBuilderState(Array.from(document.querySelectorAll(".lesson-slide")));
     if (builderStateElement) {
       builderStateElement.textContent = JSON.stringify(builderState);
     }
@@ -2341,11 +2346,12 @@ function standaloneInteractionScript() {
   if (classroom) {
     window.__lessonPresenterRecovery = {
       capture() {
-        const state = syncBuilderStateForSave();
-        const pollIndex = slides.findIndex(slide => slide.dataset.generatedPoll === "true");
+        const currentSlides = Array.from(document.querySelectorAll(".lesson-slide"));
+        const state = captureBuilderState(currentSlides);
+        const pollIndex = currentSlides.findIndex(slide => slide.dataset.generatedPoll === "true");
         return {
           document: state,
-          slideId: slides[displayedSlide]?.dataset.builderSlideId || "",
+          slideId: currentSlides[displayedSlide]?.dataset.builderSlideId || "",
           slideIndex: displayedSlide,
           presentedAt, presentedLessonId, presentedLessonTitle,
           confidencePoll: structuredClone(confidencePoll), pollIndex,
