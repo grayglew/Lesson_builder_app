@@ -8,6 +8,8 @@ import {
   assertValidLessonSize,
   isUuid,
   normalizeByteSize,
+  expectedLessonTimestamp,
+  LESSON_CONFLICT_MESSAGE,
 } from "@/lib/builder-sync/saved-lessons";
 
 export async function POST(request: Request) {
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
   if (requestedId) {
     const { data: existing, error: existingError } = await auth.supabase
       .from("builder_lessons")
-      .select("id")
+      .select("id, updated_at")
       .eq("id", lessonId)
       .eq("owner_id", auth.user.id)
       .is("deleted_at", null)
@@ -43,6 +45,10 @@ export async function POST(request: Request) {
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Saved lesson not found." }, { status: 404 });
     }
+    const expected = expectedLessonTimestamp(body.expectedUpdatedAt);
+    if (!expected || existing.updated_at !== expected) {
+      return NextResponse.json({ ok: false, code: "LESSON_CONFLICT", error: LESSON_CONFLICT_MESSAGE }, { status: 409 });
+    }
   }
 
   // Every save gets a new object path. Reusing lesson.json can make Supabase's
@@ -53,7 +59,7 @@ export async function POST(request: Request) {
     crypto.randomUUID(),
   );
   const { data, error } = await auth.supabase.storage.from(BUILDER_SYNC_BUCKET).createSignedUploadUrl(path, {
-    upsert: true,
+    upsert: false,
   });
 
   if (error || !data?.signedUrl) {

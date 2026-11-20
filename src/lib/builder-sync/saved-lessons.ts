@@ -1,6 +1,12 @@
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const MAX_SAVED_LESSON_BYTES = 80 * 1024 * 1024;
+export const LESSON_CONFLICT_MESSAGE = "This lesson changed or is no longer available. Reopen it from Saved lessons before updating, or use Save copy to preserve this browser's version.";
+
+export function expectedLessonTimestamp(value: unknown) {
+  const timestamp = typeof value === "string" ? value.trim() : "";
+  return timestamp && Number.isFinite(Date.parse(timestamp)) ? timestamp : "";
+}
 
 export type ConfidenceSummary = {
   version: 1;
