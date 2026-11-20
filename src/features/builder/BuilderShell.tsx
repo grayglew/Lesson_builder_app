@@ -24,10 +24,10 @@ import {
   loadBuilderGlobalState,
   renameClassName,
   saveClassNames,
-  saveCurrentLesson,
-  syncBuilderDocument,
 } from "./api-client";
 import { useAppNotifications } from "./AppNotifications";
+import { saveBuilderLesson, lessonSaveStatus } from "./save-lesson";
+import { isLessonDirty } from "./saved-lesson-parity";
 import {
   CompactAppBar,
   CompactDeckHeader,
@@ -57,7 +57,7 @@ import {
 } from "./live-starter";
 import { NewLessonDialog } from "./NewLessonDialog";
 import { prepareNewLessonDocument, type NewLessonDetails } from "./new-lesson";
-import { loadV2CachedDocument, saveV2CachedDocument } from "./persistence";
+import { loadV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
 import { RetrievalComposer } from "./RetrievalComposer";
 import { getDueRetrievalItems } from "./retrieval";
@@ -179,7 +179,6 @@ function BuilderShellWorkspace({
   const selectedSlideId = useBuilderStore((state) => state.selectedSlideId);
   const hydrated = useBuilderStore((state) => state.hydrated);
   const hydrate = useBuilderStore((state) => state.hydrate);
-  const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const reset = useBuilderStore((state) => state.reset);
   const updateMetadata = useBuilderStore((state) => state.updateMetadata);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
@@ -499,13 +498,8 @@ function BuilderShellWorkspace({
       message: copy ? "Saving a lesson copy..." : "Saving the lesson...",
     });
     try {
-      await saveV2CachedDocument(document);
-      const [saved] = await Promise.all([
-        saveCurrentLesson(document, { copy }),
-        syncBuilderDocument(document),
-      ]);
-      markLessonSaved(saved);
-      setStatus({ tone: "success", message: `Saved "${saved.title}".` });
+      const result = await saveBuilderLesson(document, { copy });
+      if (result.isCurrent()) setStatus(lessonSaveStatus(result));
     } catch (error) {
       setStatus({
         tone: "error",
@@ -632,43 +626,17 @@ function BuilderShellWorkspace({
     try {
       const nextDocument = prepareNewLessonDocument(document, details);
       setStatus({ tone: "working", message: `Creating and saving "${nextDocument.title}"...` });
-      const saved = await saveCurrentLesson(nextDocument, { copy: true });
-      const savedDocument = {
-        ...nextDocument,
-        title: saved.title,
-        className: saved.className,
-        teachingDate: saved.teachingDate,
-        activeLessonId: saved.id,
-        activeLessonSavedAt: saved.updatedAt,
-        lessonUpdatedAt: saved.updatedAt,
-        classNames: Array.from(
-          new Set([saved.className, ...nextDocument.classNames].filter(Boolean)),
-        ),
-        updatedAt: new Date().toISOString(),
-      };
-
-      hydrate(savedDocument);
+      const result = await saveBuilderLesson(document, { copy: true, replacement: nextDocument });
+      if (!result.isCurrent()) return;
+      if (!result.applied) {
+        setStatus(lessonSaveStatus(result));
+        return;
+      }
       setActiveTool("starter");
       setNewLessonDialogOpen(false);
-
-      try {
-        await Promise.all([
-          saveV2CachedDocument(savedDocument),
-          syncBuilderDocument(savedDocument),
-        ]);
-        setStatus({
-          tone: "success",
-          message: `Created and saved "${saved.title}".`,
-        });
-      } catch (error) {
-        setStatus({
-          tone: "warning",
-          message: errorMessage(
-            error,
-            `"${saved.title}" was saved, but the workspace recovery copy could not be updated.`,
-          ),
-        });
-      }
+      setStatus(result.workspace === "failed" || result.localRecovery === "failed" ? lessonSaveStatus(result) : {
+        tone: "success", message: `Created and saved "${result.saved.title}".`,
+      });
     } catch (error) {
       setStatus({
         tone: "error",
@@ -717,7 +685,11 @@ function BuilderShellWorkspace({
             teachingDate={document.teachingDate}
             overdueCount={overdueCount}
             userEmail={userEmail}
-            cloudMessage={workspaceAutosave.message}
+            cloudMessage={workspaceAutosave.phase === "saved"
+              ? ((document.activeLessonId || document.slides.length) && isLessonDirty(document)
+                ? "Workspace saved · lesson unsaved"
+                : document.activeLessonId ? "Lesson saved · workspace saved" : "Workspace saved")
+              : workspaceAutosave.message}
             busy={Boolean(busyAction)}
             backgroundInert={compactDrawerOpen}
             identityControl={

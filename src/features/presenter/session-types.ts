@@ -7,6 +7,7 @@ export type PresenterResume = {
   slideIndex: number;
   presentedAt: string;
   presentedLessonId: string;
+  presentedLessonSavedAt?: string;
   presentedLessonTitle: string;
   confidencePoll?: { counts: Record<string, number>; completedAt: string; locked: boolean; saved?: boolean };
   pollIndex?: number;

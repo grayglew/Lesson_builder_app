@@ -232,6 +232,7 @@ describe("SavedLessonLibrary production actions", () => {
     await waitFor(() =>
       expect(updateSavedLessonMetadata).toHaveBeenCalledWith({
         id: "active",
+        expectedUpdatedAt: "2026-07-19T01:00:00.000Z",
         title: "Active lesson",
         className: "Year 10",
         teachingDate: "2026-04-02",

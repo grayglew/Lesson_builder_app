@@ -676,6 +676,8 @@ function standaloneInteractionScript() {
   const presenterResume = readJsonScript("lesson-presenter-recovery");
   const presentedAt = presenterResume?.presentedAt || new Date().toISOString();
   let presentedLessonId = presenterResume?.presentedLessonId || "";
+  let presentedLessonSavedAt = presenterResume?.presentedLessonSavedAt || "";
+  let presentedSavePromise = null;
   let presentedLessonTitle = presenterResume?.presentedLessonTitle || "";
   const confidencePoll = presenterResume?.confidencePoll || {
     counts: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
@@ -1566,6 +1568,9 @@ function standaloneInteractionScript() {
   }
 
   function updateConfidencePoll() {
+    document.querySelectorAll("[data-confidence-end]").forEach((button) => {
+      button.disabled = confidencePoll.locked || Boolean(presentedSavePromise);
+    });
     const total = [1, 2, 3, 4, 5].reduce(
       (sum, score) => sum + (Number(confidencePoll.counts[String(score)]) || 0),
       0,
@@ -1737,7 +1742,17 @@ function standaloneInteractionScript() {
     return String(value || "").match(/^data:([^;,]+)/)?.[1] || "";
   }
 
-  async function savePresentedLesson() {
+  function savePresentedLesson() {
+    if (presentedSavePromise) return presentedSavePromise;
+    presentedSavePromise = performPresentedLessonSave().finally(() => {
+      presentedSavePromise = null;
+      updateConfidencePoll();
+    });
+    updateConfidencePoll();
+    return presentedSavePromise;
+  }
+
+  async function performPresentedLessonSave() {
     if (
       !presenterConfig?.sourceLessonId ||
       !presenterConfig.uploadEndpoint ||
@@ -1798,7 +1813,7 @@ function standaloneInteractionScript() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: presentedLessonId, byteSize: blob.size }),
+        body: JSON.stringify({ id: presentedLessonId, byteSize: blob.size, expectedUpdatedAt: presentedLessonId ? presentedLessonSavedAt : "" }),
       });
       const ticket = await readApiJson(
         ticketResponse,
@@ -1809,7 +1824,6 @@ function standaloneInteractionScript() {
       formData.append("", blob, "lesson.json");
       const uploadResponse = await fetch(ticket.signedUrl, {
         method: "PUT",
-        headers: { "x-upsert": "true" },
         body: formData,
       });
       if (!uploadResponse.ok) {
@@ -1822,6 +1836,7 @@ function standaloneInteractionScript() {
         body: JSON.stringify({
           id: ticket.id,
           path: ticket.path,
+          expectedUpdatedAt: presentedLessonId ? presentedLessonSavedAt : "",
           title: taughtDocument.title,
           className: taughtDocument.className,
           teachingDate: taughtDocument.teachingDate,
@@ -1834,14 +1849,17 @@ function standaloneInteractionScript() {
         "Could not complete the taught lesson save.",
       );
       presentedLessonId = completed?.lesson?.id || ticket.id;
+      presentedLessonSavedAt = completed?.lesson?.updatedAt || "";
       recoveryChanged();
       const taughtResponse = await fetch(presenterConfig.taughtEndpoint, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: presentedLessonId, taught: true }),
+        body: JSON.stringify({ id: presentedLessonId, taught: true, expectedUpdatedAt: presentedLessonSavedAt }),
       });
-      await readApiJson(taughtResponse, "Could not mark the lesson as taught.");
+      const marked = await readApiJson(taughtResponse, "Could not mark the lesson as taught.");
+      presentedLessonSavedAt = marked?.lesson?.updatedAt || presentedLessonSavedAt;
+      recoveryChanged();
       presenterNotifications.notify("Saved taught lesson to Lesson Builder.", "success");
       return completed?.lesson || null;
     } catch (error) {
@@ -2063,7 +2081,7 @@ function standaloneInteractionScript() {
     }
     const confidenceEnd = event.target.closest("[data-confidence-end]");
     if (confidenceEnd) {
-      if (confidencePoll.locked) return;
+      if (confidencePoll.locked || presentedSavePromise) return;
       confidencePoll.locked = true;
       confidencePoll.saved = false;
       const choices = confidenceEnd.closest(".lesson-slide")?.querySelectorAll("[data-confidence-score]") || [];
@@ -2353,7 +2371,7 @@ function standaloneInteractionScript() {
           document: state,
           slideId: currentSlides[displayedSlide]?.dataset.builderSlideId || "",
           slideIndex: displayedSlide,
-          presentedAt, presentedLessonId, presentedLessonTitle,
+          presentedAt, presentedLessonId, presentedLessonSavedAt, presentedLessonTitle,
           confidencePoll: structuredClone(confidencePoll), pollIndex,
           pollAnnotations: window.__lessonPresenterRuntimeController?.getAnnotations()?.[String(pollIndex)] || [],
         };

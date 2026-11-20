@@ -191,23 +191,35 @@ test("a failed checkpoint leaves the last committed checkpoint intact and warns 
 
 test("a taught save after reload reuses its saved copy and does not save on resume", async ({ page }) => {
   const ids: string[] = [];
+  const versions: string[] = [];
+  const completedAt = "2026-11-19T00:00:01.123456+00:00";
+  const markedAt = "2026-11-19T00:00:02.654321+00:00";
   const id = await seed(page);
   await page.route(`${origin}/ticket`, route => {
     ids.push(route.request().postDataJSON().id);
+    versions.push(route.request().postDataJSON().expectedUpdatedAt || "");
     return route.fulfill({ json: { ok: true, id: "taught-copy", path: "lesson.json", signedUrl: `${origin}/upload` } });
   });
   await page.route(`${origin}/upload`, route => route.fulfill({ json: { ok: true } }));
-  await page.route(`${origin}/complete`, route => route.fulfill({ json: { ok: true, lesson: { id: "taught-copy" } } }));
-  await page.route(`${origin}/taught`, route => route.fulfill({ json: { ok: true } }));
+  await page.route(`${origin}/complete`, route => {
+    expect(route.request().postDataJSON().expectedUpdatedAt || "").toBe(ids.length === 1 ? "" : markedAt);
+    return route.fulfill({ json: { ok: true, lesson: { id: "taught-copy", updatedAt: completedAt } } });
+  });
+  await page.route(`${origin}/taught`, route => {
+    expect(route.request().postDataJSON().expectedUpdatedAt).toBe(completedAt);
+    return route.fulfill({ json: { ok: true, lesson: { id: "taught-copy", updatedAt: markedAt } } });
+  });
   await page.goto(`${origin}/?session=${id}`);
   const frame = page.frameLocator("iframe");
   await frame.getByRole("button", { name: "Save to Builder", exact: true }).click();
   await expect.poll(() => page.evaluate(async ({ id, owner }) => (await (window as unknown as { recoveryStore: typeof import("../../src/features/presenter/session-storage") }).recoveryStore.readPresenterSession(owner, id))?.checkpoint?.presentedLessonId, { id, owner })).toBe("taught-copy");
+  await expect.poll(() => page.evaluate(async ({ id, owner }) => (await (window as unknown as { recoveryStore: typeof import("../../src/features/presenter/session-storage") }).recoveryStore.readPresenterSession(owner, id))?.checkpoint?.presentedLessonSavedAt, { id, owner })).toBe(markedAt);
   await page.reload();
   await expect(frame.locator(".presenter-tools")).toBeVisible();
   expect(ids).toEqual([""]);
   await frame.getByRole("button", { name: "Save to Builder", exact: true }).click();
   await expect.poll(() => ids).toEqual(["", "taught-copy"]);
+  expect(versions).toEqual(["", markedAt]);
 });
 
 test("a foreground account change blocks the prior teacher's presenter", async ({ page }) => {
@@ -218,6 +230,73 @@ test("a foreground account change blocks the prior teacher's presenter", async (
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await expect(page.getByRole("alert")).toContainText("different account");
   await expect(page.locator("iframe")).toHaveCount(0);
+});
+
+test("ending a poll waits for an earlier toolbar save and uploads the final votes", async ({ page }) => {
+  const id = await seed(page);
+  let tickets = 0;
+  let releaseFirst!: () => void;
+  const held = new Promise<void>(resolve => { releaseFirst = resolve; });
+  const uploaded: { confidencePoll: { total?: number; counts?: Record<string, number>; completedAt?: string } }[] = [];
+  await page.route(`${origin}/ticket`, async route => {
+    tickets++;
+    if (tickets === 1) await held;
+    await route.fulfill({ json: { ok: true, id: "taught-copy", path: "lesson.json", signedUrl: `${origin}/upload` } });
+  });
+  await page.route(`${origin}/upload`, async route => {
+    const request = route.request();
+    const form = await new Request(request.url(), { method: "PUT", headers: request.headers(), body: new Uint8Array(request.postDataBuffer()!).buffer }).formData();
+    const file = [...form.values()].find(value => typeof value !== "string");
+    if (!file || typeof file === "string") throw new Error("Missing taught lesson JSON");
+    uploaded.push(JSON.parse(await file.text()));
+    await route.fulfill({ json: { ok: true } });
+  });
+  for (const path of ["complete", "taught"]) await page.route(`${origin}/${path}`, route => route.fulfill({ json: { ok: true, lesson: { id: "taught-copy", updatedAt: "2026-11-20T00:00:01.000Z" } } }));
+  await page.goto(`${origin}/?session=${id}`);
+  const frame = page.frameLocator("iframe");
+  await frame.getByRole("button", { name: "Lesson actions", exact: true }).click();
+  await frame.locator("#presenter-poll").click();
+  await frame.getByRole("button", { name: "Save to Builder", exact: true }).click();
+  await expect.poll(() => tickets).toBe(1);
+  await frame.getByRole("button", { name: "Confidence 4", exact: true }).click();
+  const end = frame.locator("[data-confidence-end]");
+  await expect(end).toBeDisabled();
+  await end.dispatchEvent("click");
+  await expect(frame.getByRole("button", { name: "Confidence 4", exact: true })).toBeEnabled();
+  releaseFirst();
+  await expect(end).toBeEnabled();
+  await expect(end).toHaveText("End poll and save");
+  await end.click();
+  await expect(end).toHaveText("Saved");
+  expect(tickets).toBe(2);
+  expect(uploaded[1].confidencePoll).toMatchObject({ total: 1, counts: { "4": 1 }, completedAt: expect.any(String) });
+  expect(uploaded[1].confidencePoll.completedAt).not.toBe("");
+});
+
+test("a failed taught marker retains the committed ID and revision for retry", async ({ page }) => {
+  const id = await seed(page);
+  const requests: { id: string; expectedUpdatedAt: string }[] = [];
+  const committed = "2026-11-20T00:00:01.123456+00:00";
+  let marked = 0;
+  await page.route(`${origin}/ticket`, route => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true, id: "taught-copy", path: "lesson.json", signedUrl: `${origin}/upload` } });
+  });
+  await page.route(`${origin}/upload`, route => route.fulfill({ json: { ok: true } }));
+  await page.route(`${origin}/complete`, route => route.fulfill({ json: { ok: true, lesson: { id: "taught-copy", updatedAt: committed } } }));
+  await page.route(`${origin}/taught`, route => ++marked === 1
+    ? route.fulfill({ status: 503, json: { error: "Taught marker unavailable" } })
+    : route.fulfill({ json: { ok: true, lesson: { id: "taught-copy", updatedAt: "2026-11-20T00:00:02.000Z" } } }));
+  await page.goto(`${origin}/?session=${id}`);
+  const save = page.frameLocator("iframe").getByRole("button", { name: "Save to Builder", exact: true });
+  await save.click();
+  await expect.poll(() => marked).toBe(1);
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect.poll(() => marked).toBe(2);
+  expect(requests.map(({ id, expectedUpdatedAt }) => ({ id, expectedUpdatedAt }))).toEqual([
+    { id: "", expectedUpdatedAt: "" }, { id: "taught-copy", expectedUpdatedAt: committed },
+  ]);
 });
 
 test("resuming an existing checkpoint does not automatically publish a student snapshot", async ({ page }) => {

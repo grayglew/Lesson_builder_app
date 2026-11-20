@@ -31,7 +31,7 @@ describe("current lesson output preparation wiring", () => {
     expect(html).toContain("Prepared");
   });
 
-  it("prepares PDF once while saving and syncing the original document", async () => {
+  it("prepares PDF once through the coordinated lesson-save service", async () => {
     const document = createInitialBuilderDocument();
     document.title = "Original";
     const prepared = { ...structuredClone(document), title: "Prepared" };
@@ -43,8 +43,6 @@ describe("current lesson output preparation wiring", () => {
     expect(dependencies.prepareDocument).toHaveBeenCalledOnce();
     expect(dependencies.saveLesson).toHaveBeenCalledOnce();
     expect(dependencies.saveLesson).toHaveBeenCalledWith(document);
-    expect(dependencies.syncDocument).toHaveBeenCalledOnce();
-    expect(dependencies.syncDocument).toHaveBeenCalledWith(document);
     expect(dependencies.downloadPdf).toHaveBeenCalledWith(
       "saved-lesson",
       expect.stringContaining("Prepared"),
@@ -61,7 +59,6 @@ describe("current lesson output preparation wiring", () => {
 
     expect(dependencies.prepareDocument).not.toHaveBeenCalled();
     expect(dependencies.saveLesson).not.toHaveBeenCalled();
-    expect(dependencies.syncDocument).not.toHaveBeenCalled();
     expect(payload.lessonBuilder).toBe(document);
   });
 
@@ -226,13 +223,18 @@ function outputDependencies(prepared: BuilderDocument) {
       javaScript: "window.runtime=true;",
     }),
     saveLesson: vi.fn().mockResolvedValue({
+      saved: {
       id: "saved-lesson",
       title: "Original",
       className: "",
       teachingDate: "",
       updatedAt: "2026-08-03T00:00:00.000Z",
+      },
+      workspace: "synced",
+      applied: true,
+      localRecovery: "saved",
+      isCurrent: () => true,
     }),
-    syncDocument: vi.fn().mockResolvedValue(undefined),
     downloadPdf: vi.fn().mockResolvedValue(
       new Blob(["pdf"], { type: "application/pdf" }),
     ),

@@ -38,6 +38,7 @@ vi.mock("@/features/builder/persistence", () => ({
 vi.mock("@/features/builder/api-client", async (importOriginal) => {
   const original =
     await importOriginal<typeof import("@/features/builder/api-client")>();
+  const syncDocument = vi.fn().mockResolvedValue(undefined);
   return {
     ...original,
     listSavedLessons: vi.fn().mockResolvedValue({ ok: true, lessons: [], totalByteSize: 0 }),
@@ -54,7 +55,8 @@ vi.mock("@/features/builder/api-client", async (importOriginal) => {
     archiveClassName: vi.fn(),
     resolveRetrievalImages: vi.fn(),
     saveCurrentLesson: vi.fn(),
-    syncBuilderDocument: vi.fn().mockResolvedValue(undefined),
+    syncBuilderDocument: syncDocument,
+    withWorkspaceSync: (run: Parameters<typeof original.withWorkspaceSync>[0]) => run(syncDocument),
   };
 });
 
@@ -347,6 +349,31 @@ describe("BuilderShell legacy UI parity", () => {
     ]);
     expect(dialog).toBeInTheDocument();
     expect(useBuilderStore.getState().document.unitsOfWork).toEqual([]);
+  });
+
+  it("keeps the New Lesson dialog and newer current edits when activation is declined", async () => {
+    const document = createInitialBuilderDocument();
+    document.title = "Keep my current lesson"; document.classNames = ["7Ma3"];
+    useBuilderStore.getState().hydrate(document);
+    vi.mocked(loadBuilderDocument).mockResolvedValue(document);
+    let finish!: (saved: Awaited<ReturnType<typeof saveCurrentLesson>>) => void;
+    vi.mocked(saveCurrentLesson).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const user = userEvent.setup();
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await user.click(screen.getByRole("button", { name: "New lesson" }));
+    const dialog = screen.getByRole("dialog", { name: "Create and save a new lesson" });
+    await user.type(within(dialog).getByLabelText("Lesson title"), "Separate lesson");
+    await user.selectOptions(within(dialog).getByLabelText("Class"), "7Ma3");
+    await user.click(within(dialog).getByRole("button", { name: "Create and save lesson" }));
+    const pending = vi.mocked(saveCurrentLesson).mock.calls[0][0];
+    act(() => useBuilderStore.getState().addBlankSlide());
+    await act(async () => finish({ id: "separate", title: pending.title, className: pending.className,
+      teachingDate: pending.teachingDate, byteSize: 100, taughtAt: "", isTaught: false,
+      createdAt: pending.updatedAt, updatedAt: pending.updatedAt }));
+    expect(dialog).toBeInTheDocument();
+    expect(useBuilderStore.getState().document.title).toBe("Keep my current lesson");
+    expect(useBuilderStore.getState().document.slides).toHaveLength(1);
+    expect(useBuilderStore.getState().status).toMatchObject({ tone: "warning", message: expect.stringMatching(/current.*retained/i) });
   });
 
   it.each(["existing", "new"])("creates a lesson associated with an %s unit only after saving", async (mode) => {

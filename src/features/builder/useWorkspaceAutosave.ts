@@ -5,11 +5,12 @@ import {
   BuilderApiError,
   getWorkspaceSyncHead,
   subscribeWorkspaceSync,
-  syncBuilderDocument,
+  withWorkspaceSync,
   type WorkspaceSyncResult,
 } from "./api-client";
 import { saveV2CachedDocument } from "./persistence";
 import type { BuilderDocument } from "./schema";
+import { isLessonDirty } from "./saved-lesson-parity";
 
 export const WORKSPACE_AUTOSAVE_DELAY_MS = 2_500;
 const LOCAL_AUTOSAVE_DELAY_MS = 350;
@@ -71,11 +72,11 @@ export function useWorkspaceAutosave(
         localSaveFailedRef.current = true;
         updateState({
           phase: "error",
-          message:
-            "Browser recovery failed; keep this page open.",
+          message: lastSyncedVersionRef.current === snapshot.updatedAt
+            ? "Workspace saved to the cloud; browser recovery is unavailable. Retry browser recovery."
+            : "Browser recovery failed; keep this page open.",
           savedAt: stateRef.current.savedAt,
         });
-        throw new Error("Browser recovery storage is unavailable.");
       }
     },
     [updateState],
@@ -111,19 +112,14 @@ export function useWorkspaceAutosave(
     }
 
     const snapshot = documentRef.current;
-    if (
-      snapshot.updatedAt === lastSyncedVersionRef.current &&
-      !localSaveFailedRef.current
-    ) {
-      updateState({
-        phase: "saved",
-        message: "Saved to the cloud.",
-        savedAt: snapshot.updatedAt,
-      });
+    if (snapshot.updatedAt === lastSyncedVersionRef.current) {
+      if (localSaveFailedRef.current) await persistLocal(snapshot);
+      updateState(cloudSavedState(localSaveFailedRef.current, snapshot.updatedAt));
       return;
     }
 
-    const operation = (async () => {
+    const operation = withWorkspaceSync(async (uploadWorkspace) => {
+      const snapshot = documentRef.current;
       let attemptedRevision = "";
       updateState({
         phase: "saving",
@@ -141,18 +137,14 @@ export function useWorkspaceAutosave(
         }
         attemptedRevision = head.revision;
 
-        const completed = await syncBuilderDocument(snapshot, {
+        const completed = await uploadWorkspace(snapshot, {
           expectedRevision: head.revision,
         });
         knownRevisionRef.current = completed.revision;
         lastSyncedVersionRef.current = snapshot.updatedAt;
 
         if (documentRef.current.updatedAt === snapshot.updatedAt) {
-          updateState({
-            phase: "saved",
-            message: "Saved to the cloud.",
-            savedAt: completed.updatedAt || snapshot.updatedAt,
-          });
+          updateState(cloudSavedState(localSaveFailedRef.current, completed.updatedAt || snapshot.updatedAt));
         } else {
           queuedRef.current = true;
           updateState(DIRTY_STATE);
@@ -189,7 +181,7 @@ export function useWorkspaceAutosave(
           savedAt: stateRef.current.savedAt,
         });
       }
-    })().finally(() => {
+    }).finally(() => {
       inFlightRef.current = null;
       const shouldRunAgain =
         queuedRef.current &&
@@ -214,7 +206,7 @@ export function useWorkspaceAutosave(
       if (stateRef.current.phase !== "conflict") updateState(DIRTY_STATE);
       scheduleCloudSync(WORKSPACE_AUTOSAVE_DELAY_MS);
     } else if (stateRef.current.phase !== "saved") {
-      updateState({ phase: "saved", message: "Saved to the cloud.", savedAt: document.updatedAt });
+      updateState(cloudSavedState(localSaveFailedRef.current, document.updatedAt));
     }
 
     if (localTimerRef.current !== null) {
@@ -248,11 +240,7 @@ export function useWorkspaceAutosave(
         knownRevisionRef.current = completed.revision;
         if (completed.updatedAt === documentRef.current.updatedAt) {
           lastSyncedVersionRef.current = completed.updatedAt;
-          updateState({
-            phase: "saved",
-            message: "Saved to the cloud.",
-            savedAt: completed.updatedAt,
-          });
+          updateState(cloudSavedState(localSaveFailedRef.current, completed.updatedAt));
         }
       }),
     [updateState],
@@ -270,7 +258,10 @@ export function useWorkspaceAutosave(
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (
         documentRef.current.updatedAt === lastSyncedVersionRef.current &&
-        !inFlightRef.current
+        !localSaveFailedRef.current &&
+        !inFlightRef.current &&
+        !(documentRef.current.activeLessonId && isLessonDirty(documentRef.current)) &&
+        !(!documentRef.current.activeLessonId && documentRef.current.slides.length)
       ) {
         return;
       }
@@ -306,6 +297,16 @@ export function useWorkspaceAutosave(
   return {
     ...state,
     retry: runSync,
+  };
+}
+
+function cloudSavedState(localFailed: boolean, savedAt: string): WorkspaceAutosaveState {
+  return {
+    phase: localFailed ? "error" : "saved",
+    message: localFailed
+      ? "Workspace saved to the cloud; browser recovery is unavailable. Retry browser recovery."
+      : "Saved to the cloud.",
+    savedAt,
   };
 }
 

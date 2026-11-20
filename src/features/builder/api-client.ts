@@ -133,7 +133,7 @@ export type SavedLessonSummary = z.infer<typeof lessonSummarySchema>;
 export type SavedLessonMetadataPatch = Pick<
   SavedLessonSummary,
   "id" | "title" | "className" | "teachingDate"
->;
+> & { expectedUpdatedAt: string };
 
 export class BuilderApiError extends Error {
   constructor(
@@ -208,9 +208,15 @@ export function syncBuilderDocument(
   document: BuilderDocument,
   options: { expectedRevision?: string } = {},
 ) {
+  return withWorkspaceSync(upload => upload(document, options));
+}
+
+export function withWorkspaceSync<T>(
+  run: (upload: typeof performWorkspaceSync) => Promise<T>,
+): Promise<T> {
   const operation = workspaceSyncQueue
     .catch(() => undefined)
-    .then(() => performWorkspaceSync(document, options));
+    .then(() => run(performWorkspaceSync));
   workspaceSyncQueue = operation.then(
     () => undefined,
     () => undefined,
@@ -220,7 +226,7 @@ export function syncBuilderDocument(
 
 async function performWorkspaceSync(
   document: BuilderDocument,
-  options: { expectedRevision?: string },
+  options: { expectedRevision?: string } = {},
 ) {
   const expectedRevision = loadedWorkspaceRevision;
   if (expectedRevision === undefined) {
@@ -310,6 +316,8 @@ export async function saveCurrentLesson(
   document: BuilderDocument,
   options: { copy?: boolean } = {},
 ) {
+  const requestedId = options.copy ? "" : document.activeLessonId;
+  const expectedUpdatedAt = requestedId ? document.activeLessonSavedAt : "";
   const savedDocument = {
     schemaVersion: 1,
     lessonKind: "saved-builder-lesson",
@@ -330,7 +338,8 @@ export async function saveCurrentLesson(
   const ticket = await postJson(
     "/api/builder-lessons/upload-url",
     {
-      id: options.copy ? "" : document.activeLessonId,
+      id: requestedId,
+      expectedUpdatedAt,
       byteSize: blob.size,
     },
     z.object({
@@ -347,7 +356,6 @@ export async function saveCurrentLesson(
   formData.append("", blob, "lesson.json");
   const uploadResponse = await fetch(ticket.signedUrl, {
     method: "PUT",
-    headers: { "x-upsert": "true" },
     body: formData,
   });
   if (!uploadResponse.ok) {
@@ -362,6 +370,7 @@ export async function saveCurrentLesson(
     {
       id: ticket.id,
       path: ticket.path,
+      expectedUpdatedAt,
       title: savedDocument.title,
       className: savedDocument.className,
       teachingDate: savedDocument.teachingDate,
@@ -461,10 +470,10 @@ export async function updateSavedLessonMetadata(patch: SavedLessonMetadataPatch)
   return result.lesson;
 }
 
-export async function setSavedLessonTaught(id: string, taught: boolean) {
+export async function setSavedLessonTaught(id: string, taught: boolean, expectedUpdatedAt: string) {
   const result = await postJson(
     "/api/builder-lessons/taught",
-    { id, taught },
+    { id, taught, expectedUpdatedAt },
     lessonMutationSchema,
   );
   return result.lesson;

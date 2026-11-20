@@ -8,8 +8,6 @@ import {
 import {
   createPresenterStudentSession,
   downloadPresenterPdf,
-  saveCurrentLesson,
-  syncBuilderDocument,
 } from "./api-client";
 import {
   buildStandaloneLessonHtml,
@@ -23,6 +21,7 @@ import {
 import { prepareBuilderDocumentForExport } from "./prepare-export-document";
 import type { BuilderDocument, RetrievalItem } from "./schema";
 import { openRecoverablePresenter } from "../presenter/session-launch";
+import { saveBuilderLesson, workspaceSaveWarning } from "./save-lesson";
 
 type CurrentOutputDependencies = {
   prepareDocument?: (
@@ -37,8 +36,7 @@ type CurrentLessonOutputServiceDependencies = CurrentOutputDependencies & {
     css: string;
     javaScript: string;
   }>;
-  saveLesson?: typeof saveCurrentLesson;
-  syncDocument?: typeof syncBuilderDocument;
+  saveLesson?: typeof saveBuilderLesson;
   downloadPdf?: typeof downloadPresenterPdf;
 };
 
@@ -190,8 +188,7 @@ export function createCurrentLessonOutputService(
 ) {
   const loadRuntimeAssets =
     dependencies.loadRuntimeAssets ?? loadPresenterRuntimeAssets;
-  const saveLesson = dependencies.saveLesson ?? saveCurrentLesson;
-  const syncDocument = dependencies.syncDocument ?? syncBuilderDocument;
+  const saveLesson = dependencies.saveLesson ?? saveBuilderLesson;
   const downloadPdf = dependencies.downloadPdf ?? downloadPresenterPdf;
 
   async function prepareStandalone(options: {
@@ -251,15 +248,15 @@ export function createCurrentLessonOutputService(
       return prepareStandalone({ offlineCapabilities: true });
     },
     async preparePdf() {
-      const [html, saved] = await Promise.all([
+      const [html, saveResult] = await Promise.all([
         prepareStandalone({}),
         saveLesson(document),
-        syncDocument(document),
       ]);
       return {
         html,
-        saved,
-        pdf: await downloadPdf(saved.id, html),
+        saved: saveResult.saved,
+        saveResult,
+        pdf: await downloadPdf(saveResult.saved.id, html),
       };
     },
     buildJsonPayload() {
@@ -274,7 +271,6 @@ export function createCurrentLessonOutputService(
 export function useLessonExportActions() {
   const document = useBuilderStore((state) => state.document);
   const hydrate = useBuilderStore((state) => state.hydrate);
-  const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const setStatus = useBuilderStore((state) => state.setStatus);
   const { confirmDialog } = useAppNotifications();
   const outputService = createCurrentLessonOutputService(document);
@@ -315,9 +311,8 @@ export function useLessonExportActions() {
         if (document.activeLessonId) {
           presenterLessonId = document.activeLessonId;
         } else {
-          const saved = await saveCurrentLesson(document);
-          markLessonSaved(saved);
-          presenterLessonId = saved.id;
+          const result = await saveBuilderLesson(document);
+          presenterLessonId = result.saved.id;
         }
         const createdSession =
           await createPresenterStudentSession(presenterLessonId);
@@ -394,10 +389,11 @@ export function useLessonExportActions() {
     }
     setStatus({ tone: "working", message: "Rendering the lesson PDF..." });
     try {
-      const { pdf, saved } = await outputService.preparePdf();
-      markLessonSaved(saved);
+      const { pdf, saveResult } = await outputService.preparePdf();
       downloadBlob(pdf, `${safeFileName(document.title)}.pdf`);
-      setStatus({ tone: "success", message: "Exported the lesson PDF." });
+      if (saveResult.isCurrent()) setStatus(saveResult.workspace === "failed"
+        ? { tone: "warning", message: `Exported the lesson PDF. ${workspaceSaveWarning(saveResult.saved.title)}` }
+        : { tone: "success", message: "Exported the lesson PDF." });
     } catch (error) {
       setStatus({
         tone: "error",

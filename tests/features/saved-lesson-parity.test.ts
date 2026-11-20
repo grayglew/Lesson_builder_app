@@ -97,11 +97,11 @@ describe("saved lesson production parity", () => {
     });
   });
 
-  it("uses the production 500ms dirty threshold", () => {
+  it("detects newer edits without a 500ms blind spot", () => {
     const document = createInitialBuilderDocument("2026-07-19T01:00:00.000Z");
     document.activeLessonSavedAt = "2026-07-19T01:00:00.000Z";
     document.lessonUpdatedAt = "2026-07-19T01:00:00.500Z";
-    expect(isLessonDirty(document)).toBe(false);
+    expect(isLessonDirty(document)).toBe(true);
     document.lessonUpdatedAt = "2026-07-19T01:00:00.501Z";
     expect(isLessonDirty(document)).toBe(true);
   });

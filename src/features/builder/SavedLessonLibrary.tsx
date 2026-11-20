@@ -33,12 +33,12 @@ import {
   createPresenterStudentSession,
   listSavedLessons,
   openSavedLesson as fetchSavedLesson,
-  saveCurrentLesson,
   type SavedLessonSummary,
   setSavedLessonTaught,
   updateSavedLessonMetadata,
 } from "./api-client";
 import { useAppNotifications } from "./AppNotifications";
+import { saveBuilderLesson, lessonSaveStatus } from "./save-lesson";
 import { BuilderActionMenu } from "./BuilderActionMenu";
 import styles from "./BuilderShell.module.css";
 import { ConfidenceModal } from "./ConfidenceModal";
@@ -70,7 +70,6 @@ export function SavedLessonLibrary({
 }) {
   const document = useBuilderStore(selectDocument);
   const openLesson = useBuilderStore((state) => state.openSavedLesson);
-  const markLessonSaved = useBuilderStore((state) => state.markLessonSaved);
   const updateActiveLessonMetadata = useBuilderStore(
     (state) => state.updateActiveLessonMetadata,
   );
@@ -191,13 +190,9 @@ export function SavedLessonLibrary({
       message: copy ? "Saving a lesson copy…" : "Saving the lesson…",
     });
     try {
-      const saved = await saveCurrentLesson(document, { copy });
-      markLessonSaved(saved);
+      const result = await saveBuilderLesson(document, { copy });
       await refresh();
-      setStatus({
-        tone: "success",
-        message: `Saved "${saved.title}" (${formatBytes(saved.byteSize)}).`,
-      });
+      if (result.isCurrent()) setStatus(lessonSaveStatus(result));
     } catch (error) {
       setStatus({
         tone: "error",
@@ -330,6 +325,7 @@ export function SavedLessonLibrary({
     await mutateLesson(lesson.id, async () => {
       const updated = await updateSavedLessonMetadata({
         id: lesson.id,
+        expectedUpdatedAt: lesson.updatedAt,
         title: lesson.title,
         className,
         teachingDate: lesson.teachingDate,
@@ -337,7 +333,7 @@ export function SavedLessonLibrary({
       setLessons((current) =>
         current.map((entry) => (entry.id === updated.id ? updated : entry)),
       );
-      updateActiveLessonMetadata(updated);
+      updateActiveLessonMetadata(updated, lesson.updatedAt, ["className"]);
       setStatus({
         tone: "success",
         message: `Moved "${updated.title}" to ${updated.className}.`,
@@ -363,6 +359,7 @@ export function SavedLessonLibrary({
     await mutateLesson(lesson.id, async () => {
       const updated = await updateSavedLessonMetadata({
         id: lesson.id,
+        expectedUpdatedAt: lesson.updatedAt,
         title,
         className: lesson.className,
         teachingDate: lesson.teachingDate,
@@ -370,7 +367,7 @@ export function SavedLessonLibrary({
       setLessons((current) =>
         current.map((entry) => (entry.id === updated.id ? updated : entry)),
       );
-      updateActiveLessonMetadata(updated);
+      updateActiveLessonMetadata(updated, lesson.updatedAt, ["title"]);
       setStatus({
         tone: "success",
         message: `Renamed the lesson to "${updated.title}".`,
@@ -380,7 +377,8 @@ export function SavedLessonLibrary({
 
   async function toggleTaught(lesson: SavedLessonSummary) {
     await mutateLesson(lesson.id, async () => {
-      const updated = await setSavedLessonTaught(lesson.id, !lesson.isTaught);
+      const updated = await setSavedLessonTaught(lesson.id, !lesson.isTaught, lesson.updatedAt);
+      updateActiveLessonMetadata(updated, lesson.updatedAt, []);
       setLessons((current) =>
         current.map((entry) => (entry.id === updated.id ? updated : entry)),
       );

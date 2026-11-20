@@ -12,7 +12,9 @@ import {
   useWorkspaceAutosave,
 } from "@/features/builder/useWorkspaceAutosave";
 
-vi.mock("@/features/builder/api-client", () => ({
+vi.mock("@/features/builder/api-client", () => {
+  const syncDocument = vi.fn();
+  return {
   BuilderApiError: class BuilderApiError extends Error {
     constructor(
       message: string,
@@ -23,8 +25,10 @@ vi.mock("@/features/builder/api-client", () => ({
   },
   getWorkspaceSyncHead: vi.fn(),
   subscribeWorkspaceSync: vi.fn(() => () => undefined),
-  syncBuilderDocument: vi.fn(),
-}));
+  syncBuilderDocument: syncDocument,
+  withWorkspaceSync: (run: (upload: typeof syncDocument) => Promise<unknown>) => run(syncDocument),
+  };
+});
 
 vi.mock("@/features/builder/persistence", () => ({
   saveV2CachedDocument: vi.fn(),
@@ -182,6 +186,22 @@ describe("workspace autosave", () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+  });
+  it("saves cloud recovery despite browser failure and retries only the failed browser channel", async () => {
+    const document = { ...createInitialBuilderDocument("2026-11-19T00:00:01.000Z"),
+      activeLessonId: "lesson-a", activeLessonSavedAt: "2026-11-19T00:00:00.000Z", slides: [{ id: "new-slide", type: "blank" as const, title: "Newest slide" }] };
+    vi.mocked(saveV2CachedDocument).mockRejectedValue(new Error("Browser storage unavailable"));
+    const { result } = renderHook(() => useWorkspaceAutosave(document, true));
+    await act(async () => { await vi.advanceTimersByTimeAsync(WORKSPACE_AUTOSAVE_DELAY_MS); });
+    expect(syncBuilderDocument).toHaveBeenCalledWith(document, { expectedRevision: "" });
+    expect(result.current.message).toMatch(/workspace saved to.*cloud.*browser recovery.*unavailable/i);
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    vi.mocked(saveV2CachedDocument).mockResolvedValue(undefined);
+    await act(async () => { await result.current.retry(); });
+    expect(syncBuilderDocument).toHaveBeenCalledTimes(1);
+    expect(result.current.phase).toBe("saved");
   });
 
   it("keeps local recovery without uploading before the initial cloud comparison", async () => {

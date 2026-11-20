@@ -103,7 +103,7 @@ export function isLessonDirty(document: BuilderDocument) {
   const changedAt = Date.parse(document.lessonUpdatedAt);
   if (Number.isNaN(savedAt)) return true;
   if (Number.isNaN(changedAt)) return false;
-  return changedAt > savedAt + 500;
+  return changedAt > savedAt;
 }
 
 export function usableConfidenceSummary(

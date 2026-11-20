@@ -16,6 +16,8 @@ import {
   normalizeBuilderDocument,
 } from "./schema";
 import { applyUnitToLesson } from "./unit-of-work";
+import { isLessonDirty } from "./saved-lesson-parity";
+import { mergeWorkspaceUnitLibraries } from "./workspace-unit-library";
 
 type MetadataPatch = Partial<
   Pick<BuilderDocument, "title" | "className" | "teachingDate" | "overallLessonLo">
@@ -37,6 +39,8 @@ type SavedLessonMetadata = {
   updatedAt: string;
 };
 
+export type LessonSaveToken = { session: number; version: number; attempt: number };
+
 type GlobalDataPatch = {
   classNames?: string[];
   retrievalItems?: RetrievalItem[];
@@ -51,14 +55,17 @@ export type BuilderStatus = {
 
 export type BuilderStore = {
   document: BuilderDocument;
+  lessonSession: number;
+  lessonVersion: number;
+  lastCompletedSave: number;
   selectedSlideId: string | null;
   editingSlideId: string | null;
   hydrated: boolean;
   status: BuilderStatus;
   hydrate: (document: unknown) => void;
   openSavedLesson: (document: unknown, metadata: SavedLessonMetadata) => void;
-  markLessonSaved: (metadata: SavedLessonMetadata) => void;
-  updateActiveLessonMetadata: (metadata: SavedLessonMetadata) => void;
+  markLessonSaved: (metadata: SavedLessonMetadata, token: LessonSaveToken, replacement?: BuilderDocument) => boolean;
+  updateActiveLessonMetadata: (metadata: SavedLessonMetadata, expectedSavedAt: string, fields: readonly ("title" | "className" | "teachingDate")[]) => void;
   clearActiveLesson: (id?: string) => void;
   updateGlobalData: (patch: GlobalDataPatch) => void;
   reset: () => void;
@@ -91,6 +98,9 @@ const idleStatus: BuilderStatus = {
 export const useBuilderStore = create<BuilderStore>()(
   immer((set, get) => ({
     document: createInitialBuilderDocument(),
+    lessonSession: 0,
+    lessonVersion: 0,
+    lastCompletedSave: 0,
     selectedSlideId: null,
     editingSlideId: null,
     hydrated: false,
@@ -98,6 +108,7 @@ export const useBuilderStore = create<BuilderStore>()(
 
     hydrate: (input) =>
       set((state) => {
+        beginLessonSession(state);
         state.document = normalizeBuilderDocument(input);
         state.selectedSlideId = null;
         state.editingSlideId = null;
@@ -107,6 +118,7 @@ export const useBuilderStore = create<BuilderStore>()(
 
     openSavedLesson: (input, metadata) =>
       set((state) => {
+        beginLessonSession(state);
         const lesson = normalizeBuilderDocument(input);
         state.document = {
           ...lesson,
@@ -133,40 +145,63 @@ export const useBuilderStore = create<BuilderStore>()(
         };
       }),
 
-    markLessonSaved: (metadata) =>
+    markLessonSaved: (metadata, token, replacement) => {
+      const current = get();
+      if (current.lessonSession !== token.session ||
+          current.lastCompletedSave >= token.attempt ||
+          (replacement && current.lessonVersion !== token.version)) return false;
       set((state) => {
+        const previousUpdatedAt = state.document.updatedAt;
+        if (replacement) {
+          beginLessonSession(state);
+          state.document = {
+            ...replacement,
+            classNames: state.document.classNames,
+            retrievalItems: state.document.retrievalItems,
+            slideTemplates: state.document.slideTemplates,
+            unitsOfWork: mergeWorkspaceUnitLibraries(state.document.unitsOfWork, replacement.unitsOfWork),
+          };
+          state.selectedSlideId = null;
+          state.editingSlideId = null;
+        }
+        state.lastCompletedSave = token.attempt;
         state.document.activeLessonId = metadata.id;
         state.document.activeLessonSavedAt = metadata.updatedAt;
-        state.document.lessonUpdatedAt = metadata.updatedAt;
-        state.document.title = metadata.title;
-        state.document.className = metadata.className;
-        state.document.teachingDate = metadata.teachingDate;
-        state.document.classNames = uniqueStrings([
-          metadata.className,
-          ...state.document.classNames,
-        ]);
-        state.document.updatedAt = new Date().toISOString();
-      }),
+        if (replacement || state.lessonVersion === token.version) {
+          state.document.lessonUpdatedAt = metadata.updatedAt;
+          state.document.title = metadata.title;
+          state.document.className = metadata.className;
+          state.document.teachingDate = metadata.teachingDate;
+        } else {
+          state.document.lessonUpdatedAt = nextTimestamp(state.document.lessonUpdatedAt, metadata.updatedAt);
+        }
+        state.document.classNames = uniqueStrings([metadata.className, ...state.document.classNames]);
+        state.document.updatedAt = nextTimestamp(previousUpdatedAt);
+      });
+      return true;
+    },
 
-    updateActiveLessonMetadata: (metadata) =>
+    updateActiveLessonMetadata: (metadata, expectedSavedAt, fields) =>
       set((state) => {
-        if (state.document.activeLessonId !== metadata.id) return;
+        if (state.document.activeLessonId !== metadata.id || state.document.activeLessonSavedAt !== expectedSavedAt) return;
         const wasDirty = isLessonDirty(state.document);
-        state.document.title = metadata.title;
-        state.document.className = metadata.className;
-        state.document.teachingDate = metadata.teachingDate;
+        for (const field of fields) state.document[field] = metadata[field];
         state.document.classNames = uniqueStrings([
           metadata.className,
           ...state.document.classNames,
         ]);
         state.document.activeLessonSavedAt = metadata.updatedAt;
-        if (!wasDirty) state.document.lessonUpdatedAt = metadata.updatedAt;
-        state.document.updatedAt = new Date().toISOString();
+        state.lessonVersion++;
+        state.document.lessonUpdatedAt = wasDirty
+          ? nextTimestamp(state.document.lessonUpdatedAt, metadata.updatedAt)
+          : metadata.updatedAt;
+        state.document.updatedAt = nextTimestamp(state.document.updatedAt);
       }),
 
     clearActiveLesson: (id) =>
       set((state) => {
         if (id && state.document.activeLessonId !== id) return;
+        beginLessonSession(state);
         state.document.activeLessonId = "";
         state.document.activeLessonSavedAt = "";
         state.document.lessonUpdatedAt = new Date().toISOString();
@@ -191,6 +226,7 @@ export const useBuilderStore = create<BuilderStore>()(
 
     reset: () =>
       set((state) => {
+        beginLessonSession(state);
         const unitsOfWork = state.document.unitsOfWork;
         state.document = { ...createInitialBuilderDocument(), unitsOfWork };
         state.selectedSlideId = null;
@@ -223,7 +259,7 @@ export const useBuilderStore = create<BuilderStore>()(
         if (id && !unit) throw new Error("The source unit is not available in your library.");
         state.document = applyUnitToLesson(state.document, unit || null);
         if (!state.document.slides.some(slide => slide.id === state.selectedSlideId)) state.selectedSlideId = null;
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     refreshUnitOfWork: () =>
@@ -232,13 +268,13 @@ export const useBuilderStore = create<BuilderStore>()(
         if (!unit) throw new Error("The source unit is not available in your library.");
         state.document = applyUnitToLesson(state.document, unit);
         if (!state.document.slides.some(slide => slide.id === state.selectedSlideId)) state.selectedSlideId = null;
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     updateMetadata: (patch) =>
       set((state) => {
         Object.assign(state.document, patch);
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     selectSlide: (slideId) =>
@@ -257,7 +293,7 @@ export const useBuilderStore = create<BuilderStore>()(
         state.document.handoutSlideIds = state.document.slides
           .filter((slide) => selectedIds.has(slide.id))
           .map((slide) => slide.id);
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     addBlankSlide: () =>
@@ -300,7 +336,7 @@ export const useBuilderStore = create<BuilderStore>()(
         const slide = state.document.slides.find(entry => entry.id === id && entry.type === "starter");
         if (!slide) return;
         slide.slots = clonePlain(slots).slice(0, 4);
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     updateSlideContent: (id, update) => {
@@ -309,7 +345,7 @@ export const useBuilderStore = create<BuilderStore>()(
       set((state) => {
         const slide = state.document.slides.find(entry => entry.id === id)!;
         Object.assign(slide, clonePlain(update));
-        touchDocument(state.document);
+        touchLesson(state);
       });
       return true;
     },
@@ -325,7 +361,7 @@ export const useBuilderStore = create<BuilderStore>()(
           selectedIndex < 0 ? state.document.slides.length : selectedIndex + 1;
         state.document.slides.splice(insertionIndex, 0, ...prepared);
         state.selectedSlideId = prepared[prepared.length - 1].id;
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     insertTemplateSlide: (template) =>
@@ -352,7 +388,7 @@ export const useBuilderStore = create<BuilderStore>()(
         duplicate.createdAt = new Date().toISOString();
         state.document.slides.splice(sourceIndex + 1, 0, duplicate);
         state.selectedSlideId = duplicate.id;
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     moveSlide: (slideId, direction) =>
@@ -372,7 +408,7 @@ export const useBuilderStore = create<BuilderStore>()(
         state.document.handoutSlideIds = state.document.slides
           .filter((entry) => selectedIds.has(entry.id))
           .map((entry) => entry.id);
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     removeSlide: (slideId) =>
@@ -387,7 +423,7 @@ export const useBuilderStore = create<BuilderStore>()(
         state.selectedSlideId =
           state.document.slides[Math.min(index, state.document.slides.length - 1)]?.id ??
           null;
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     updateSelectedSlide: (patch) =>
@@ -397,7 +433,7 @@ export const useBuilderStore = create<BuilderStore>()(
         );
         if (!selected) return;
         Object.assign(selected, patch);
-        touchDocument(state.document);
+        touchLesson(state);
       }),
 
     setStatus: (status) =>
@@ -413,7 +449,7 @@ export const selectSelectedSlide = (state: BuilderStore) =>
   state.document.slides.find((slide) => slide.id === state.selectedSlideId) ?? null;
 
 function insertAfterSelection(
-  state: Pick<BuilderStore, "document" | "selectedSlideId">,
+  state: Pick<BuilderStore, "document" | "selectedSlideId" | "lessonVersion">,
   slide: BuilderSlide,
 ) {
   const selectedIndex = state.document.slides.findIndex(
@@ -422,13 +458,23 @@ function insertAfterSelection(
   const insertionIndex = selectedIndex < 0 ? state.document.slides.length : selectedIndex + 1;
   state.document.slides.splice(insertionIndex, 0, slide);
   state.selectedSlideId = slide.id;
-  touchDocument(state.document);
+  touchLesson(state);
 }
 
-function touchDocument(document: BuilderDocument) {
-  const now = new Date().toISOString();
-  document.updatedAt = now;
-  document.lessonUpdatedAt = now;
+function beginLessonSession(state: BuilderStore) {
+  state.lessonSession++;
+  state.lessonVersion = 0;
+  state.lastCompletedSave = 0;
+}
+
+function touchLesson(state: Pick<BuilderStore, "document" | "lessonVersion">) {
+  state.lessonVersion++;
+  state.document.updatedAt = nextTimestamp(state.document.updatedAt, state.document.lessonUpdatedAt, state.document.activeLessonSavedAt);
+  state.document.lessonUpdatedAt = state.document.updatedAt;
+}
+
+function nextTimestamp(...timestamps: string[]) {
+  return new Date(Math.max(Date.now(), ...timestamps.map(value => (Date.parse(value) || 0) + 1))).toISOString();
 }
 
 function clonePlain<T>(value: T): T {
@@ -444,12 +490,4 @@ function clonePlain<T>(value: T): T {
 
 function uniqueStrings(values: readonly string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-}
-
-function isLessonDirty(document: BuilderDocument) {
-  const savedAt = Date.parse(document.activeLessonSavedAt);
-  const changedAt = Date.parse(document.lessonUpdatedAt);
-  if (Number.isNaN(savedAt)) return true;
-  if (Number.isNaN(changedAt)) return false;
-  return changedAt > savedAt + 500;
 }
