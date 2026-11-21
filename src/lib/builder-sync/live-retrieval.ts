@@ -4,6 +4,8 @@ import { PRESENTER_SIGNED_URL_SECONDS } from "@/lib/builder-sync/signed-url-expi
 
 type LiveRetrievalInput = {
   lessonId: string;
+  retrievalItemId: string;
+  retrievalBankClassName: string;
   lo: string;
   className: string;
   teachingDate: string;
@@ -15,6 +17,7 @@ type LiveRetrievalInput = {
 type LiveRetrievalQuestionInput = {
   lessonId: string;
   retrievalItemId: string;
+  retrievalBankClassName: string;
   lo: string;
   className: string;
   slideIndex: number;
@@ -85,6 +88,12 @@ const RETRIEVAL_LO_SELECT = "id,lo_code,lo_text,legacy_lo_id";
 const RETRIEVAL_PROGRESS_SELECT =
   "id,retrieval_lo_id,class_name,seen_count,current_image_slot,last_taught,retrieval_lo:retrieval_los(id,lo_code,lo_text,legacy_lo_id)";
 
+export class InactiveLiveRetrievalError extends Error {
+  constructor() {
+    super("This retrieval entry is no longer active in the source bank. Reopen the lesson to refresh it.");
+  }
+}
+
 export function normalizeLiveRetrievalInput(body: Record<string, unknown>): LiveRetrievalInput {
   const lessonId = String(body.lessonId || "").trim();
   const lo = String(body.lo || "").trim().slice(0, 500);
@@ -96,6 +105,8 @@ export function normalizeLiveRetrievalInput(body: Record<string, unknown>): Live
 
   return {
     lessonId,
+    retrievalItemId: String(body.retrievalItemId || "").trim(),
+    retrievalBankClassName: String(body.retrievalBankClassName || "").trim().slice(0, 120),
     lo,
     className,
     teachingDate,
@@ -109,6 +120,7 @@ export function normalizeLiveRetrievalQuestionInput(body: Record<string, unknown
   return {
     lessonId: String(body.lessonId || "").trim(),
     retrievalItemId: String(body.retrievalItemId || "").trim(),
+    retrievalBankClassName: String(body.retrievalBankClassName || "").trim().slice(0, 120),
     lo: String(body.lo || "").trim().slice(0, 500),
     className: String(body.className || "").trim().slice(0, 120),
     slideIndex: normalizeNonNegativeInteger(body.slideIndex),
@@ -121,9 +133,12 @@ export async function logLiveRetrievalEvent(
   userId: string,
   input: LiveRetrievalInput,
 ): Promise<LiveRetrievalResult> {
-  const classId = await ensureClassForLiveRetrieval(supabase, userId, input.className);
-  const existing = await findLiveRetrievalItem(supabase, userId, input.lo, input.className);
-  const item = existing || (await createLiveRetrievalItem(supabase, userId, classId, input));
+  const existing = input.retrievalBankClassName
+    ? await findExactLiveRetrievalItem(supabase, userId, input.retrievalItemId, input.retrievalBankClassName)
+    : await findLiveRetrievalItem(supabase, userId, input.lo, input.className);
+  const item = existing ?? await createLiveRetrievalItem(
+    supabase, userId, await ensureClassForLiveRetrieval(supabase, userId, input.className), input,
+  );
   const nextSeen = Math.max(0, Math.round(Number(item.seen_count) || 0) + input.deltaSeen);
 
   const { data, error } = await supabase
@@ -131,12 +146,15 @@ export async function logLiveRetrievalEvent(
     .update({ seen_count: nextSeen, last_taught: input.teachingDate })
     .eq("owner_id", userId)
     .eq("id", item.id)
+    .eq("class_name", item.class_name)
+    .is("archived_at", null)
     .select(RETRIEVAL_PROGRESS_SELECT)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) throw new InactiveLiveRetrievalError();
 
-  const updated = (data || item) as unknown as RetrievalProgressRow;
+  const updated = data as unknown as RetrievalProgressRow;
   const retrievalLo = firstRetrievalLo(updated.retrieval_lo);
   return {
     itemId: updated.id,
@@ -173,12 +191,47 @@ export async function advanceLiveRetrievalQuestion(
     .update({ current_image_slot: advancedSlot })
     .eq("owner_id", userId)
     .eq("id", item.id)
+    .eq("class_name", item.class_name)
+    .is("archived_at", null)
     .select(RETRIEVAL_PROGRESS_SELECT)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) throw new InactiveLiveRetrievalError();
 
-  return retrievalQuestionResultForItem(supabase, (data || { ...item, current_image_slot: advancedSlot }) as unknown as RetrievalProgressRow);
+  return retrievalQuestionResultForItem(supabase, data as unknown as RetrievalProgressRow);
+}
+
+export async function archiveLiveRetrievalItem(
+  supabase: SupabaseClient, userId: string, itemId: string, bank: string,
+): Promise<{ itemId: string }> {
+  if (!isUuid(itemId) || !bank) throw new InactiveLiveRetrievalError();
+  const { data, error } = await supabase
+    .from("retrieval_class_progress")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("owner_id", userId)
+    .eq("id", itemId)
+    .eq("class_name", bank)
+    .is("archived_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new InactiveLiveRetrievalError();
+  return { itemId: data.id };
+}
+
+async function findExactLiveRetrievalItem(supabase: SupabaseClient, userId: string, itemId: string, bank: string) {
+  if (!isUuid(itemId)) throw new InactiveLiveRetrievalError();
+  const { data, error } = await supabase.from("retrieval_class_progress")
+    .select(RETRIEVAL_PROGRESS_SELECT)
+    .eq("owner_id", userId)
+    .eq("id", itemId)
+    .eq("class_name", bank)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new InactiveLiveRetrievalError();
+  return data as unknown as RetrievalProgressRow;
 }
 
 async function ensureClassForLiveRetrieval(supabase: SupabaseClient, userId: string, className: string) {
@@ -224,6 +277,9 @@ async function findLiveRetrievalItemByContext(
   userId: string,
   input: LiveRetrievalQuestionInput,
 ) {
+  if (input.retrievalBankClassName) {
+    return findExactLiveRetrievalItem(supabase, userId, input.retrievalItemId, input.retrievalBankClassName);
+  }
   if (isUuid(input.retrievalItemId)) {
     const { data, error } = await supabase
       .from("retrieval_class_progress")

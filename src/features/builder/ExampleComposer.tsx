@@ -29,6 +29,7 @@ import {
   exampleSlideSchema,
 } from "./schema";
 import { selectDocument, useBuilderStore } from "./store";
+import { useRetrievalBankSelection } from "./useRetrievalBankSelection";
 
 type ImageDraft = {
   asset: BuilderAsset | null;
@@ -50,6 +51,9 @@ const emptyImageDrafts = () =>
 export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCancel }: SlideEditProps & { compact?: boolean }) {
   const [existing] = useState(() => editingSlide ? exampleSlideSchema.safeParse(editingSlide).data : undefined);
   const document = useBuilderStore(selectDocument);
+  const lessonSession = useBuilderStore(state => state.lessonSession);
+  const { bank, partner, chooseBank } = useRetrievalBankSelection(document);
+  const exactClass = Boolean(partner);
   const addSlides = useBuilderStore((state) => state.addSlides);
   const updateSlideContent = useBuilderStore((state) => state.updateSlideContent);
   const updateGlobalData = useBuilderStore((state) => state.updateGlobalData);
@@ -76,11 +80,12 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
       getExampleRetrievalBankStatus(
         document.retrievalItems,
         lo,
-        document.className,
+        bank,
+        { exactClass },
       ),
-    [document.className, document.retrievalItems, lo],
+    [bank, exactClass, document.retrievalItems, lo],
   );
-  const liveLookupQueryKey = `${document.className}\n${lo.trim()}`;
+  const liveLookupQueryKey = JSON.stringify([lessonSession, bank, lo.trim()]);
   const activeLiveLookup =
     liveLookup.state !== "idle" && liveLookup.queryKey === liveLookupQueryKey
       ? liveLookup
@@ -92,10 +97,10 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
 
     let cancelled = false;
     const controller = new AbortController();
-    const queryKey = `${document.className}\n${trimmedLo}`;
+    const queryKey = liveLookupQueryKey;
     const timer = window.setTimeout(() => {
       setLiveLookup({ state: "checking", queryKey });
-      void lookupRetrievalLo(trimmedLo, document.className, controller.signal)
+      void lookupRetrievalLo(trimmedLo, bank, controller.signal)
         .then((result) => {
           if (!cancelled) setLiveLookup({ state: "ready", queryKey, result });
         })
@@ -114,7 +119,7 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [document.className, existing, lo]);
+  }, [bank, existing, liveLookupQueryKey, lo]);
 
   function updateRetrievalImage(
     role: "questions" | "answers",
@@ -249,36 +254,54 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
     const existing = findExampleRetrievalItem(
       document.retrievalItems,
       trimmedLo,
-      document.className,
+      bank,
+      { exactClass },
     );
-    if (existing) {
-      const approved = await confirmDialog({
-        title: "Replace the existing retrieval entry?",
-        description:
-          "This LO already exists. Updating it will replace its spacing, last-taught date, seen count, and retrieval images.",
-        confirmLabel: "Replace entry",
-        cancelLabel: "Keep existing entry",
-        tone: "warning",
-      });
-      if (!approved) return;
-    }
-
     setIsSavingBank(true);
-    setStatus({ tone: "working", message: "Updating the retrieval bank..." });
+    const otherBank = bank === partner ? document.className : partner;
+    const hasImageEdits = [...questions, ...answers].some(draft => draft.dirty);
+    const stillInLesson = () => useBuilderStore.getState().lessonSession === lessonSession;
     try {
+      // Recheck the destination at save time: another device may have changed tracking.
+      const [freshLookup, partnerLookup] = await Promise.all([
+        exactClass ? lookupRetrievalLo(trimmedLo, bank) : undefined,
+        otherBank && hasImageEdits ? lookupRetrievalLo(trimmedLo, otherBank) : undefined,
+      ]);
+      if (!stillInLesson()) return;
+      const alreadyTracked = freshLookup?.trackedForClass ?? Boolean(existing);
+      const sharedOverride = partnerLookup?.trackedForClass &&
+        partnerLookup.match?.contentId === freshLookup?.match?.contentId;
+      if (alreadyTracked || sharedOverride) {
+        const description = [
+          alreadyTracked ? `This skill is already tracked${bank ? ` in ${bank}` : ""}. Updating it saves the spacing and teaching date for that entry.` : "",
+          sharedOverride ? `The image changes apply to your copy of this skill in both ${bank} and ${otherBank}. The other bank's retrieval progress will not change.` : "",
+        ].filter(Boolean).join(" ");
+        if (!await confirmDialog({
+          title: alreadyTracked ? "Replace the existing retrieval entry?" : "Update retrieval images in both banks?",
+          description,
+          confirmLabel: alreadyTracked ? "Replace entry" : "Update shared images",
+          cancelLabel: "Keep existing entry",
+          tone: "warning",
+        })) return;
+      }
+      const current = useBuilderStore.getState().document;
+      if (!stillInLesson() || current.className !== document.className ||
+          (exactClass && !current.linkedRetrievalBanks.some(pair => pair.includes(bank) && pair.includes(document.className)))) return;
+      setStatus({ tone: "working", message: partner ? `Updating the ${bank} retrieval bank...` : "Updating the retrieval bank..." });
       const sharedItem =
         bankStatus.state === "shared" || bankStatus.state === "tracked"
           ? bankStatus.sharedItem
           : undefined;
       const source = existing ?? sharedItem;
       const liveMatch =
-        activeLiveLookup.state === "ready" ? activeLiveLookup.result.match : null;
+        freshLookup ? freshLookup.match : activeLiveLookup.state === "ready" ? activeLiveLookup.result.match : null;
       const saved = await saveRetrievalItem({
         ...(existing ?? {}),
         id: existing?.id ?? createBuilderId("retrieval"),
-        lo: !existing && liveMatch ? liveMatch.lo : trimmedLo,
-        className: document.className,
-        contentId: source?.contentId ?? liveMatch?.contentId,
+        lo: (exactClass || !existing) && liveMatch ? liveMatch.lo : trimmedLo,
+        className: bank,
+        contentId: exactClass ? liveMatch?.contentId : source?.contentId ?? liveMatch?.contentId,
+        ...(exactClass && { preserveTrackedProgress: true as const, expectedTrackedProgress: alreadyTracked }),
         spacingFactor: coerceExampleSpacing(spacingFactor),
         lastTaught: document.teachingDate,
         seenCount: Math.max(1, existing?.seenCount ?? 0),
@@ -304,6 +327,7 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
             : existing?.answerImages,
         ),
       ]);
+      if (!stillInLesson()) return;
       mergeSavedItem(existing?.id, {
         ...saved,
         selected: existing?.selected ?? false,
@@ -311,14 +335,14 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
         answerImages: savedAnswers,
       });
 
-      const message = existing
+      const message = alreadyTracked
         ? "Updated the existing retrieval item."
         : bankStatus.state === "shared" || Boolean(liveMatch)
           ? "Added class tracking for the existing shared LO."
           : "Added a retrieval row.";
-      setStatus({ tone: "success", message });
+      setStatus({ tone: "success", message: partner ? `${message} Bank: ${bank}.` : message });
     } catch (error) {
-      setStatus({
+      if (stillInLesson()) setStatus({
         tone: "error",
         message:
           error instanceof Error && error.message
@@ -339,7 +363,7 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
     const preservedSlots = normalizeImageSlots(preserved);
     return Promise.all(
       drafts.map(async (draft, index) => {
-        if (!draft.dirty) return draft.asset ?? preservedSlots[index] ?? null;
+        if (!draft.dirty) return preservedSlots[index] ?? draft.asset ?? null;
         if (draft.resetToGlobal) {
           await resetRetrievalImageOverride(itemId, role, index);
           return draft.asset;
@@ -545,6 +569,15 @@ export function ExampleComposer({ compact = false, editingSlide, onUpdate, onCan
           <Plus className="size-4" aria-hidden />
           Add example slide
         </button>
+        {partner ? (
+          <label className={styles.exampleBankDestination}>
+            <span className={styles.fieldLabel}>Retrieval bank</span>
+            <select className={styles.textInput} value={bank} disabled={isSavingBank} onChange={event => chooseBank(event.target.value)}>
+              <option value={document.className}>{document.className} · lesson class</option>
+              <option value={partner}>{partner} · linked bank</option>
+            </select>
+          </label>
+        ) : null}
         <button
           className={styles.secondaryButton}
           type="button"
@@ -571,13 +604,13 @@ function getDatabaseStatus(
   if (liveLookup.state === "checking") {
     return { tone: "neutral" as const, message: "Checking retrieval database..." };
   }
-  if (bankStatus.state === "tracked") {
+  if (bankStatus.state === "tracked" && liveLookup.state !== "ready") {
     return {
       tone: "good" as const,
       message: "Already in retrieval database; tracked for this class.",
     };
   }
-  if (bankStatus.state === "shared") {
+  if (bankStatus.state === "shared" && liveLookup.state !== "ready") {
     return {
       tone: "warn" as const,
       message: "Already in retrieval database; not yet tracked for this class.",

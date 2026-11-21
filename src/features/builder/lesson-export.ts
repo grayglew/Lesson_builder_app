@@ -8,6 +8,7 @@ import {
 import type {
   BuilderDocument,
   BuilderSlide,
+  RetrievalItem,
 } from "./schema";
 import { renderLatexDocument } from "./latex";
 import { inlineMarkdownToHtml } from "./markdown";
@@ -15,6 +16,7 @@ import { UNIT_RESOURCE_CSS, hasUnitResources, renderUnitResourceCards } from "./
 import { normalizeBuilderDocument } from "./schema";
 import { renderStaticAnnotationSvg } from "./static-annotations";
 import { extractRetrievalLoCode } from "./example";
+import { retrievalBankKey } from "./retrieval-bank-links";
 import { studentSnapshotRuntimeSource } from "./student-snapshot-runtime";
 import { TABLET_PRESENTER_CSS } from "../presenter/tablet-styles";
 import type { PresenterResume } from "../presenter/session-types";
@@ -26,10 +28,12 @@ export type StandaloneLessonOptions = {
   handout?: boolean;
   offlineCapabilities?: boolean;
   staticAnnotations?: boolean;
+  activeRetrievalItems?: readonly RetrievalItem[];
   liveRetrieval?: {
     enabled: boolean;
     endpoint: string;
     nextEndpoint: string;
+    archiveEndpoint?: string;
     lessonId: string;
     className: string;
     teachingDate: string;
@@ -68,6 +72,7 @@ const presenterIcons = {
   exitFull: '<path d="M4 9h5V4m11 5h-5V4M4 15h5v5m11-5h-5v5"/>',
   ink: '<path d="M12 3c2 3 6 7 6 11a6 6 0 1 1-12 0c0-4 4-8 6-11Z"/>',
   blankSlide: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 12h8m-4-4v8"/>',
+  archive: '<path d="M3 6h18M9 6V3h6v3m4 0-1 15H6L5 6m5 4v7m4-7v7"/>',
   save: '<path d="M5 3h12l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M7 3v6h9V3M7 21v-8h10v8"/>',
   student: '<path d="M3 12V5h18v7M8 21h8m-4-4v4M3 16h18m-9-2V8m-3 3 3-3 3 3"/>',
   busy: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
@@ -90,12 +95,17 @@ export function buildStandaloneLessonHtml(
     options.presenterConfig?.enabled && options.presenterConfig.sourceLessonId
       ? options.presenterConfig
       : null;
+  const activeRetrievalKeys = liveRetrieval && options.activeRetrievalItems
+    ? new Set(options.activeRetrievalItems.map(item => liveRetrievalKey(item.trackingId || item.id, item.className)))
+    : undefined;
   const slides = document.slides
     .map((slide, index) => {
       const renderedSlide = renderStandaloneSlide(
         slide,
         index,
         Boolean(liveRetrieval),
+        Boolean(liveRetrieval?.archiveEndpoint && presenterConfig && !options.handout),
+        activeRetrievalKeys,
       );
       return options.staticAnnotations
         ? injectStaticAnnotations(renderedSlide, slide.annotations)
@@ -219,7 +229,7 @@ ${options.offlineCapabilities ? `<details class="presenter-capability-note" open
 </details>` : ""}
 ${classroom ? "" : studentCode}
 <span id="presenter-student-code-status" role="status" aria-live="polite"></span>
-<script type="application/json" id="lesson-builder-state">${escapeJsonForHtml(JSON.stringify(document))}</script>
+<script type="application/json" id="lesson-builder-state">${escapeJsonForHtml(JSON.stringify(toPortableLessonDocument(document)))}</script>
 <script type="application/json" id="lesson-live-retrieval">${escapeJsonForHtml(JSON.stringify(liveRetrieval))}</script>
 <script type="application/json" id="lesson-presenter-config">${escapeJsonForHtml(JSON.stringify(presenterConfig))}</script>
 <script type="application/json" id="lesson-annotations-data">${escapeJsonForHtml(JSON.stringify(annotations))}</script>
@@ -259,6 +269,8 @@ export function normalizeImportedBuilderDocument(
   const imported = normalizeBuilderDocument(input);
   return normalizeBuilderDocument({
     ...imported,
+    linkedRetrievalBanks: current.linkedRetrievalBanks,
+    retrievalBankLinksUpdatedAt: current.retrievalBankLinksUpdatedAt,
     unitsOfWork: Object.hasOwn(lessonSource, "unitsOfWork")
       ? imported.unitsOfWork
       : current.unitsOfWork,
@@ -274,6 +286,14 @@ export function normalizeImportedBuilderDocument(
         ? imported.slideTemplates
         : current.slideTemplates,
   });
+}
+
+export function toPortableLessonDocument(document: BuilderDocument) {
+  if (!document.linkedRetrievalBanks.length && !document.retrievalBankLinksUpdatedAt) return document;
+  const { linkedRetrievalBanks, retrievalBankLinksUpdatedAt, ...lesson } = document;
+  void linkedRetrievalBanks;
+  void retrievalBankLinksUpdatedAt;
+  return lesson;
 }
 
 export type EmbedRemoteBuilderAssetsOptions = {
@@ -355,6 +375,8 @@ function renderStandaloneSlide(
   slide: BuilderSlide,
   index: number,
   liveRetrieval: boolean,
+  archiveRetrieval: boolean,
+  activeRetrievalKeys?: ReadonlySet<string>,
 ): string {
   const data = asRecord(slide);
   const title = escapeHtml(String(slide.title || slide.type || "Slide"));
@@ -395,7 +417,7 @@ function renderStandaloneSlide(
                 reveals[`starter-answer-${slotIndex}`] === true,
               )}
             </div>
-            ${liveRetrievalControl(slot, slotIndex, index, liveRetrieval)}
+            ${liveRetrievalControl(slot, slotIndex, index, liveRetrieval, archiveRetrieval, activeRetrievalKeys)}
           </article>`;
           },
         )
@@ -564,15 +586,26 @@ function liveRetrievalControl(
   slotIndex: number,
   slideIndex: number,
   enabled: boolean,
+  archiveEnabled: boolean,
+  activeRetrievalKeys?: ReadonlySet<string>,
 ) {
   const lo = String(slot.lo || "").trim();
   if (!enabled || !lo) return "";
-  const attributes = `data-live-lo="${escapeAttr(lo)}" data-live-item-id="${escapeAttr(String(slot.retrievalItemId || ""))}" data-live-current-image-slot="${escapeAttr(String(slot.currentImageSlot || 1))}" data-live-slide-index="${slideIndex}" data-live-slot-index="${slotIndex}"`;
+  const bank = String(slot.retrievalBankClassName || "");
+  const exactId = String(slot.retrievalItemId || "");
+  if (exactId && bank && activeRetrievalKeys && !activeRetrievalKeys.has(liveRetrievalKey(exactId, bank))) return "";
+  const archived = slot.retrievalArchived === true;
+  const attributes = `data-live-lo="${escapeAttr(lo)}" data-live-item-id="${escapeAttr(exactId)}" data-live-bank="${escapeAttr(bank)}" data-live-current-image-slot="${escapeAttr(String(slot.currentImageSlot || 1))}" data-live-slide-index="${slideIndex}" data-live-slot-index="${slotIndex}"${archived ? " data-live-archived disabled" : ""}`;
   return `<div class="live-retrieval-controls" data-ignore-annotation>
     <button class="live-retrieval-button" type="button" aria-label="Seen +1" title="Seen +1" data-live-retrieval data-live-delta="1" ${attributes}>+1</button>
     <button class="live-retrieval-button" type="button" aria-label="Seen -1" title="Seen -1" data-live-retrieval data-live-delta="-1" ${attributes}>-1</button>
     ${slot.overrideQuestionImage === true && slot.overrideAnswerImage === true ? "" : `<button class="live-retrieval-button" type="button" aria-label="Next retrieval question" title="Next retrieval question" data-live-retrieval-next ${attributes}>&#8635;</button>`}
+    ${archiveEnabled && bank && /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(exactId) ? `<button class="live-retrieval-button live-retrieval-archive" type="button" aria-label="Archive retrieval skill" title="Archive retrieval skill" data-live-retrieval-archive ${attributes}>${presenterIcon("archive")}</button>` : ""}
   </div>`;
+}
+
+function liveRetrievalKey(id: string, bank: string) {
+  return JSON.stringify([id, retrievalBankKey(bank)]);
 }
 
 function assetImage(asset: unknown, alt: string, className: string) {
@@ -608,6 +641,8 @@ function sanitizeImportedSlideClass(value: unknown) {
 function standaloneLessonCss() {
   return `
 ${UNIT_RESOURCE_CSS}
+.live-retrieval-controls:has(.live-retrieval-archive){grid-template-columns:repeat(4,minmax(0,1fr));max-width:calc(100% - 54px)}.live-retrieval-archive .presenter-tool-icon{margin:auto}.live-retrieval-archive svg{width:16px;height:16px}.live-retrieval-button[data-live-archived]{cursor:default}
+@media(pointer:coarse) and (min-width:640px){.live-retrieval-controls:has(.live-retrieval-archive){grid-template-columns:repeat(4,44px)}.live-retrieval-controls:has(.live-retrieval-archive) .live-retrieval-button{width:44px;height:44px}}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 :root{--presenter-edge-space:6px;--presenter-toolbar-space:64px;--presenter-slide-width:100vw;--presenter-slide-height:62.5vw}
 .lesson-header{position:sticky;top:0;z-index:4;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;background:#fff;border-bottom:1px solid #cad7d7}
@@ -1364,6 +1399,52 @@ function standaloneInteractionScript() {
     return "(function(){function waitForImages(){var images=Array.prototype.slice.call(document.querySelectorAll('img'));return Promise.all(images.map(function(image){if(image.complete&&image.naturalWidth>0)return Promise.resolve();if(typeof image.decode==='function')return image.decode().catch(function(){});return new Promise(function(resolve){image.addEventListener('load',resolve,{once:true});image.addEventListener('error',resolve,{once:true});});}));}function openPrintDialog(){waitForImages().then(function(){setTimeout(function(){window.print();},350);});}if(document.readyState==='complete')openPrintDialog();else window.addEventListener('load',openPrintDialog,{once:true});})();";
   }
 
+  async function handleArchiveRetrieval(button) {
+    const itemId = button.dataset.liveItemId;
+    const bank = button.dataset.liveBank;
+    if (button.disabled || !itemId || !bank || !liveRetrieval?.archiveEndpoint || !liveRetrieval.lessonId) return;
+    const controls = Array.from(document.querySelectorAll(".live-retrieval-controls button")).filter(control =>
+      control.dataset.liveItemId === itemId && control.dataset.liveBank === bank,
+    );
+    controls.forEach(control => { control.disabled = true; control.dataset.liveArchivePending = "true"; });
+    try {
+      const approved = await presenterNotifications.confirm({
+        title: "Archive retrieval skill?",
+        description: 'Remove "' + button.dataset.liveLo + '" from ' + bank + '? The current question and your annotations will stay on the slide.',
+        confirmLabel: "Archive skill",
+        cancelLabel: "Keep skill",
+        tone: "danger",
+      });
+      if (!approved) return;
+      const response = await fetch(liveRetrieval.archiveEndpoint, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessonId: liveRetrieval.lessonId, retrievalItemId: itemId, className: bank }),
+      });
+      await readApiJson(response, "Could not archive this retrieval skill.");
+      controls.forEach(control => {
+        control.dataset.liveArchived = "true";
+        control.title = "Archived from " + bank;
+      });
+      recoveryChanged();
+      presenterNotifications.notify("Archived from " + bank + ". The question remains on this slide.", "success");
+      try {
+        const channel = new BroadcastChannel("lesson-builder-retrieval-changed");
+        channel.postMessage("archive");
+        channel.close();
+      } catch {}
+    } catch (error) {
+      presenterNotifications.notify(error?.message || "Could not archive this retrieval skill.", "error");
+    } finally {
+      controls.forEach(control => {
+        delete control.dataset.liveArchivePending;
+        control.disabled = control.hasAttribute("data-live-archived");
+      });
+      if (!button.disabled && button.isConnected) button.focus();
+    }
+  }
+
   async function handleLiveRetrieval(button) {
     if (!liveRetrieval?.endpoint || !liveRetrieval.lessonId || button.disabled) {
       return;
@@ -1377,6 +1458,8 @@ function standaloneInteractionScript() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lessonId: liveRetrieval.lessonId,
+          retrievalItemId: button.dataset.liveItemId || "",
+          retrievalBankClassName: button.dataset.liveBank || "",
           lo: button.dataset.liveLo || "",
           className: liveRetrieval.className || "",
           teachingDate: liveRetrieval.teachingDate || "",
@@ -1418,6 +1501,7 @@ function standaloneInteractionScript() {
         body: JSON.stringify({
           lessonId: liveRetrieval.lessonId,
           retrievalItemId: button.dataset.liveItemId || "",
+          retrievalBankClassName: button.dataset.liveBank || "",
           lo: button.dataset.liveLo || "",
           className: liveRetrieval.className || "",
           slideIndex: Number(button.dataset.liveSlideIndex || 0),
@@ -1447,7 +1531,7 @@ function standaloneInteractionScript() {
   }
 
   function setLiveControlStatus(button, text, className, disabled = true) {
-    button.disabled = disabled;
+    button.disabled = disabled || button.hasAttribute("data-live-archived") || button.hasAttribute("data-live-archive-pending");
     button.textContent = text;
     button.classList.remove("is-saved", "is-error");
     if (className) button.classList.add(className);
@@ -1717,6 +1801,8 @@ function standaloneInteractionScript() {
         if (control.dataset.liveItemId) {
           slot.retrievalItemId = control.dataset.liveItemId;
         }
+        if (control.dataset.liveBank) slot.retrievalBankClassName = control.dataset.liveBank;
+        if (control.hasAttribute("data-live-archived")) slot.retrievalArchived = true;
         slot.lockImageSlot = true;
         if (control.dataset.liveLo) slot.lo = control.dataset.liveLo;
       }
@@ -2038,7 +2124,13 @@ function standaloneInteractionScript() {
     const data = document.getElementById("lesson-annotations-data");
     const annotations = window.__lessonPresenterRuntimeController?.getAnnotations();
     if (data && annotations) data.textContent = JSON.stringify(annotations);
-    const blob = new Blob(["<!doctype html>\n" + document.documentElement.outerHTML], { type: "text/html" });
+    const offline = document.documentElement.cloneNode(true);
+    offline.querySelectorAll(".live-retrieval-controls").forEach((controls) => controls.remove());
+    for (const id of ["lesson-live-retrieval", "lesson-presenter-config", "lesson-presenter-recovery"]) {
+      const config = offline.querySelector("#" + id);
+      if (config) config.textContent = "null";
+    }
+    const blob = new Blob(["<!doctype html>\n" + offline.outerHTML], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     const title = (document.title || "lesson").replace(/[^a-z0-9._-]+/gi, "-");
@@ -2049,6 +2141,13 @@ function standaloneInteractionScript() {
   }
 
   document.addEventListener("click", (event) => {
+    const archive = event.target.closest("[data-live-retrieval-archive]");
+    if (archive) {
+      event.preventDefault();
+      event.stopPropagation();
+      void handleArchiveRetrieval(archive);
+      return;
+    }
     const nextRetrieval = event.target.closest("[data-live-retrieval-next]");
     if (nextRetrieval) {
       event.preventDefault();

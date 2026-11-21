@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lookupRetrievalLoData } from "@/lib/builder-global/data";
+import { lookupRetrievalLoData, saveRetrievalItemData } from "@/lib/builder-global/data";
 
 describe("retrieval LO lookup", () => {
   it("matches a normalized LO code and reports class tracking", async () => {
@@ -85,6 +85,43 @@ describe("retrieval LO lookup", () => {
   });
 });
 
+describe("linked Example class tracking", () => {
+  const contentId = "11111111-1111-4111-8111-111111111111";
+  const progressId = "22222222-2222-4222-8222-222222222222";
+  const input = {
+    id: "33333333-3333-4333-8333-333333333333", // stale ID from the other bank
+    lo: "101a: Expand brackets", contentId, className: "9L2FM",
+    preserveTrackedProgress: true, expectedTrackedProgress: true,
+    seenCount: 1, currentImageSlot: 1, lastTaught: "2026-11-21", spacingFactor: 1.8,
+  };
+  const skill = { id: contentId, scope: "global", lo_text: input.lo, lo_code: "101a" };
+  const progress = {
+    id: progressId, class_name: "9L2FM", retrieval_lo_id: contentId,
+    seen_count: 7, current_image_slot: 5, retrieval_lo: skill,
+  };
+
+  it("updates only date and spacing on the exact active destination row", async () => {
+    const database = fakeSupabase({
+      classes: [{ id: "class-id", name: "9L2FM" }],
+      retrieval_los: [skill],
+      retrieval_class_progress: [progress, { id: progressId }, [progress]],
+    });
+    const result = await saveRetrievalItemData(database.client, "owner", input);
+    expect(result.item).toMatchObject({ id: progressId, seenCount: 7, currentImageSlot: 5 });
+    expect(database.calls).toContainEqual(["retrieval_class_progress", "update", JSON.stringify({ spacing_factor: 1.8, last_taught: "2026-11-21" })]);
+    expect(database.calls).not.toContainEqual(["retrieval_class_progress", "eq", "id", input.id]);
+  });
+
+  it("refuses an unconfirmed duplicate without writing", async () => {
+    const database = fakeSupabase({
+      classes: [{ id: "class-id", name: "9L2FM" }],
+      retrieval_class_progress: [progress],
+    });
+    await expect(saveRetrievalItemData(database.client, "owner", { ...input, expectedTrackedProgress: false })).rejects.toThrow("changed while you were saving");
+    expect(database.calls.some((call) => call[1] === "update")).toBe(false);
+  });
+});
+
 function fakeSupabase(responses: Record<string, unknown[]>) {
   const calls: string[][] = [];
   const responseIndex = new Map<string, number>();
@@ -96,6 +133,10 @@ function fakeSupabase(responses: Record<string, unknown[]>) {
   const client = {
     from(table: string) {
       const query = {
+        update(value: unknown) {
+          calls.push([table, "update", JSON.stringify(value)]);
+          return query;
+        },
         select(value: string) {
           calls.push([table, "select", value]);
           return query;
@@ -112,6 +153,10 @@ function fakeSupabase(responses: Record<string, unknown[]>) {
           calls.push([table, "limit", String(value)]);
           return query;
         },
+        in() { return query; },
+        order() { return query; },
+        range() { return query; },
+        single() { return query.maybeSingle(); },
         maybeSingle() {
           calls.push([table, "maybeSingle"]);
           return Promise.resolve({ data: nextResponse(table), error: null });

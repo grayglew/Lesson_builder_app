@@ -1,6 +1,6 @@
 # Linked retrieval banks, presenter archive, and A4 starter cover
 
-Status: proposed for approval. Preview only; do not promote to production.
+Status: approved for implementation in Preview on 2026-11-21. Do not promote to production.
 
 ## Intent
 

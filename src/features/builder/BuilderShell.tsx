@@ -61,6 +61,7 @@ import { loadV2CachedDocument } from "./persistence";
 import { PdfComposer } from "./PdfComposer";
 import { RetrievalComposer } from "./RetrievalComposer";
 import { getDueRetrievalItems } from "./retrieval";
+import { getLinkedBank, selectWorkspaceRetrievalBankLinks } from "./retrieval-bank-links";
 import { SavedLessonLibrary } from "./SavedLessonLibrary";
 import { StarterComposer } from "./StarterComposer";
 import { WorksheetComposer } from "./WorksheetComposer";
@@ -71,7 +72,7 @@ import { UnitResourceSlide } from "./UnitResourceSlide";
 import { hasUnitResources } from "./unit-resources";
 import { WorkspaceAutosaveIndicator } from "./WorkspaceAutosaveIndicator";
 import { mergeWorkspaceUnitLibraries } from "./workspace-unit-library";
-import { type BuilderSlide } from "./schema";
+import { type BuilderDocument, type BuilderSlide } from "./schema";
 import {
   selectDocument,
   useBuilderStore,
@@ -153,10 +154,14 @@ function BuilderShellWorkspace({
   const [themePreference, setThemePreference] =
     useState<BuilderThemePreference>(initialTheme);
   const document = useBuilderStore(selectDocument);
+  const linkedBank = getLinkedBank(document.linkedRetrievalBanks, document.className);
   const overdueCount = useMemo(
-    () => getDueRetrievalItems(document.retrievalItems, document.className, document.teachingDate).length,
-    [document.retrievalItems, document.className, document.teachingDate],
+    () => getDueRetrievalItems(document.retrievalItems, document.className, document.teachingDate, { exactClass: Boolean(linkedBank) }).length,
+    [document.retrievalItems, document.className, document.teachingDate, linkedBank],
   );
+  const linkedCount = useMemo(() => linkedBank
+    ? getDueRetrievalItems(document.retrievalItems, linkedBank, document.teachingDate, { exactClass: true }).length
+    : 0, [document.retrievalItems, document.teachingDate, linkedBank]);
   const fallbackPreviewSlides = useMemo(
     () => hydrateStarterSlotsFromRetrievalItems(document).slides,
     [document],
@@ -417,16 +422,21 @@ function BuilderShellWorkspace({
         const unitsOfWork = shouldUseRemote
           ? mergeWorkspaceUnitLibraries(remote.unitsOfWork, current.unitsOfWork)
           : mergeWorkspaceUnitLibraries(current.unitsOfWork, remote?.unitsOfWork ?? []);
-        const remoteUnitsChanged = remote && JSON.stringify(unitsOfWork) !== JSON.stringify(remote.unitsOfWork);
-        const localUnitsChanged = JSON.stringify(unitsOfWork) !== JSON.stringify(current.unitsOfWork);
+        const links = remote ? selectWorkspaceRetrievalBankLinks(current, remote) : selectWorkspaceRetrievalBankLinks(current, current);
+        const workspaceChanges = { unitsOfWork, ...links };
+        const differsFrom = (document: BuilderDocument) =>
+          document.retrievalBankLinksUpdatedAt !== links.retrievalBankLinksUpdatedAt ||
+          JSON.stringify(document.linkedRetrievalBanks) !== JSON.stringify(links.linkedRetrievalBanks) ||
+          JSON.stringify(document.unitsOfWork) !== JSON.stringify(unitsOfWork);
+        const remoteWorkspaceChanged = remote && differsFrom(remote);
         if (shouldUseRemote) {
-          hydrate(remoteUnitsChanged ? { ...remote, unitsOfWork, updatedAt: new Date().toISOString() } : remote);
+          hydrate(remoteWorkspaceChanged ? { ...remote, ...workspaceChanges, updatedAt: new Date().toISOString() } : remote);
           setStatus({ tone: "idle", message: "" });
         } else if (cached || editedDuringStartup) {
-          if (remote) updateGlobalData(remote);
-          if (localUnitsChanged) {
-            useBuilderStore.setState(state => ({ document: { ...state.document, unitsOfWork, updatedAt: new Date().toISOString() } }));
+          if (differsFrom(useBuilderStore.getState().document)) {
+            useBuilderStore.setState(state => ({ document: { ...state.document, ...workspaceChanges, updatedAt: new Date().toISOString() } }));
           }
+          if (remote) updateGlobalData(remote);
           setStatus({
             tone: "warning",
             message: "Kept the newer browser recovery copy.",
@@ -434,7 +444,7 @@ function BuilderShellWorkspace({
         } else {
           hydrate(remote ?? undefined);
         }
-        setCloudStartup({ ready: true, syncedVersion: shouldUseRemote && !remoteUnitsChanged ? remote.updatedAt : "" });
+        setCloudStartup({ ready: true, syncedVersion: shouldUseRemote && !remoteWorkspaceChanged ? remote.updatedAt : "" });
       } catch (error) {
         if (cancelled) return;
         setStartupFailed(true);
@@ -481,6 +491,29 @@ function BuilderShellWorkspace({
     void refreshRetrievalData();
     return () => controller.abort();
   }, [activeTool, document.className, hydrated, setStatus, updateGlobalData]);
+
+  useEffect(() => {
+    if (!hydrated || typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("lesson-builder-retrieval-changed");
+    let request: AbortController | undefined;
+    channel.onmessage = async event => {
+      if (event.data !== "archive") return;
+      request?.abort();
+      const controller = new AbortController();
+      request = controller;
+      const baseline = useBuilderStore.getState().document.retrievalItems;
+      try {
+        const global = await loadBuilderGlobalState(controller.signal);
+        if (!controller.signal.aborted && useBuilderStore.getState().document.retrievalItems === baseline) {
+          const selections = new Set(baseline.filter(item => item.selected).map(item => item.id));
+          updateGlobalData({ retrievalItems: global.retrievalItems.map(item => ({ ...item, selected: selections.has(item.id) })) });
+        }
+      } catch {
+        // The normal Retrieval-tab refresh is still available.
+      }
+    };
+    return () => { request?.abort(); channel.close(); };
+  }, [hydrated, updateGlobalData]);
 
   async function saveLesson(copy: boolean) {
     if (!cloudStartup.ready) {
@@ -555,6 +588,7 @@ function BuilderShellWorkspace({
     setBusyAction("rename-class");
     try {
       const global = await renameClassName(currentName, nextName);
+      useBuilderStore.getState().renameLinkedRetrievalBank(currentName, nextName);
       updateMetadata({ className: nextName });
       updateGlobalData(global);
       setStatus({
@@ -589,6 +623,7 @@ function BuilderShellWorkspace({
     setBusyAction("delete-class");
     try {
       const global = await archiveClassName(className);
+      useBuilderStore.getState().unlinkRetrievalBank(className);
       updateMetadata({ className: "" });
       updateGlobalData(global);
       setStatus({ tone: "success", message: `Deleted class "${className}".` });
@@ -684,6 +719,7 @@ function BuilderShellWorkspace({
             className={document.className}
             teachingDate={document.teachingDate}
             overdueCount={overdueCount}
+            linkedOverdue={linkedBank ? { name: linkedBank, count: linkedCount } : undefined}
             userEmail={userEmail}
             cloudMessage={workspaceAutosave.phase === "saved"
               ? ((document.activeLessonId || document.slides.length) && isLessonDirty(document)

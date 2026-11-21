@@ -97,6 +97,21 @@ describe("ExampleComposer", () => {
     ]);
   });
 
+  it("looks up and saves an Example in the chosen linked bank without changing the lesson class", async () => {
+    const user = userEvent.setup();
+    const document = useBuilderStore.getState().document;
+    useBuilderStore.getState().hydrate({ ...document, classNames: ["Year 9", "9L2FM"], linkedRetrievalBanks: [["Year 9", "9L2FM"]] });
+    render(<AppNotificationsProvider><ExampleComposer /></AppNotificationsProvider>);
+    await user.type(screen.getByLabelText("Learning objective"), "191a: Test skill");
+    await user.selectOptions(screen.getByLabelText("Retrieval bank"), "9L2FM");
+    await waitFor(() => expect(lookupRetrievalLo).toHaveBeenCalledWith("191a: Test skill", "9L2FM", expect.any(AbortSignal)));
+    await user.click(screen.getByRole("button", { name: "Add LO to retrieval bank" }));
+    await waitFor(() => expect(useBuilderStore.getState().document.retrievalItems[0]).toMatchObject({ lo: "191a: Test skill", className: "9L2FM" }));
+    expect(useBuilderStore.getState().document.className).toBe("Year 9");
+    expect(uploadRetrievalImage).not.toHaveBeenCalled();
+    expect(clearRetrievalImage).not.toHaveBeenCalled();
+  });
+
   it("requires the original minimum Example fields", async () => {
     const user = userEvent.setup();
     render(<ExampleComposer />);
@@ -115,6 +130,24 @@ describe("ExampleComposer", () => {
     expect(useBuilderStore.getState().status.message).toBe(
       "Add at least one example image.",
     );
+  });
+
+  it("confirms a linked entry found on the server even when it is not in the workspace cache", async () => {
+    const user = userEvent.setup();
+    const document = useBuilderStore.getState().document;
+    useBuilderStore.getState().hydrate({ ...document, classNames: ["Year 9", "9L2FM"], linkedRetrievalBanks: [["Year 9", "9L2FM"]] });
+    vi.mocked(lookupRetrievalLo).mockResolvedValue({
+      exists: true, trackedForClass: true,
+      match: { contentId: "global-191a", loCode: "191a", lo: "191a: Test skill", source: "global", hasRetrievalImages: true, imagePairCount: 8 },
+    });
+    render(<AppNotificationsProvider><ExampleComposer /></AppNotificationsProvider>);
+    await user.type(screen.getByLabelText("Learning objective"), "191a: Test skill");
+    await user.selectOptions(screen.getByLabelText("Retrieval bank"), "9L2FM");
+    await user.click(screen.getByRole("button", { name: "Add LO to retrieval bank" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("already tracked in 9L2FM");
+    expect(saveRetrievalItem).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Replace entry" }));
+    await waitFor(() => expect(saveRetrievalItem).toHaveBeenCalledWith(expect.objectContaining({ className: "9L2FM", preserveTrackedProgress: true })));
   });
 
   it("updates an existing class row without clearing untouched images", async () => {

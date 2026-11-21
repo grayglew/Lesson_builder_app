@@ -121,6 +121,27 @@ describe("BuilderShell legacy UI parity", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 
+  it("reconciles a cloud unlink without dropping a concurrent browser lesson edit", async () => {
+    const cached = {
+      ...createInitialBuilderDocument("2026-11-21T10:00:00.000Z"),
+      className: "10Ma1", classNames: ["10Ma1", "9L2FM"],
+      linkedRetrievalBanks: [["10Ma1", "9L2FM"]] as [string, string][],
+      retrievalBankLinksUpdatedAt: "2026-11-21T09:00:00.000Z",
+    };
+    const remote = { ...cached, linkedRetrievalBanks: [], retrievalBankLinksUpdatedAt: "2026-11-21T09:30:00.000Z" };
+    let finish!: (document: typeof remote) => void;
+    vi.mocked(loadV2CachedDocument).mockResolvedValue(cached);
+    vi.mocked(loadBuilderDocument).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    render(<BuilderShell userEmail="teacher@example.com" />);
+    await screen.findByText("Loaded the browser recovery copy; checking Supabase...");
+    fireEvent.change(screen.getByLabelText("Lesson title"), { target: { value: "New local edit" } });
+    await act(async () => { finish(remote); });
+    const document = useBuilderStore.getState().document;
+    expect(document.title).toBe("New local edit");
+    expect(document.linkedRetrievalBanks).toEqual([]);
+    expect(document.retrievalBankLinksUpdatedAt).toBe(remote.retrievalBankLinksUpdatedAt);
+  });
+
   it("does not start an explicit save before the cloud workspace has been reconciled", async () => {
     const cached = { ...createInitialBuilderDocument("2026-11-01T00:00:00.000Z"), className: "11Ma2" };
     let finish!: (document: typeof cached) => void;
@@ -1260,11 +1281,16 @@ describe("BuilderShell Compact Console action parity", () => {
         answerImage: null,
       },
     ]);
+    const frame = window.document.createElement("iframe");
+    window.document.body.append(frame);
+    const actualWindow = frame.contentWindow!;
     const previewWindow = {
       close: vi.fn(),
-      document: { write: vi.fn() },
+      document: actualWindow.document,
       focus: vi.fn(),
       location: { replace: vi.fn() },
+      addEventListener: actualWindow.addEventListener.bind(actualWindow),
+      removeEventListener: actualWindow.removeEventListener.bind(actualWindow),
     } as unknown as Window;
     const openSpy = vi.spyOn(window, "open").mockReturnValue(previewWindow);
     const createObjectUrl = vi.fn((blob: Blob) => {
@@ -1293,6 +1319,10 @@ describe("BuilderShell Compact Console action parity", () => {
         "current",
       ),
     );
+    const choice = await within(actualWindow.document.body).findByRole("button", {
+      name: "Existing layout",
+    });
+    await user.click(choice);
     await waitFor(() => expect(createObjectUrl).toHaveBeenCalledTimes(1));
     const handoutBlob = createObjectUrl.mock.calls[0]?.[0] as Blob;
     const handoutHtml = await new Promise<string>((resolve, reject) => {
@@ -1302,6 +1332,7 @@ describe("BuilderShell Compact Console action parity", () => {
       reader.readAsText(handoutBlob);
     });
     expect(handoutHtml).toContain("data:image/png;base64,ZnJlc2g=");
+    frame.remove();
     expect(useBuilderStore.getState().document.slides[0]).toEqual(
       expect.objectContaining({
         slots: [

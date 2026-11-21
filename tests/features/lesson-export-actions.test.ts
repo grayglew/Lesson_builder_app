@@ -92,6 +92,19 @@ describe("current lesson output preparation wiring", () => {
     expect(prepareDocument).not.toHaveBeenCalled();
   });
 
+  it("offers the cover only when the selected slides include a core Starter", async () => {
+    const document = currentHandoutDocument();
+    const chooseStarterLayout = vi.fn(async () => "a4-cover" as const);
+    const prepareDocument = async (selected: BuilderDocument) => selected;
+    const dependencies = { prepareDocument, chooseStarterLayout };
+    const withStarter = await prepareCurrentA4Handout(document, dependencies);
+    expect(withStarter.html).toContain('aria-label="A4 booklet cover"');
+    document.handoutSlideIds = ["example"];
+    const withoutStarter = await prepareCurrentA4Handout(document, dependencies);
+    expect(withoutStarter.html).not.toContain('aria-label="A4 booklet cover"');
+    expect(chooseStarterLayout).toHaveBeenCalledOnce();
+  });
+
   it("describes the exact duplex sheet count when offering additional-sheet glue margins", async () => {
     const requests: Array<Record<string, unknown>> = [];
     const chooseAdditionalSheetGlue = createAdditionalSheetGlueChooser(

@@ -18,6 +18,7 @@ import {
 import { applyUnitToLesson } from "./unit-of-work";
 import { isLessonDirty } from "./saved-lesson-parity";
 import { mergeWorkspaceUnitLibraries } from "./workspace-unit-library";
+import { getLinkedBank, normalizeRetrievalBankLinks, retrievalBankKey } from "./retrieval-bank-links";
 
 type MetadataPatch = Partial<
   Pick<BuilderDocument, "title" | "className" | "teachingDate" | "overallLessonLo">
@@ -68,6 +69,9 @@ export type BuilderStore = {
   updateActiveLessonMetadata: (metadata: SavedLessonMetadata, expectedSavedAt: string, fields: readonly ("title" | "className" | "teachingDate")[]) => void;
   clearActiveLesson: (id?: string) => void;
   updateGlobalData: (patch: GlobalDataPatch) => void;
+  linkRetrievalBanks: (left: string, right: string) => void;
+  unlinkRetrievalBank: (className: string) => void;
+  renameLinkedRetrievalBank: (previousName: string, nextName: string) => void;
   reset: () => void;
   saveUnitOfWork: (unit: UnitOfWork) => void;
   associateUnitOfWork: (id: string) => void;
@@ -135,6 +139,8 @@ export const useBuilderStore = create<BuilderStore>()(
           retrievalItems: state.document.retrievalItems,
           slideTemplates: state.document.slideTemplates,
           unitsOfWork: state.document.unitsOfWork,
+          linkedRetrievalBanks: state.document.linkedRetrievalBanks,
+          retrievalBankLinksUpdatedAt: state.document.retrievalBankLinksUpdatedAt,
           updatedAt: new Date().toISOString(),
         };
         state.selectedSlideId = null;
@@ -160,6 +166,8 @@ export const useBuilderStore = create<BuilderStore>()(
             retrievalItems: state.document.retrievalItems,
             slideTemplates: state.document.slideTemplates,
             unitsOfWork: mergeWorkspaceUnitLibraries(state.document.unitsOfWork, replacement.unitsOfWork),
+            linkedRetrievalBanks: state.document.linkedRetrievalBanks,
+            retrievalBankLinksUpdatedAt: state.document.retrievalBankLinksUpdatedAt,
           };
           state.selectedSlideId = null;
           state.editingSlideId = null;
@@ -211,6 +219,11 @@ export const useBuilderStore = create<BuilderStore>()(
     updateGlobalData: (patch) =>
       set((state) => {
         if (patch.classNames) {
+          const links = normalizeRetrievalBankLinks(state.document.linkedRetrievalBanks, patch.classNames);
+          if (JSON.stringify(links) !== JSON.stringify(state.document.linkedRetrievalBanks)) {
+            state.document.linkedRetrievalBanks = links;
+            markRetrievalBankLinksEdited(state.document);
+          }
           state.document.classNames = uniqueStrings([
             state.document.className,
             ...patch.classNames,
@@ -224,11 +237,41 @@ export const useBuilderStore = create<BuilderStore>()(
         }
       }),
 
+    linkRetrievalBanks: (left, right) =>
+      set((state) => {
+        const links = state.document.linkedRetrievalBanks;
+        if (getLinkedBank(links, left) || getLinkedBank(links, right)) throw new Error("A class can have only one linked bank.");
+        const valid = normalizeRetrievalBankLinks([[left, right]], state.document.classNames);
+        if (!valid.length) throw new Error("Choose two different existing classes.");
+        links.push(valid[0]);
+        markRetrievalBankLinksEdited(state.document);
+      }),
+
+    unlinkRetrievalBank: (className) =>
+      set((state) => {
+        const key = retrievalBankKey(className);
+        const links = state.document.linkedRetrievalBanks.filter(pair => !pair.some(name => retrievalBankKey(name) === key));
+        if (links.length === state.document.linkedRetrievalBanks.length) return;
+        state.document.linkedRetrievalBanks = links;
+        markRetrievalBankLinksEdited(state.document);
+      }),
+
+    renameLinkedRetrievalBank: (previousName, nextName) =>
+      set((state) => {
+        const links = state.document.linkedRetrievalBanks;
+        if (!getLinkedBank(links, previousName)) return;
+        const previousKey = retrievalBankKey(previousName);
+        state.document.linkedRetrievalBanks = normalizeRetrievalBankLinks(
+          links.map(pair => pair.map(name => retrievalBankKey(name) === previousKey ? nextName : name)),
+        );
+        markRetrievalBankLinksEdited(state.document);
+      }),
+
     reset: () =>
       set((state) => {
         beginLessonSession(state);
-        const unitsOfWork = state.document.unitsOfWork;
-        state.document = { ...createInitialBuilderDocument(), unitsOfWork };
+        const { unitsOfWork, linkedRetrievalBanks, retrievalBankLinksUpdatedAt, classNames } = state.document;
+        state.document = { ...createInitialBuilderDocument(), unitsOfWork, linkedRetrievalBanks, retrievalBankLinksUpdatedAt, classNames };
         state.selectedSlideId = null;
         state.editingSlideId = null;
         state.hydrated = true;
@@ -471,6 +514,11 @@ function touchLesson(state: Pick<BuilderStore, "document" | "lessonVersion">) {
   state.lessonVersion++;
   state.document.updatedAt = nextTimestamp(state.document.updatedAt, state.document.lessonUpdatedAt, state.document.activeLessonSavedAt);
   state.document.lessonUpdatedAt = state.document.updatedAt;
+}
+
+function markRetrievalBankLinksEdited(document: BuilderDocument) {
+  document.retrievalBankLinksUpdatedAt = nextTimestamp(document.retrievalBankLinksUpdatedAt);
+  document.updatedAt = nextTimestamp(document.updatedAt, document.retrievalBankLinksUpdatedAt);
 }
 
 function nextTimestamp(...timestamps: string[]) {

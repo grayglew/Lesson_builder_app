@@ -56,6 +56,27 @@ describe("RetrievalComposer", () => {
     useBuilderStore.getState().hydrate(document);
   });
 
+  it("adds from the linked bank only, leaving the lesson's class and hidden selections alone", async () => {
+    const user = userEvent.setup();
+    vi.mocked(resolveRetrievalImages).mockResolvedValueOnce([]);
+    vi.mocked(advanceRetrievalItems).mockResolvedValueOnce([]);
+    const source = useBuilderStore.getState().document;
+    useBuilderStore.getState().hydrate({ ...source, classNames: ["Year 9", "9L2FM"], linkedRetrievalBanks: [["Year 9", "9L2FM"]], retrievalItems: [
+      retrievalItem({ id: "original", selected: true }),
+      retrievalItem({ id: "linked", trackingId: "linked-progress", className: "9L2FM", lo: "Further Maths test", selected: true }),
+    ] });
+    render(<RetrievalComposer compact />);
+    await user.selectOptions(screen.getByLabelText("Retrieval bank"), "9L2FM");
+    expect(screen.getByRole("textbox", { name: "Learning objective Further Maths test" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "4-per-slide" }));
+    await waitFor(() => expect(useBuilderStore.getState().document.slides).toHaveLength(1));
+    expect(useBuilderStore.getState().document.className).toBe("Year 9");
+    expect(useBuilderStore.getState().document.slides[0]).toMatchObject({ slots: [{ lo: "Further Maths test", retrievalItemId: "linked-progress", retrievalBankClassName: "9L2FM" }] });
+    expect(advanceRetrievalItems).toHaveBeenCalledWith(["linked"]);
+    expect(useBuilderStore.getState().document.retrievalItems[0].selected).toBe(true);
+    expect(logRetrievalItems).not.toHaveBeenCalled();
+  });
+
   it("selects due rows locally without mutating retrieval progress", async () => {
     const user = userEvent.setup();
     render(<RetrievalComposer compact />);

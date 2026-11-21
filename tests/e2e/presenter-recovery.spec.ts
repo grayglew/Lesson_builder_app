@@ -299,6 +299,40 @@ test("a failed taught marker retains the committed ID and revision for retry", a
   ]);
 });
 
+test("presenter archives the linked skill only after confirmation without removing the question", async ({ page }) => {
+  const live = { ...lesson, slides: [{ id: "linked-starter", type: "starter", title: "Retrieval", slots: [{
+    lo: "191a: Algebra", retrievalItemId: "22222222-2222-4222-8222-222222222222", retrievalBankClassName: "9L2FM", image, answerImage: image,
+  }] }] };
+  const html = buildStandaloneLessonHtml(live, {
+    runtimeCss: readFileSync("src/features/presenter/presenter-runtime.css", "utf8"),
+    runtimeJavaScript: readFileSync("public/builder-v2-assets/presenter-runtime.js", "utf8"),
+    liveRetrieval: { enabled: true, lessonId: "saved-lesson", className: "10Ma1", teachingDate: "2026-11-21",
+      endpoint: `${origin}/log`, nextEndpoint: `${origin}/next`, archiveEndpoint: `${origin}/archive` },
+    presenterConfig: { enabled: true, sourceLessonId: "saved-lesson", originalTitle: lesson.title,
+      className: "10Ma1", teachingDate: "2026-11-21", uploadEndpoint: `${origin}/ticket`,
+      completeEndpoint: `${origin}/complete`, taughtEndpoint: `${origin}/taught` },
+  });
+  const id = await seed(page, owner, html);
+  const archived: unknown[] = [];
+  await page.route(`${origin}/archive`, async route => {
+    archived.push(route.request().postDataJSON());
+    await route.fulfill({ json: { ok: true, result: { itemId: "22222222-2222-4222-8222-222222222222" } } });
+  });
+  await page.goto(`${origin}/?session=${id}`);
+  const frame = page.frameLocator("iframe");
+  const bin = frame.getByRole("button", { name: "Archive retrieval skill" });
+  await bin.click();
+  const dialog = frame.getByRole("alertdialog", { name: "Archive retrieval skill?" });
+  await expect(dialog).toContainText("9L2FM");
+  await dialog.getByRole("button", { name: "Keep skill" }).click();
+  expect(archived).toEqual([]);
+  await bin.click();
+  await dialog.getByRole("button", { name: "Archive skill" }).click();
+  await expect.poll(() => archived).toEqual([{ lessonId: "saved-lesson", retrievalItemId: "22222222-2222-4222-8222-222222222222", className: "9L2FM" }]);
+  await expect(frame.getByRole("button", { name: "Seen +1" })).toBeDisabled();
+  await expect(frame.locator(".starter-cell").first().locator("img").first()).toHaveJSProperty("naturalWidth", 200);
+});
+
 test("resuming an existing checkpoint does not automatically publish a student snapshot", async ({ page }) => {
   const studentHtml = sourceHtml.replace('"taughtEndpoint":' + JSON.stringify(`${origin}/taught`), '"taughtEndpoint":' + JSON.stringify(`${origin}/taught`) + ',"studentSession":{"sessionId":"student","code":"ABC-123","viewerUrl":"/student","expiresAt":"2099-01-01"},"studentSessionUploadEndpoint":"' + origin + '/student-ticket","studentSessionCompleteEndpoint":"' + origin + '/student-complete"');
   const id = await seed(page, owner, studentHtml);

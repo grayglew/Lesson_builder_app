@@ -314,6 +314,8 @@ export function StarterComposer({ compact = false, editingSlide, previewSlide, o
                 aria-label={`Clear LO ${index + 1}`}
                 onClick={() => updateSlot(index, {
                   ...emptySlot(),
+                  retrievalBankClassName: undefined,
+                  retrievalArchived: undefined,
                   lockImageSlot: undefined,
                   overrideQuestionImage: undefined,
                   overrideAnswerImage: undefined,
@@ -331,6 +333,8 @@ export function StarterComposer({ compact = false, editingSlide, previewSlide, o
                   updateSlot(index, {
                     lo: event.target.value,
                     retrievalItemId: "",
+                    retrievalBankClassName: undefined,
+                    retrievalArchived: undefined,
                   })
                 }
               />

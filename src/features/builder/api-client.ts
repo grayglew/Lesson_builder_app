@@ -525,7 +525,7 @@ export async function saveSlideTemplates(slideTemplates: SlideTemplate[]) {
   return normalizeGlobalState(result.state);
 }
 
-export async function saveRetrievalItem(item: RetrievalItem) {
+export async function saveRetrievalItem(item: RetrievalItem & { preserveTrackedProgress?: true; expectedTrackedProgress?: boolean }) {
   const result = await requestJson(
     "/api/builder-global/retrieval-items",
     item.id.includes("-") ? "PATCH" : "POST",

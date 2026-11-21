@@ -13,10 +13,12 @@ import {
   buildStandaloneLessonHtml,
   normalizeImportedBuilderDocument,
   parseStandaloneLessonHtml,
+  toPortableLessonDocument,
 } from "./lesson-export";
 import {
   buildA4Handout,
   selectHandoutDocument,
+  type StarterHandoutLayout,
 } from "./handout-export";
 import { prepareBuilderDocumentForExport } from "./prepare-export-document";
 import type { BuilderDocument, RetrievalItem } from "./schema";
@@ -29,6 +31,7 @@ type CurrentOutputDependencies = {
     retrievalItems?: readonly RetrievalItem[],
   ) => Promise<BuilderDocument>;
   chooseAdditionalSheetGlue?: (pageCount: number) => Promise<boolean>;
+  chooseStarterLayout?: () => Promise<StarterHandoutLayout>;
 };
 
 type CurrentLessonOutputServiceDependencies = CurrentOutputDependencies & {
@@ -63,6 +66,7 @@ export async function prepareCurrentA4Handout(
   );
   return buildA4Handout(preparedDocument, {
     chooseAdditionalSheetGlue: dependencies.chooseAdditionalSheetGlue,
+    chooseStarterLayout: dependencies.chooseStarterLayout,
   });
 }
 
@@ -86,6 +90,18 @@ export function createAdditionalSheetGlueWindowChooser(
   );
 }
 
+function createStarterLayoutWindowChooser(previewWindow: Window) {
+  return async (): Promise<StarterHandoutLayout> => {
+    const useCover = await showConfirmDialogInWindow(previewWindow, {
+      title: "Choose a starter layout",
+      description: "Use the starter as a full A4 cover with four questions and room to work, or keep the existing handout layout.",
+      confirmLabel: "A4 booklet cover",
+      cancelLabel: "Existing layout",
+    });
+    return useCover ? "a4-cover" : "standard";
+  };
+}
+
 function showConfirmDialogInWindow(
   previewWindow: Window,
   options: ConfirmDialogOptions,
@@ -98,7 +114,7 @@ function showConfirmDialogInWindow(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Choose handout margins</title>
+<title>Handout options</title>
 <style>
 *{box-sizing:border-box}
 html,body{min-height:100%;margin:0}
@@ -106,10 +122,10 @@ body{display:grid;place-items:center;padding:24px;background:#f4f4f5;color:#1818
 .dialog{position:relative;width:min(100%,560px);border:1px solid #d4d4d8;border-radius:16px;background:#fff;padding:28px;box-shadow:0 20px 45px rgba(24,24,27,.14)}
 h1{margin:0 36px 10px 0;font-size:24px;line-height:1.2}
 p{margin:0;color:#52525b;font-size:15px;line-height:1.55}
-.close{position:absolute;top:16px;right:16px;width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:#52525b;font-size:24px;line-height:1;cursor:pointer}
+.close{position:absolute;top:16px;right:16px;width:44px;height:44px;border:0;border-radius:999px;background:transparent;color:#52525b;font-size:24px;line-height:1;cursor:pointer}
 .close:hover,.close:focus-visible{background:#f4f4f5;outline:2px solid #18181b;outline-offset:2px}
-.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
-button{min-height:42px;border:1px solid #a1a1aa;border-radius:10px;padding:9px 16px;background:#fff;color:#18181b;font:inherit;font-weight:700;cursor:pointer}
+.actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:24px}
+button{min-height:44px;border:1px solid #a1a1aa;border-radius:10px;padding:9px 16px;background:#fff;color:#18181b;font:inherit;font-weight:700;cursor:pointer}
 button:hover,button:focus-visible{outline:2px solid #18181b;outline-offset:2px}
 .primary{border-color:#18181b;background:#18181b;color:#fff}
 </style>
@@ -127,6 +143,7 @@ button:hover,button:focus-visible{outline:2px solid #18181b;outline-offset:2px}
 </body>
 </html>`);
     previewDocument.close();
+    previewDocument.title = options.title;
 
     const title = previewDocument.getElementById("glue-dialog-title");
     const description = previewDocument.getElementById(
@@ -205,11 +222,13 @@ export function createCurrentLessonOutputService(
       offlineCapabilities: options.offlineCapabilities,
       runtimeCss: runtime.css,
       runtimeJavaScript: runtime.javaScript.replace(/<\/script/gi, "<\\/script"),
+      activeRetrievalItems: document.retrievalItems,
       liveRetrieval: presenterLessonId
         ? {
             enabled: true,
             endpoint: appEndpoint("/api/presenter/retrieval-log"),
             nextEndpoint: appEndpoint("/api/presenter/retrieval-next"),
+            archiveEndpoint: appEndpoint("/api/presenter/retrieval-archive"),
             lessonId: presenterLessonId,
             className: embeddedDocument.className,
             teachingDate: embeddedDocument.teachingDate,
@@ -261,7 +280,7 @@ export function createCurrentLessonOutputService(
     },
     buildJsonPayload() {
       return {
-        lessonBuilder: document,
+        lessonBuilder: toPortableLessonDocument(document),
         exportedAt: new Date().toISOString(),
       };
     },
@@ -464,7 +483,7 @@ export function useLessonExportActions() {
     }
   }
 
-  async function replaceDocument(nextDocument: unknown) {
+  async function replaceDocument(nextDocument: BuilderDocument) {
     if (document.slides.length) {
       const approved = await confirmDialog({
         title: "Import and replace the current lesson?",
@@ -476,12 +495,14 @@ export function useLessonExportActions() {
       });
       if (!approved) return false;
     }
-    hydrate(nextDocument);
+    const current = useBuilderStore.getState().document;
+    hydrate({ ...nextDocument, linkedRetrievalBanks: current.linkedRetrievalBanks, retrievalBankLinksUpdatedAt: current.retrievalBankLinksUpdatedAt });
     return true;
   }
 
   async function prepareA4Handout(previewWindow: Window) {
     return prepareCurrentA4Handout(document, {
+      chooseStarterLayout: createStarterLayoutWindowChooser(previewWindow),
       chooseAdditionalSheetGlue:
         createAdditionalSheetGlueWindowChooser(previewWindow),
     });

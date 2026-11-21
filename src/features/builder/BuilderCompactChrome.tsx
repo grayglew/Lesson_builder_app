@@ -60,6 +60,7 @@ type CompactAppBarProps = {
   className: string;
   teachingDate: string;
   overdueCount: number;
+  linkedOverdue?: { name: string; count: number };
   userEmail: string;
   cloudMessage: string;
   busy: boolean;
@@ -83,6 +84,7 @@ export function CompactAppBar({
   onPresent,
   onSave,
   overdueCount,
+  linkedOverdue,
   teachingDate,
   themePreference,
   title,
@@ -106,7 +108,16 @@ export function CompactAppBar({
       <div className={styles.compactLessonIdentity}>
         <div className={styles.compactLessonTitleRow}>
           <strong title={title.trim() || "Untitled lesson"}>{title.trim() || "Untitled lesson"}</strong>
-          <output
+          {linkedOverdue ? (
+            <div className={styles.compactLinkedOverdue} aria-label="Linked retrieval banks">
+              {[{ name: className, count: overdueCount }, linkedOverdue].map(({ name, count }) => (
+                <output key={name} className={styles.compactOverdueBadge} aria-label={`${name} overdue retrieval items`}
+                  aria-live="polite" aria-atomic="true" title={`${name}: ${count} overdue on or before ${teachingDate}`}>
+                  {name}: {count} overdue
+                </output>
+              ))}
+            </div>
+          ) : <output
             className={styles.compactOverdueBadge}
             aria-label="Overdue retrieval items"
             aria-live="polite"
@@ -114,7 +125,7 @@ export function CompactAppBar({
             title={`Retrieval items due on or before ${teachingDate || "the teaching date"}, for ${className || "all classes"}.`}
           >
             {overdueCount} overdue
-          </output>
+          </output>}
         </div>
         <span>{className || "No class"} · {teachingDate || "No teaching date"}</span>
       </div>

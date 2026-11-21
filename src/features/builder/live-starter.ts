@@ -38,9 +38,10 @@ export function hydrateStarterSlotsFromRetrievalItems(
         return {
           ...slot,
           lo: String(slot.lo || item.lo || "").trim(),
-          retrievalItemId: String(
-            slot.retrievalItemId || item.id || "",
-          ).trim(),
+          retrievalItemId: String(item.trackingId || slot.retrievalItemId || item.id || "").trim(),
+          ...(item.trackingId && item.className &&
+            (slot.retrievalBankClassName || normalizeText(item.className) === normalizeText(document.className)) &&
+            { retrievalBankClassName: slot.retrievalBankClassName || item.className }),
           currentImageSlot,
           image: resolveSlotImage(slot.image, item.images[currentImageSlot - 1], slot.overrideQuestionImage),
           answerImage: resolveSlotImage(slot.answerImage, item.answerImages[currentImageSlot - 1], slot.overrideAnswerImage),
@@ -103,7 +104,9 @@ export async function hydrateLiveStarterSlots(
       if (!slot || !resolved) return;
       slots[reference.slotIndex] = {
         ...slot,
-        retrievalItemId: resolved.itemId || slot.retrievalItemId || reference.item.id,
+        retrievalItemId: slot.retrievalBankClassName
+          ? slot.retrievalItemId
+          : resolved.itemId || slot.retrievalItemId || reference.item.id,
         currentImageSlot:
           resolved.currentImageSlot ||
           slot.currentImageSlot ||
@@ -141,8 +144,16 @@ function findRetrievalItemForLiveSlot(
   className: string,
 ) {
   const itemId = String(slot.retrievalItemId || "").trim();
+  if (slot.retrievalArchived) return;
+  if (slot.retrievalBankClassName) {
+    return items.find((candidate) =>
+      (candidate.trackingId || candidate.id) === itemId &&
+      normalizeText(candidate.className) === normalizeText(slot.retrievalBankClassName),
+    );
+  }
+  const targetClass = normalizeText(className);
   if (itemId) {
-    const item = items.find((candidate) =>
+    const matching = items.filter((candidate) =>
       [
         candidate.id,
         candidate.trackingId,
@@ -151,18 +162,24 @@ function findRetrievalItemForLiveSlot(
         candidate.legacyLoId,
       ].some((candidateId) => String(candidateId || "").trim() === itemId),
     );
-    if (item) return item;
+    const scoped = matching.filter((candidate) => normalizeText(candidate.className) === targetClass);
+    if (scoped.length === 1) return scoped[0];
+    if (matching.length) {
+      const unique = matching.length === 1 ? matching[0] : undefined;
+      return unique && (!normalizeText(unique.className) || unique.trackingId === itemId || unique.id === itemId) ? unique : undefined;
+    }
   }
 
   const lo = normalizeText(slot.lo);
-  const targetClass = normalizeText(className);
   if (lo) {
-    const byLo = items.find((item) => {
+    const matches = items.filter((item) => {
       if (normalizeText(item.lo) !== lo) return false;
       const itemClass = normalizeText(item.className);
       return !targetClass || !itemClass || itemClass === targetClass;
     });
-    if (byLo) return byLo;
+    const scoped = matches.filter((candidate) => normalizeText(candidate.className) === targetClass);
+    if (scoped.length === 1) return scoped[0];
+    if (matches.length === 1 && !normalizeText(matches[0].className)) return matches[0];
   }
 
   return findUniqueRetrievalItemByAsset(items, slot, targetClass);

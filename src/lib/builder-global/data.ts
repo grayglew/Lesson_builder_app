@@ -67,6 +67,8 @@ type BuilderRetrievalItem = {
   images?: Array<BuilderImagePayload | null>;
   answerImages?: Array<BuilderImagePayload | null>;
   selected?: boolean;
+  preserveTrackedProgress?: boolean;
+  expectedTrackedProgress?: boolean;
 };
 
 type BuilderSlideTemplate = {
@@ -622,10 +624,21 @@ export async function saveRetrievalItemData(supabase: SupabaseClient, userId: st
   if (!lo) throw new Error("Learning objective is required.");
 
   const className = String(input.className || "").trim();
-  const classes = await upsertClasses(supabase, userId, uniqueStrings([className]));
-  const classByName = new Map(classes.map((row) => [normalizeBuilderKey(row.name), row]));
-  const classRow = className ? classByName.get(normalizeBuilderKey(className)) : null;
+  let classRow: ClassRow | null | undefined;
+  if (input.preserveTrackedProgress === true) {
+    const { data, error } = await supabase.from("classes").select("id,name,sort_order")
+      .eq("owner_id", userId).eq("name", className).is("archived_at", null).maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("This retrieval bank is no longer available. Refresh the Builder and try again.");
+    classRow = data as ClassRow;
+  } else {
+    const classes = await upsertClasses(supabase, userId, uniqueStrings([className]));
+    classRow = classes.find(row => normalizeBuilderKey(row.name) === normalizeBuilderKey(className));
+  }
   const existing = await fetchExistingRetrievalItemForInput(supabase, userId, input, className, lo);
+  if (input.preserveTrackedProgress === true && Boolean(existing) !== input.expectedTrackedProgress) {
+    throw new Error("This retrieval bank changed while you were saving. Please try again.");
+  }
   const retrievalLo = await upsertSharedRetrievalLo(supabase, userId, input, lo);
   const saved = await upsertClassProgress(supabase, userId, input, {
     existing,
@@ -1296,7 +1309,7 @@ async function fetchExistingRetrievalItemForInput(
   lo: string,
 ) {
   const trackingId = String(input.trackingId || input.id || "");
-  if (isUuid(trackingId)) {
+  if (input.preserveTrackedProgress !== true && isUuid(trackingId)) {
     const { data, error } = await supabase
       .from("retrieval_class_progress")
       .select(RETRIEVAL_PROGRESS_SELECT)
@@ -1504,6 +1517,20 @@ async function upsertClassProgress(
   };
 
   if (options.existing?.id) {
+    if (input.preserveTrackedProgress === true) {
+      const { data, error } = await supabase
+        .from("retrieval_class_progress")
+        .update({ spacing_factor: row.spacing_factor, last_taught: row.last_taught })
+        .eq("owner_id", userId)
+        .eq("id", options.existing.id)
+        .eq("class_name", options.className)
+        .eq("retrieval_lo_id", options.retrievalLoId)
+        .is("archived_at", null)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data as { id: string };
+    }
     const { data, error } = await supabase
       .from("retrieval_class_progress")
       .update(row)
@@ -1515,7 +1542,7 @@ async function upsertClassProgress(
     return data as { id: string };
   }
 
-  if (isUuid(trackingId)) {
+  if (input.preserveTrackedProgress !== true && isUuid(trackingId)) {
     const { data, error } = await supabase
       .from("retrieval_class_progress")
       .update(row)
@@ -1529,6 +1556,9 @@ async function upsertClassProgress(
 
   const found = await findRetrievalProgressByLoIdAndClass(supabase, userId, options.retrievalLoId, options.className);
   if (found) {
+    if (input.preserveTrackedProgress === true) {
+      throw new Error("This retrieval bank changed while you were saving. Please try again.");
+    }
     const { data, error } = await supabase
       .from("retrieval_class_progress")
       .update(row)

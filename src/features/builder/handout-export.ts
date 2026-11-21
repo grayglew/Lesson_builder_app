@@ -24,11 +24,14 @@ export type HandoutBuildResult = {
   warnings: string[];
 };
 
+export type StarterHandoutLayout = "standard" | "a4-cover";
+
 export type HandoutOptions = {
   renderWorksheetPages?: (
     worksheet: BuilderAsset,
   ) => Promise<HandoutWorksheetPage[]>;
   chooseAdditionalSheetGlue?: (pageCount: number) => Promise<boolean>;
+  chooseStarterLayout?: () => Promise<StarterHandoutLayout>;
 };
 
 type HandoutSection =
@@ -148,19 +151,37 @@ export async function buildA4Handout(
   const renderWorksheetPages =
     options.renderWorksheetPages ?? renderWorksheetPdfPages;
   const title = document.title.trim() || "Lesson handout";
+  const teachingDate = formatHandoutDate(document.teachingDate);
+  const overallLessonLo = document.overallLessonLo.trim();
+  const starter = document.slides.find(isCoreStarterSlide);
+  const useCover = starter && (await options.chooseStarterLayout?.()) === "a4-cover";
   const pages =
-    composition.mode === "starter-booklet"
+    useCover
+      ? [
+          starterCoverPage(starter, title, teachingDate, overallLessonLo),
+          ...(composition.mode === "standard"
+            ? await buildStandardPages(
+                composition.sections.filter((section) => section.kind !== "starter"),
+                title,
+                teachingDate,
+                overallLessonLo,
+                warnings,
+                renderWorksheetPages,
+              )
+            : []),
+        ]
+      : composition.mode === "starter-booklet"
       ? starterBookletPages(
           composition.starter,
           title,
-          formatHandoutDate(document.teachingDate),
-          document.overallLessonLo.trim(),
+          teachingDate,
+          overallLessonLo,
         )
       : await buildStandardPages(
           composition.sections,
           title,
-          formatHandoutDate(document.teachingDate),
-          document.overallLessonLo.trim(),
+          teachingDate,
+          overallLessonLo,
           warnings,
           renderWorksheetPages,
         );
@@ -227,6 +248,31 @@ function starterHeading(
   <div class="handout-lesson-title">${escapeHtml(title)}</div>
   <strong class="handout-date">Date: ${escapeHtml(teachingDate)}</strong>
 </header>`;
+}
+
+function starterCoverPage(
+  starter: BuilderSlide,
+  title: string,
+  teachingDate: string,
+  overallLessonLo: string,
+) {
+  const slots = records(recordOf(starter).slots);
+  return `<section class="handout-page handout-cover" aria-label="A4 booklet cover">
+  ${starterHeading(title, teachingDate, overallLessonLo)}
+  <div class="handout-cover-grid">
+    ${Array.from({ length: 4 }, (_, index) => {
+      const slot = slots[index] ?? {};
+      const number = index + 1;
+      const code = extractRetrievalLoCode(String(slot.lo || ""));
+      return `<section class="handout-starter-cell handout-cover-cell" aria-label="Starter question ${number}">
+        <span class="handout-starter-number">${number}</span>
+        ${code ? `<span class="handout-starter-key-skill">${escapeHtml(code)}</span>` : ""}
+        <div class="handout-cover-question">${imageHtml(assetOf(slot.image), `Starter question ${number}`)}</div>
+        <div class="handout-cover-working" aria-label="Student working space"></div>
+      </section>`;
+    }).join("")}
+  </div>
+</section>`;
 }
 
 function starterBookletPages(
@@ -688,6 +734,7 @@ html,body{margin:0;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,
 .handout-example-page{padding:4mm}.handout-example-stack{width:100%;height:100%;display:grid;gap:4mm}.handout-example-stack.is-single{grid-template-rows:minmax(0,1fr)}.handout-example-stack.is-double{grid-template-rows:repeat(2,minmax(0,1fr))}.handout-example-block{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-example-cell{min-width:0;min-height:0;border:1px solid #111827;display:grid;place-items:stretch;overflow:hidden}.handout-student-space{min-height:0;background:#fff}
 .handout-booklet-side{display:block}.handout-booklet-copies{width:100%;height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr))}.handout-booklet-copy{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid #111827;overflow:hidden}.handout-booklet-panel{min-width:0;min-height:0;border:1px solid #111827;padding:3mm;overflow:hidden}.handout-booklet-glue{display:grid;place-items:center;font-size:28px;font-weight:800;letter-spacing:.08em}.handout-booklet-front{display:grid;grid-template-rows:auto minmax(0,1fr);gap:2mm}.handout-booklet-starter{min-height:0;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));overflow:hidden}.handout-booklet-inside-questions{padding:0}.handout-booklet-inside-blank{background:#fff}
 .handout-image{width:100%;height:100%;min-height:0;display:block;object-fit:contain;object-position:top center}.handout-empty{display:grid;place-items:center;width:100%;height:100%;min-height:20mm;color:#6b7280;font-size:11px;text-align:center}
+.handout-cover{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:4mm}.handout-cover .handout-heading{max-height:44mm;overflow:hidden;overflow-wrap:anywhere}.handout-cover-grid{min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.handout-cover-cell{grid-template-rows:minmax(0,48%) minmax(0,1fr)}.handout-cover-question{min-height:0;min-width:0;padding:3mm 11mm 1mm 3mm;overflow:hidden}.handout-cover-working{min-width:0;min-height:0;background:#fff}
 .handout-page-full{display:block;padding:0}.handout-full-page-content{position:relative;width:100%;height:100%;display:grid;place-items:center;overflow:hidden}.handout-pdf-page-image{width:100%;height:100%;object-fit:contain;object-position:center}.handout-pdf-page-image.is-rotated-landscape{position:absolute;top:50%;left:50%;width:281mm;height:194mm;max-width:none;max-height:none;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center}
 .handout-retrieval-page-content{width:100%;height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr)}.handout-retrieval-heading{min-width:0;padding:3mm 4mm 0;overflow:hidden}.handout-retrieval-lesson-title{overflow:hidden;color:#4b5563;font-size:10px;font-weight:700;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}.handout-retrieval-grid{width:100%;height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:3mm;padding:4mm}.handout-retrieval-page-content .handout-retrieval-grid{height:auto;min-height:0}.handout-retrieval-text{align-self:center;justify-self:stretch;padding:8mm 5mm 5mm;font-size:13px;line-height:1.35}
 .handout-half-page-stack{width:100%;height:100%;display:grid;grid-template-rows:repeat(2,minmax(0,1fr));gap:4mm;padding:4mm}.handout-half-panel{min-height:0;border:1px solid #111827;padding:4mm;overflow:hidden}.handout-text-panel{width:100%;height:100%;overflow:hidden;font-size:15px;line-height:1.35}.handout-text-panel h2{margin:0 0 4mm;font-size:18px;line-height:1.2}.handout-text-panel p{margin:0;white-space:pre-wrap}.handout-text-panel ul{margin:0;padding-left:6mm}.handout-math-panel .latex-rendered{font-size:16px}.latex-rendered p{margin:0 0 .8em}.latex-display{display:flex;justify-content:center;margin:.6em 0}.latex-frac{display:inline-grid;grid-template-rows:auto auto;vertical-align:middle;text-align:center;line-height:1.1}.latex-frac-num{border-bottom:.06em solid currentColor;padding:0 .15em}.latex-root{display:inline-flex;align-items:flex-start}.latex-root-body{border-top:.06em solid currentColor}.latex-script{display:inline-flex;align-items:flex-start}.latex-script sup,.latex-script sub{font-size:.65em}.latex-var,.latex-italic{font-style:italic}.latex-bold{font-weight:800}.latex-list{margin:.5em 0}

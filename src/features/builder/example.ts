@@ -29,6 +29,7 @@ export function findExampleRetrievalItem(
   items: RetrievalItem[],
   lo: string,
   className: string,
+  { exactClass = false }: { exactClass?: boolean } = {},
 ): RetrievalItem | undefined {
   const normalizedLo = normalizeIdentity(lo);
   const code = extractRetrievalLoCode(lo);
@@ -36,7 +37,7 @@ export function findExampleRetrievalItem(
 
   return items.find((item) => {
     const itemClass = normalizeIdentity(item.className);
-    if (normalizedClass && itemClass && itemClass !== normalizedClass) {
+    if (normalizedClass && (exactClass || itemClass) && itemClass !== normalizedClass) {
       return false;
     }
     const itemCode = extractRetrievalLoCode(item.lo);
@@ -50,6 +51,7 @@ export function getExampleRetrievalBankStatus(
   items: RetrievalItem[],
   lo: string,
   className: string,
+  options?: { exactClass?: boolean },
 ): ExampleRetrievalBankStatus {
   const trimmedLo = normalizeWhitespace(lo);
   if (!trimmedLo) {
@@ -75,7 +77,7 @@ export function getExampleRetrievalBankStatus(
     };
   }
 
-  const trackedItem = findExampleRetrievalItem(matching, trimmedLo, className);
+  const trackedItem = findExampleRetrievalItem(matching, trimmedLo, className, options);
   if (trackedItem) {
     return {
       state: "tracked",

@@ -4,6 +4,7 @@ import { isUuid } from "@/lib/builder-sync/saved-lessons";
 import {
   advanceLiveRetrievalQuestion,
   getLiveRetrievalQuestion,
+  InactiveLiveRetrievalError,
   normalizeLiveRetrievalQuestionInput,
 } from "@/lib/builder-sync/live-retrieval";
 
@@ -46,6 +47,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load the next retrieval question.";
-    return NextResponse.json({ ok: false, error: message }, { status: message.includes("not found") ? 404 : 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: error instanceof InactiveLiveRetrievalError ? 409 : message.includes("not found") ? 404 : 500 });
   }
 }

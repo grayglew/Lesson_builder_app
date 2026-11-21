@@ -46,6 +46,7 @@ test.describe("flexible A4 handout print layout", () => {
       .click();
     const handout = await popupPromise;
 
+    await handout.getByRole("button", { name: "Existing layout", exact: true }).click();
     const pages = handout.locator(".handout-page");
     const blocks = handout.locator(".handout-example-block");
     await expect(pages).toHaveCount(2);
@@ -93,6 +94,7 @@ test.describe("flexible A4 handout print layout", () => {
       .click();
     const handout = await popupPromise;
 
+    await handout.getByRole("button", { name: "Existing layout", exact: true }).click();
     const pages = handout.locator(".handout-booklet-side");
     await expect(pages).toHaveCount(2);
     await expect(pages.nth(0).locator(".handout-booklet-copy")).toHaveCount(2);
@@ -107,6 +109,31 @@ test.describe("flexible A4 handout print layout", () => {
         elements.map((element) => element.getBoundingClientRect().height),
       );
     expect(Math.abs(copyHeights[0] - copyHeights[1])).toBeLessThan(1);
+    await expectNoPageOverflow(handout);
+  });
+
+  test("prints a full A4 cover with four contained question and working areas", async ({ page }) => {
+    const starter = starterSlide();
+    starter.slots[0].image = image("tall-question", 120, 640);
+    await stubHandoutBuilder(page, [starter], ["starter-slide"]);
+    await page.goto("/builder?visual=1");
+    const popup = page.waitForEvent("popup");
+    await page.getByRole("button", { name: "Open handout from 1 selected slide" }).click();
+    const handout = await popup;
+    await handout.getByRole("button", { name: "A4 booklet cover", exact: true }).click();
+    await handout.emulateMedia({ media: "print" });
+    await expect(handout.locator(".handout-page")).toHaveCount(1);
+    const cover = handout.getByRole("region", { name: "A4 booklet cover" });
+    await expect(cover.getByRole("img")).toHaveCount(4);
+    await expect(cover.getByText("GLUE", { exact: true })).toHaveCount(0);
+    const working = await cover.locator(".handout-cover-working").evaluateAll(
+      (elements) => elements.map((node) => node.getBoundingClientRect().height),
+    );
+    expect(working).toHaveLength(4);
+    expect(Math.min(...working)).toBeGreaterThan(130);
+    const firstImage = cover.getByRole("img").first();
+    await expect.poll(() => firstImage.evaluate((node: HTMLImageElement) => node.naturalHeight)).toBe(640);
+    expect(await firstImage.evaluate((node) => getComputedStyle(node).objectFit)).toBe("contain");
     await expectNoPageOverflow(handout);
   });
 
@@ -149,6 +176,7 @@ test.describe("flexible A4 handout print layout", () => {
       .getByRole("button", { name: "Open handout from 5 selected slides" })
       .click();
     const handout = await popupPromise;
+    await handout.getByRole("button", { name: "Existing layout", exact: true }).click();
     await expect(
       handout.getByRole("dialog", {
         name: "Add glue margins for additional sheets?",
@@ -278,7 +306,9 @@ test.describe("flexible A4 handout print layout", () => {
       await page
         .getByRole("button", { name: "Open handout from 5 selected slides" })
         .click();
-      return popupPromise;
+      const handout = await popupPromise;
+      await handout.getByRole("button", { name: "Existing layout", exact: true }).click();
+      return handout;
     };
 
     const withoutGlue = await openHandout();
@@ -431,8 +461,8 @@ function directLandscapePdfSlide() {
   };
 }
 
-function image(label: string) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="120"><rect width="320" height="120" fill="white"/><text x="16" y="64" font-size="18">${label}</text></svg>`;
+function image(label: string, width = 320, height = 120) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="white"/><rect x="4" y="4" width="${width - 8}" height="${height - 8}" fill="none" stroke="black"/><text x="16" y="64" font-size="18">${label}</text></svg>`;
   return {
     name: `${label}.svg`,
     type: "image/svg+xml",

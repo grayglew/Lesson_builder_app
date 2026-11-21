@@ -1926,6 +1926,46 @@
   white-space: nowrap;
 }
 
+.compactLinkedOverdue {
+  display: flex;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.compactLinkedOverdue .compactOverdueBadge {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.retrievalBankControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+}
+
+.retrievalBankControls > label {
+  flex: 0 1 15rem;
+  min-width: 0;
+}
+
+.retrievalBankControls :is(select, button) {
+  min-height: 2.75rem;
+  max-width: 100%;
+}
+
+.exampleBankDestination {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.exampleBankDestination select {
+  min-height: 2.75rem;
+}
+
 .compactCloudStatus {
   display: flex;
   max-width: 12rem;
@@ -3470,6 +3510,7 @@
 
 @media (max-width: 639px) {
   .compactConsole { --compact-app-bar-height: 4.9rem; }
+  .compactConsole:has(.compactLinkedOverdue) { --compact-app-bar-height: 6.4rem; }
   .compactConsole .appShell { grid-template-rows: var(--compact-app-bar-height) minmax(0, 1fr); }
   .compactConsole .compactAppBar {
     grid-template-columns: auto minmax(0, 1fr) auto auto auto;
@@ -3496,6 +3537,13 @@
     grid-column: 5;
     justify-self: end;
     font-size: .73rem;
+  }
+  .compactConsole .compactAppBar:has(.compactLinkedOverdue) {
+    grid-template-rows: 2.8rem minmax(0, 1fr) 1.5rem;
+  }
+  .compactConsole .compactLinkedOverdue {
+    grid-row: 3;
+    grid-column: 1 / -1;
   }
   .compactConsole .compactAppBar > .compactPresentButton { grid-column: 3; grid-row: 1; }
   .compactConsole .compactAppBar > .compactSaveButton { grid-column: 4; grid-row: 1; }

@@ -33,6 +33,8 @@ import {
 } from "./schema";
 import { getRetrievalNextDueDate, isRetrievalItemDue } from "./starter";
 import { selectDocument, useBuilderStore } from "./store";
+import { getLinkedBank, retrievalBankKey } from "./retrieval-bank-links";
+import { useRetrievalBankSelection } from "./useRetrievalBankSelection";
 
 type ImageDraft = {
   asset: BuilderAsset | null;
@@ -67,30 +69,52 @@ export function RetrievalComposer({
   const [editor, setEditor] = useState<RetrievalEditorState | null>(null);
   const [busyAction, setBusyAction] = useState("");
   const warningIdPrefix = useId();
+  const { bank, partner, chooseBank } = useRetrievalBankSelection(document);
+  const [linkChoice, setLinkChoice] = useState("");
+  const linkCandidates = document.className && !partner ? document.classNames.filter(name =>
+    retrievalBankKey(name) !== retrievalBankKey(document.className) && !getLinkedBank(document.linkedRetrievalBanks, name),
+  ) : [];
+  const exactClass = Boolean(partner);
 
   const visibleItems = useMemo(
     () =>
-      getVisibleRetrievalItems(document.retrievalItems, document.className)
+      getVisibleRetrievalItems(document.retrievalItems, bank, { exactClass })
         .slice()
         .sort((left, right) =>
           compareRetrievalItems(left, right, document.teachingDate),
         ),
-    [document.className, document.retrievalItems, document.teachingDate],
+    [bank, exactClass, document.retrievalItems, document.teachingDate],
   );
   const dueItems = useMemo(
     () =>
       getDueRetrievalItems(
         document.retrievalItems,
-        document.className,
+        bank,
         document.teachingDate,
+        { exactClass },
       ),
     [
-      document.className,
+      bank,
+      exactClass,
       document.retrievalItems,
       document.teachingDate,
     ],
   );
   const selectedItems = visibleItems.filter((item) => item.selected);
+
+  function changeLink() {
+    const store = useBuilderStore.getState();
+    try {
+      if (partner) store.unlinkRetrievalBank(document.className);
+      else store.linkRetrievalBanks(document.className, linkChoice);
+      setLinkChoice("");
+      setStatus({ tone: "success", message: partner
+        ? `Unlinked ${document.className} and ${partner}. Both retrieval banks are unchanged.`
+        : `Linked ${document.className} and ${linkChoice}. Their retrieval progress remains separate.` });
+    } catch (error) {
+      setStatus({ tone: "error", message: errorMessage(error, "Could not change linked retrieval banks.") });
+    }
+  }
 
   function replaceItems(items: RetrievalItem[]) {
     updateGlobalData({ retrievalItems: items });
@@ -167,7 +191,7 @@ export function RetrievalComposer({
 
   async function openEditor(item?: RetrievalItem) {
     if (!item) {
-      setEditor(createEditorState(undefined, document.className, document.teachingDate));
+      setEditor(createEditorState(undefined, bank, document.teachingDate));
       return;
     }
     setBusyAction(`edit-${item.id}`);
@@ -182,10 +206,10 @@ export function RetrievalComposer({
           }
         : item;
       setEditor(
-        createEditorState(hydrated, document.className, document.teachingDate),
+        createEditorState(hydrated, bank, document.teachingDate),
       );
     } catch (error) {
-      setEditor(createEditorState(item, document.className, document.teachingDate));
+      setEditor(createEditorState(item, bank, document.teachingDate));
       setStatus({
         tone: "warning",
         message: errorMessage(
@@ -321,7 +345,8 @@ export function RetrievalComposer({
             const slot = pair?.currentImageSlot ?? item.currentImageSlot;
             return {
               lo: item.lo,
-              retrievalItemId: item.id,
+              retrievalItemId: item.trackingId || item.id,
+              ...(partner && { retrievalBankClassName: item.className }),
               currentImageSlot: slot,
               lockImageSlot: true,
               image:
@@ -419,7 +444,7 @@ export function RetrievalComposer({
               contentId:
                 String(pair?.contentId || item.contentId || "").trim() ||
                 undefined,
-              className: item.className || document.className,
+              className: item.className || bank,
               currentImageSlot: pair?.currentImageSlot ?? slot,
               image:
                 pair?.questionImage ??
@@ -461,7 +486,7 @@ export function RetrievalComposer({
         selectedItems.map((item) => ({
           itemId: item.id,
           lo: item.lo,
-          className: item.className || document.className,
+          className: item.className || bank,
           teachingDate: document.teachingDate,
           deltaSeen: 1,
         })),
@@ -521,7 +546,7 @@ export function RetrievalComposer({
         rollbackItems.map((item) => ({
           itemId: item.id,
           lo: item.lo,
-          className: item.className || document.className,
+          className: item.className || bank,
           teachingDate: document.teachingDate,
           deltaSeen: -1,
         })),
@@ -686,9 +711,33 @@ export function RetrievalComposer({
         </div>
       </div>
 
+      {partner || linkCandidates.length > 0 ? (
+        <div className={styles.retrievalBankControls}>
+          {partner ? (
+            <label>
+              <span className={styles.fieldLabel}>Retrieval bank</span>
+              <select className={styles.textInput} value={bank} disabled={Boolean(busyAction)} onChange={event => chooseBank(event.target.value)}>
+                <option value={document.className}>{document.className} · lesson class</option>
+                <option value={partner}>{partner} · linked bank</option>
+              </select>
+            </label>
+          ) : (
+            <label>
+              <span className={styles.fieldLabel}>Class to link</span>
+              <select className={styles.textInput} value={linkCandidates.includes(linkChoice) ? linkChoice : ""} disabled={Boolean(busyAction)} onChange={event => setLinkChoice(event.target.value)}>
+                <option value="">Choose a class</option>
+                {linkCandidates.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+          )}
+          <button className={styles.secondaryButton} type="button" disabled={Boolean(busyAction) || refreshing || (!partner && !linkCandidates.includes(linkChoice))} onClick={changeLink}>
+            {partner ? "Unlink banks" : "Link retrieval banks"}
+          </button>
+        </div>
+      ) : null}
       <div className={styles.retrievalMeta}>
         <span>
-          {document.className ? `${document.className}: ` : ""}
+          {bank ? `${bank}: ` : ""}
           {visibleItems.length} item{visibleItems.length === 1 ? "" : "s"}
         </span>
         <span>{dueItems.length} due</span>

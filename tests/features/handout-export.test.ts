@@ -116,6 +116,51 @@ describe("production A4 handout export", () => {
     );
   });
 
+  it("prints a starter-only A4 cover with four question spaces, no answers or glue", async () => {
+    const document = handoutDocument();
+    const base = starter("starter");
+    document.slides = [{ ...base, slots: Array.from({ length: 4 }, () => ({
+      lo: "191a: Simplify",
+      image: asset("question.png", "image/png", "c3RhcnRlcg=="),
+      answerImage: asset("answer.png", "image/png", "YW5zd2Vy"),
+    })) }];
+    const chooseStarterLayout = vi.fn(async () => "a4-cover" as const);
+    const chooseAdditionalSheetGlue = vi.fn(async () => true);
+    const { html } = await buildA4Handout(document, {
+      chooseStarterLayout,
+      chooseAdditionalSheetGlue,
+    });
+    const dom = new JSDOM(html).window.document;
+    const cover = dom.querySelector(".handout-cover");
+    expect(chooseStarterLayout).toHaveBeenCalledOnce();
+    expect(chooseAdditionalSheetGlue).not.toHaveBeenCalled();
+    expect(dom.querySelectorAll("main > section")).toHaveLength(1);
+    expect(cover?.querySelector("h1")?.textContent).toBe("Expand brackets");
+    expect(cover?.querySelectorAll('img[alt^="Starter question"]')).toHaveLength(4);
+    expect(cover?.querySelectorAll(".handout-cover-working")).toHaveLength(4);
+    expect(cover?.querySelectorAll('img[alt*="answer"]')).toHaveLength(0);
+    expect(cover?.querySelector(".handout-starter-key-skill")?.textContent).toBe("191a");
+    expect(cover?.innerHTML).not.toContain("YW5zd2Vy");
+    expect(cover?.textContent).not.toMatch(/glue/i);
+  });
+
+  it("puts the A4 cover first and preserves the order of the other sections", async () => {
+    const document = handoutDocument();
+    document.slides = [example(), starter("starter"), retrievalStarter()];
+    const chooseAdditionalSheetGlue = vi.fn(async () => true);
+    const { html } = await buildA4Handout(document, {
+      chooseStarterLayout: async () => "a4-cover",
+      chooseAdditionalSheetGlue,
+    });
+    const dom = new JSDOM(html).window.document;
+    const pages = Array.from(dom.querySelectorAll("main > section") as NodeListOf<HTMLElement>);
+    expect(pages).toHaveLength(3);
+    expect(pages[0].classList).toContain("handout-cover");
+    expect(pages[1].getAttribute("aria-label")).toBe("Worked example page");
+    expect(pages[2].querySelector(".handout-retrieval-grid")).not.toBeNull();
+    expect(chooseAdditionalSheetGlue).toHaveBeenCalledExactlyOnceWith(3);
+  });
+
   it("keeps a multi-page handout unmodified when glue margins are declined", async () => {
     const document = handoutDocument();
     document.slides = [

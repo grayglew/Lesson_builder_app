@@ -50,11 +50,13 @@ export async function prepareSavedLessonHtml(
     offlineCapabilities: options.offlineCapabilities,
     runtimeCss,
     runtimeJavaScript: runtimeJavaScript.replace(/<\/script/gi, "<\\/script"),
+    activeRetrievalItems: options.retrievalItems,
     liveRetrieval: lessonId
       ? {
           enabled: true,
           endpoint: appEndpoint("/api/presenter/retrieval-log"),
           nextEndpoint: appEndpoint("/api/presenter/retrieval-next"),
+          archiveEndpoint: appEndpoint("/api/presenter/retrieval-archive"),
           lessonId,
           className: embeddedDocument.className,
           teachingDate: embeddedDocument.teachingDate,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedBuilderSyncClient } from "@/lib/builder-sync/auth";
 import { isUuid } from "@/lib/builder-sync/saved-lessons";
-import { logLiveRetrievalEvent, normalizeLiveRetrievalInput } from "@/lib/builder-sync/live-retrieval";
+import { InactiveLiveRetrievalError, logLiveRetrievalEvent, normalizeLiveRetrievalInput } from "@/lib/builder-sync/live-retrieval";
 
 export async function POST(request: Request) {
   const auth = await getAuthorizedBuilderSyncClient();
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Could not update retrieval tracker." },
-      { status: 500 },
+      { status: error instanceof InactiveLiveRetrievalError ? 409 : 500 },
     );
   }
 }

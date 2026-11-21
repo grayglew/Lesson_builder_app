@@ -7,12 +7,13 @@ import {
 export function getVisibleRetrievalItems(
   items: RetrievalItem[],
   className: string,
+  { exactClass = false }: { exactClass?: boolean } = {},
 ): RetrievalItem[] {
   const activeClass = normalizeClassName(className);
   if (!activeClass) return items.filter(Boolean);
   return items.filter((item) => {
     const itemClass = normalizeClassName(item.className);
-    return !itemClass || itemClass === activeClass;
+    return (!exactClass && !itemClass) || itemClass === activeClass;
   });
 }
 
@@ -20,8 +21,9 @@ export function getDueRetrievalItems(
   items: RetrievalItem[],
   className: string,
   teachingDate: string,
+  options?: { exactClass?: boolean },
 ): RetrievalItem[] {
-  return getVisibleRetrievalItems(items, className)
+  return getVisibleRetrievalItems(items, className, options)
     .filter((item) => isRetrievalItemDue(item, teachingDate))
     .sort((left, right) =>
       compareRetrievalItems(left, right, teachingDate),

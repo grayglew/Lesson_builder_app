@@ -13,6 +13,26 @@ import {
 } from "@/features/builder/schema";
 
 describe("live starter hydration", () => {
+  it("does not rebind a linked slide when its exact progress entry moves to another bank", () => {
+    const document = createInitialBuilderDocument();
+    document.className = "Year 7";
+    const moved = { ...retrievalItem("progress-id", "101a: Expand", 3), trackingId: "progress-id", className: "Further Maths" };
+    const original = { lo: moved.lo, retrievalItemId: moved.trackingId, retrievalBankClassName: "Year 7", image: asset("original.png") };
+    document.slides = [{ id: "starter", type: "starter", title: "Starter", slots: [original] }];
+    expect(hydrateStarterSlotsFromRetrievalItems(document, [moved]).slides[0]).toMatchObject({ slots: [original] });
+  });
+
+  it("finds legacy shared references only within the lesson's own bank", () => {
+    const document = createInitialBuilderDocument();
+    document.className = "Year 7";
+    const home = { ...retrievalItem("home", "101a: Expand", 3), trackingId: "home", contentId: "shared" };
+    const partner = { ...home, id: "partner", trackingId: "partner", className: "Further Maths" };
+    document.slides = [{ id: "starter", type: "starter", title: "Starter", slots: [{ lo: home.lo, retrievalItemId: "shared" }] }];
+    expect(hydrateStarterSlotsFromRetrievalItems(document, [partner, home]).slides[0]).toMatchObject({
+      slots: [{ retrievalItemId: "home", retrievalBankClassName: "Year 7" }],
+    });
+  });
+
   it("keeps a slide-only replacement and a cleared answer while other slides use the bank", async () => {
     const document = createInitialBuilderDocument();
     const replacement = asset("slide-question.png");

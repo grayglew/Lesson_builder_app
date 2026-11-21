@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeRetrievalBankLinks } from "./retrieval-bank-links";
 
 export const DEFAULT_CLASS_NAMES = [
   "Year 7",
@@ -43,6 +44,8 @@ export const starterSlotSchema = z
   .object({
     lo: z.string().default(""),
     retrievalItemId: z.string().optional(),
+    retrievalBankClassName: z.string().optional(),
+    retrievalArchived: z.boolean().optional(),
     currentImageSlot: z.number().int().min(1).max(8).optional(),
     lockImageSlot: z.boolean().optional(),
     overrideQuestionImage: z.boolean().optional(),
@@ -266,11 +269,15 @@ const unitAssociationShape = {
   unitOfWorkVersion: z.string().default(""),
 };
 
+const retrievalBankLinksSchema = z.array(z.tuple([z.string(), z.string()])).default([]);
+
 export const builderDocumentSchema = z
   .object({
     schemaVersion: z.literal(2),
     ...unitAssociationShape,
     unitsOfWork: z.array(unitOfWorkSchema).default([]),
+    linkedRetrievalBanks: retrievalBankLinksSchema,
+    retrievalBankLinksUpdatedAt: timestampSchema.default(""),
     title: z.string(),
     className: z.string(),
     teachingDate: isoDateSchema,
@@ -293,6 +300,8 @@ export const workspaceDocumentSchema = z
     syncKind: z.literal("workspace"),
     ...unitAssociationShape,
     unitsOfWork: z.array(unitOfWorkSchema).default([]),
+    linkedRetrievalBanks: retrievalBankLinksSchema,
+    retrievalBankLinksUpdatedAt: timestampSchema.default(""),
     title: z.string(),
     className: z.string(),
     teachingDate: isoDateSchema,
@@ -335,6 +344,8 @@ export function createInitialBuilderDocument(now = new Date().toISOString()): Bu
   return {
     schemaVersion: 2,
     unitsOfWork: [],
+    linkedRetrievalBanks: [],
+    retrievalBankLinksUpdatedAt: "",
     unitOfWorkId: "",
     unitOfWorkName: "",
     unitOfWorkVersion: "",
@@ -399,6 +410,8 @@ export function normalizeBuilderDocument(input: unknown): BuilderDocument {
       asString(source.updatedAt) ||
       now,
     classNames,
+    linkedRetrievalBanks: normalizeRetrievalBankLinks(source.linkedRetrievalBanks),
+    retrievalBankLinksUpdatedAt: asString(source.retrievalBankLinksUpdatedAt),
     slides,
     handoutSlideIds,
     retrievalItems,
@@ -447,6 +460,7 @@ export function mergeWorkspaceAndGlobal(
         : [workspace.className, ...workspace.classNames],
     ),
     retrievalItems: global.retrievalItems,
+    linkedRetrievalBanks: normalizeRetrievalBankLinks(workspace.linkedRetrievalBanks, hasManagedClassList ? asStringArray(asRecord(globalInput).classNames) : undefined),
     slideTemplates: global.slideTemplates,
   });
 }
@@ -456,6 +470,8 @@ export function toWorkspaceDocument(document: BuilderDocument): WorkspaceDocumen
     schemaVersion: 3,
     syncKind: "workspace",
     unitsOfWork: structuredCloneSafe(document.unitsOfWork),
+    linkedRetrievalBanks: normalizeRetrievalBankLinks(document.linkedRetrievalBanks),
+    retrievalBankLinksUpdatedAt: document.retrievalBankLinksUpdatedAt,
     unitOfWorkId: document.unitOfWorkId,
     unitOfWorkName: document.unitOfWorkName,
     unitOfWorkVersion: document.unitOfWorkVersion,
