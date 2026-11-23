@@ -10,11 +10,12 @@ const lesson = createInitialBuilderDocument();
 lesson.title = "Tablet recovery";
 const image = { name: "Question", type: "image/svg+xml", size: 10, dataUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Ctext x='10' y='50'%3EQuestion%3C/text%3E%3C/svg%3E" };
 lesson.slides = [{ id: "starter", type: "starter", title: "Starter", slots: [{ lo: "191a: Algebra", image, answerImage: image }] }, { id: "working", type: "blank", title: "Working" }];
-const sourceHtml = buildStandaloneLessonHtml(lesson, {
+const presenterOptions = {
   runtimeCss: readFileSync("src/features/presenter/presenter-runtime.css", "utf8"),
   runtimeJavaScript: readFileSync("public/builder-v2-assets/presenter-runtime.js", "utf8"),
   presenterConfig: { enabled: true, sourceLessonId: "original", originalTitle: lesson.title, className: "Year 7", teachingDate: "2026-11-16", uploadEndpoint: `${origin}/ticket`, completeEndpoint: `${origin}/complete`, taughtEndpoint: `${origin}/taught` },
-});
+};
+const sourceHtml = buildStandaloneLessonHtml(lesson, presenterOptions);
 
 test.beforeEach(async ({ page }) => {
   const code = buildSync({ stdin: { contents: `
@@ -41,6 +42,37 @@ async function seed(page: import("@playwright/test").Page, identity = owner, htm
     return api.seedPresenter(identity, html);
   }, { identity, html });
 }
+
+test("shows the handout marker only while presenting a marked slide", async ({ page }) => {
+  const extraSlides = Array.from({ length: 10 }, (_, index) => ({
+    id: `extra-${index}`, type: "blank", title: `Extra ${index + 1}`,
+  }));
+  const html = buildStandaloneLessonHtml({ ...lesson, slides: [...lesson.slides, ...extraSlides], handoutSlideIds: ["starter"] }, presenterOptions);
+  const id = await seed(page, owner, html);
+  await page.goto(`${origin}/?session=${id}`);
+  const frame = page.frameLocator("iframe");
+  const pager = frame.getByRole("group", { name: "Slide navigation" });
+  const indicator = pager.getByRole("img", { name: "Marked for handout" });
+  const toolbar = frame.locator(".presenter-tools");
+  for (const width of [375, 414, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 768 });
+    await expect(indicator).toBeVisible();
+    const markerBox = (await indicator.boundingBox())!;
+    const pagerBox = (await pager.boundingBox())!;
+    expect(markerBox.x).toBeGreaterThanOrEqual(pagerBox.x);
+    expect(markerBox.x + markerBox.width).toBeLessThanOrEqual(pagerBox.x + pagerBox.width);
+    expect(await pager.getByText("1 / 12", { exact: true }).evaluate(count => count.scrollWidth <= count.clientWidth)).toBe(true);
+  }
+  const markedHeight = (await toolbar.boundingBox())!.height;
+  await pager.getByRole("button", { name: "Next slide" }).click();
+  await expect(pager).toContainText("2 / 12");
+  await expect(indicator).toBeHidden();
+  expect((await toolbar.boundingBox())!.height).toBe(markedHeight);
+  await pager.getByRole("button", { name: "Previous slide" }).click();
+  await expect(indicator).toBeVisible();
+  await page.emulateMedia({ media: "print" });
+  await expect(indicator).toBeHidden();
+});
 
 test("recovers reveals, completed ink, added slides and position after the opener is gone", async ({ page, context }) => {
   const id = await seed(page);

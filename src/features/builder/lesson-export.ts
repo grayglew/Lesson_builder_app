@@ -72,6 +72,7 @@ const presenterIcons = {
   exitFull: '<path d="M4 9h5V4m11 5h-5V4M4 15h5v5m11-5h-5v5"/>',
   ink: '<path d="M12 3c2 3 6 7 6 11a6 6 0 1 1-12 0c0-4 4-8 6-11Z"/>',
   blankSlide: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 12h8m-4-4v8"/>',
+  handout: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Zm0 0v6h6M8 14l2 2 4-4"/>',
   archive: '<path d="M3 6h18M9 6V3h6v3m4 0-1 15H6L5 6m5 4v7m4-7v7"/>',
   save: '<path d="M5 3h12l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M7 3v6h9V3M7 21v-8h10v8"/>',
   student: '<path d="M3 12V5h18v7M8 21h8m-4-4v4M3 16h18m-9-2V8m-3 3 3-3 3 3"/>',
@@ -95,6 +96,8 @@ export function buildStandaloneLessonHtml(
     options.presenterConfig?.enabled && options.presenterConfig.sourceLessonId
       ? options.presenterConfig
       : null;
+  const classroom = Boolean(presenterConfig && !options.handout);
+  const handoutIds = classroom ? new Set(document.handoutSlideIds) : null;
   const activeRetrievalKeys = liveRetrieval && options.activeRetrievalItems
     ? new Set(options.activeRetrievalItems.map(item => liveRetrievalKey(item.trackingId || item.id, item.className)))
     : undefined;
@@ -106,6 +109,7 @@ export function buildStandaloneLessonHtml(
         Boolean(liveRetrieval),
         Boolean(liveRetrieval?.archiveEndpoint && presenterConfig && !options.handout),
         activeRetrievalKeys,
+        handoutIds?.has(slide.id),
       );
       return options.staticAnnotations
         ? injectStaticAnnotations(renderedSlide, slide.annotations)
@@ -114,7 +118,6 @@ export function buildStandaloneLessonHtml(
     .join("");
   const title = escapeHtml(document.title || "Lesson");
   const handoutClass = options.handout ? " handout-mode" : "";
-  const classroom = Boolean(presenterConfig && !options.handout);
   const studentCode = '<button id="presenter-student-code" class="presenter-student-code" type="button" aria-pressed="false" hidden></button>';
   const sessionTool = (id: string, label: string, description: string, icon: "save" | "student", offlineLabel: string) =>
     `<button id="presenter-${id}" class="presenter-tool${classroom ? " presenter-session-tool" : icon === "save" ? " primary" : ""}" type="button" hidden${classroom ? ` aria-label="${label}" title="${description}"` : ""}>${classroom ? presenterIcon(icon, "presenter-idle-icon") + presenterIcon("busy", "presenter-busy-icon") : offlineLabel}</button>`;
@@ -155,7 +158,13 @@ export function buildStandaloneLessonHtml(
   ${classroom ? `
     <div class="presenter-pager" role="group" aria-label="Slide navigation">
       <button id="presenter-previous" class="presenter-tool" type="button" aria-label="Previous slide" title="Previous slide">${presenterIcon("previous")}</button>
-      <div id="presenter-slide-position" aria-live="polite" aria-atomic="true"></div>
+      <div id="presenter-slide-position" aria-live="polite" aria-atomic="true">
+        <div class="presenter-slide-counter">
+          <span id="presenter-slide-count"></span>
+          <span id="presenter-handout-indicator" role="img" aria-label="Marked for handout" title="Marked for handout" hidden>${presenterIcon("handout")}</span>
+        </div>
+        <strong id="presenter-slide-name"></strong>
+      </div>
       <button id="presenter-next" class="presenter-tool" type="button" aria-label="Next slide" title="Next slide">${presenterIcon("next")}</button>
     </div>` : ""}
   <div class="presenter-command-row">
@@ -377,6 +386,7 @@ function renderStandaloneSlide(
   liveRetrieval: boolean,
   archiveRetrieval: boolean,
   activeRetrievalKeys?: ReadonlySet<string>,
+  markedForHandout?: boolean,
 ): string {
   const data = asRecord(slide);
   const title = escapeHtml(String(slide.title || slide.type || "Slide"));
@@ -391,7 +401,7 @@ function renderStandaloneSlide(
     slide.type === "pdf-page"
       ? ` ${aspect >= 1 ? "landscape" : "portrait"}`
       : "";
-  const attrs = `class="lesson-slide ${escapeAttr(slide.type)}-slide${orientation}" style="--slide-aspect:${aspect}" aria-label="Slide ${index + 1}: ${escapeAttr(String(slide.title || slide.type || "Slide"))}" data-slide-aspect="${aspect}" data-slide-index="${index}" data-annotation-slide="${index}" data-builder-slide-id="${escapeAttr(slide.id)}" data-builder-slide-type="${escapeAttr(slide.type)}"`;
+  const attrs = `class="lesson-slide ${escapeAttr(slide.type)}-slide${orientation}" style="--slide-aspect:${aspect}" aria-label="Slide ${index + 1}: ${escapeAttr(String(slide.title || slide.type || "Slide"))}" data-slide-aspect="${aspect}" data-slide-index="${index}" data-annotation-slide="${index}" data-builder-slide-id="${escapeAttr(slide.id)}" data-builder-slide-type="${escapeAttr(slide.type)}"${markedForHandout ? " data-marked-for-handout" : ""}`;
 
   if (slide.type === "starter") {
     const slots = arrayOfRecords(data.slots).slice(0, 4);
@@ -687,7 +697,9 @@ function standaloneInteractionScript() {
   const classroom = document.body.classList.contains("presenter-classroom");
   const previousSlide = document.getElementById("presenter-previous");
   const nextSlide = document.getElementById("presenter-next");
-  const slidePosition = document.getElementById("presenter-slide-position");
+  const slideCount = document.getElementById("presenter-slide-count");
+  const slideName = document.getElementById("presenter-slide-name");
+  const handoutIndicator = document.getElementById("presenter-handout-indicator");
   let displayedSlide = 0;
   let navigationFrame = 0;
   let layoutFrame = 0;
@@ -964,18 +976,15 @@ function standaloneInteractionScript() {
   }
 
   function updateSlideNavigation(index = visibleSlideIndex()) {
-    if (!slidePosition || !slides[index]) return;
+    if (!slideCount || !slideName || !slides[index]) return;
     const changed = displayedSlide !== index;
     displayedSlide = index;
     const title = slides[index].getAttribute("aria-label")?.replace(/^Slide \d+:\s*/, "") || "Slide";
     const count = (index + 1) + " / " + slides.length;
-    if (slidePosition.firstElementChild?.textContent !== count || slidePosition.lastElementChild?.textContent !== title) {
-      const position = document.createElement("span");
-      const name = document.createElement("strong");
-      position.textContent = count;
-      name.textContent = title;
-      slidePosition.replaceChildren(position, name);
-    }
+    if (slideCount.textContent !== count) slideCount.textContent = count;
+    if (slideName.textContent !== title) slideName.textContent = title;
+    const markedForHandout = slides[index].hasAttribute("data-marked-for-handout");
+    if (handoutIndicator?.hidden === markedForHandout) handoutIndicator.hidden = !markedForHandout;
     previousSlide?.setAttribute("aria-disabled", String(index === 0));
     nextSlide?.setAttribute("aria-disabled", String(index >= slides.length - 1));
     slides.forEach((slide, i) => {

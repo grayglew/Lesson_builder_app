@@ -14,9 +14,12 @@ export const TABLET_PRESENTER_CSS = `
   .presenter-pager,.presenter-modes,.presenter-view-tools{display:flex;align-items:center;gap:0}
   .presenter-pager{flex:0 1 10rem;min-width:0}
   #presenter-slide-position{flex:1;min-width:0;text-align:center;line-height:1.13;color:var(--console-ink)}
-  #presenter-slide-position span,#presenter-slide-position strong{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-  #presenter-slide-position span{color:var(--console-muted);font-size:.75rem;font-weight:750;font-variant-numeric:tabular-nums}
-  #presenter-slide-position strong{font-size:.86rem;margin-top:.2rem}
+  .presenter-slide-counter{display:flex;align-items:center;justify-content:center;gap:.125rem;min-block-size:.875rem}
+  #presenter-slide-count,#presenter-slide-name{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  #presenter-slide-count{color:var(--console-muted);font-size:.75rem;font-weight:750;font-variant-numeric:tabular-nums}
+  #presenter-slide-name{font-size:.86rem;margin-top:.2rem}
+  #presenter-handout-indicator{display:flex;flex:none;color:var(--console-accent)}
+  #presenter-handout-indicator :is(.presenter-tool-icon,svg){inline-size:.875rem;block-size:.875rem}
   .presenter-classroom .presenter-tool{
     display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-width:44px;min-height:44px;
     padding:.35rem .62rem;border-color:var(--console-line);border-radius:.42rem;background:#fff;color:var(--console-ink);
@@ -186,8 +189,9 @@ export const TABLET_PRESENTER_CSS = `
   .presenter-classroom .presenter-student-code[aria-pressed="false"]{padding-inline:.2rem}
   .presenter-classroom .presenter-student-code[aria-pressed="false"] span{display:none}
   .presenter-classroom .presenter-student-code[aria-pressed="false"] strong{font-size:.8em}
-  #presenter-slide-position span{font-size:.7rem;word-spacing:-.13em}
-  #presenter-slide-position strong{position:absolute;width:1px;height:1px;clip-path:inset(50%)}
+  .presenter-slide-counter{flex-direction:column;gap:.1rem}
+  #presenter-slide-count{max-inline-size:100%;font-size:.7rem;word-spacing:-.13em}
+  #presenter-slide-name{position:absolute;width:1px;height:1px;clip-path:inset(50%)}
   .presenter-classroom .presenter-ink{left:auto;right:-44px}
 }
 @media screen and (width < 768px){
