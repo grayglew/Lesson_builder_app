@@ -30,6 +30,22 @@ describe("presenter recovery document", () => {
     expect(parsed.querySelector("[data-presenter-runtime]")!.textContent).toContain("window.runtimeLoaded");
   });
 
+  it.each(["stored source", "recovery checkpoint"])("reopens a %s without workspace link fields", (entrypoint) => {
+    const source = extractPresenterSource(sourceHtml());
+    source.document.linkedRetrievalBanks = [["Year 7", "Year 8"]];
+    source.document.handoutSlideIds = ["first"];
+    source.document.slides[0].annotations = [{ id: "stroke", mode: "pen", color: "#111827", width: 2, points: [{ x: 10, y: 20 }, { x: 30, y: 40 }] }];
+    const parser = new DOMParser();
+    const stored: typeof source.document = JSON.parse(parser.parseFromString(renderPresenterSession(source), "text/html").querySelector("#lesson-builder-state")!.textContent!);
+    expect(stored).not.toHaveProperty("linkedRetrievalBanks");
+    const html = entrypoint === "stored source"
+      ? renderPresenterSession({ ...source, document: stored })
+      : renderPresenterSession(source, { document: stored, slideId: "first", slideIndex: 0, presentedAt: "", presentedLessonId: "", presentedLessonTitle: "" });
+    const reopened = parser.parseFromString(html, "text/html");
+    expect(reopened.querySelectorAll(".lesson-slide[data-marked-for-handout]")).toHaveLength(1);
+    expect(JSON.parse(reopened.querySelector("#lesson-annotations-data")!.textContent!)["0"][0].id).toBe("stroke");
+  });
+
   it("escapes checkpoint text so it cannot create a script element", () => {
     const source = extractPresenterSource(sourceHtml());
     const html = renderPresenterSession(source, { document: source.document, slideId: "first", slideIndex: 0, presentedAt: "", presentedLessonId: "", presentedLessonTitle: '</script><script id="injected">bad()</script>' });

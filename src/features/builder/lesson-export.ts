@@ -298,7 +298,8 @@ export function normalizeImportedBuilderDocument(
 }
 
 export function toPortableLessonDocument(document: BuilderDocument) {
-  if (!document.linkedRetrievalBanks.length && !document.retrievalBankLinksUpdatedAt) return document;
+  // Older Presenter sessions and portable checkpoints may omit workspace metadata.
+  if (!document.linkedRetrievalBanks?.length && !document.retrievalBankLinksUpdatedAt) return document;
   const { linkedRetrievalBanks, retrievalBankLinksUpdatedAt, ...lesson } = document;
   void linkedRetrievalBanks;
   void retrievalBankLinksUpdatedAt;

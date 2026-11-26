@@ -75,7 +75,9 @@ test("shows the handout marker only while presenting a marked slide", async ({ p
 });
 
 test("recovers reveals, completed ink, added slides and position after the opener is gone", async ({ page, context }) => {
-  const id = await seed(page);
+  const id = await seed(page, owner, buildStandaloneLessonHtml({
+    ...lesson, linkedRetrievalBanks: [["Year 7", "Year 8"]], handoutSlideIds: ["starter"],
+  }, presenterOptions));
   const presenter = await context.newPage();
   // Copy the app shell, not the presenter: recovery must come from IndexedDB.
   const shell = await page.content();
@@ -98,10 +100,20 @@ test("recovers reveals, completed ink, added slides and position after the opene
     return (await api.readPresenterSession(owner, id)).checkpoint?.document.slides[2]?.annotations?.length;
   }, { id, owner })).toBe(1);
   await presenter.clock.install(); await presenter.clock.fastForward(61_000);
+  await presenter.evaluate(async ({ id, owner }) => {
+    const api = (window as unknown as { recoveryStore: typeof import("../../src/features/presenter/session-storage") }).recoveryStore;
+    const record = await api.readPresenterSession(owner, id);
+    if (!record?.checkpoint) throw new Error("Checkpoint not found");
+    // Match the portable checkpoints written by the affected Presenter.
+    Reflect.deleteProperty(record.checkpoint.document, "linkedRetrievalBanks");
+    Reflect.deleteProperty(record.checkpoint.document, "retrievalBankLinksUpdatedAt");
+    await api.writePresenterCheckpoint(owner, id, record.checkpoint, record.revision + 1);
+  }, { id, owner });
   await presenter.reload();
   await expect(frame.locator("#presenter-slide-position")).toContainText("3 / 3");
   await expect(frame.locator(".lesson-slide").nth(2).locator(".annotation-svg path")).toHaveCount(1);
   await expect(frame.locator(".qa-toggle").first()).toHaveClass(/is-showing-answer/);
+  await expect(frame.locator(".lesson-slide[data-marked-for-handout]")).toHaveCount(1);
   await expect(frame.locator(".presenter-tools")).toBeVisible();
   expect((await frame.locator(".presenter-tools").boundingBox())!.height).toBeLessThanOrEqual(56);
 });
