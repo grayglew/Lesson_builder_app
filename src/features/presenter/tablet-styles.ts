@@ -161,8 +161,8 @@ export const TABLET_PRESENTER_CSS = `
   .presenter-classroom .example-reveal-button{
     min-height:44px;min-width:44px;padding:.35rem .65rem;font-size:.85rem;touch-action:manipulation
   }
-  .presenter-classroom .live-retrieval-controls{grid-template-columns:repeat(3,44px);gap:4px}
-  .presenter-classroom .live-retrieval-button{width:44px;height:44px}
+  .presenter-classroom .live-retrieval-controls{display:flex;gap:4px}
+  .presenter-classroom .live-retrieval-button{flex:0 1 44px;min-width:0;width:44px;height:44px}
   .presenter-classroom .presenter-notification button{min-width:44px;min-height:44px}
   .presenter-classroom .presenter-dialog button{min-width:44px;min-height:44px}
   .presenter-classroom .confidence-poll-choice:disabled{opacity:.65;cursor:default}

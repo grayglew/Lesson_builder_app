@@ -331,9 +331,9 @@ test("a failed taught marker retains the committed ID and revision for retry", a
   ]);
 });
 
-test("presenter archives the linked skill only after confirmation without removing the question", async ({ page }) => {
+test("keeps linked retrieval actions on one line and confirms archive without removing the question", async ({ page }) => {
   const live = { ...lesson, slides: [{ id: "linked-starter", type: "starter", title: "Retrieval", slots: [{
-    lo: "191a: Algebra", retrievalItemId: "22222222-2222-4222-8222-222222222222", retrievalBankClassName: "9L2FM", image, answerImage: image,
+    lo: "999m: Algebra", retrievalItemId: "22222222-2222-4222-8222-222222222222", retrievalBankClassName: "9L2FM", image, answerImage: image,
   }] }] };
   const html = buildStandaloneLessonHtml(live, {
     runtimeCss: readFileSync("src/features/presenter/presenter-runtime.css", "utf8"),
@@ -352,6 +352,21 @@ test("presenter archives the linked skill only after confirmation without removi
   });
   await page.goto(`${origin}/?session=${id}`);
   const frame = page.frameLocator("iframe");
+  const controls = frame.locator(".starter-cell").first().locator(".live-retrieval-controls");
+  await expect(controls.getByRole("button")).toHaveCount(4);
+  for (const width of [375, 414, 768, 1024, 1440, 1280]) {
+    await page.setViewportSize({ width, height: 768 });
+    await controls.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    const { buttons, codeLeft } = await controls.evaluate((row) => ({
+      buttons: Array.from(row.querySelectorAll("button"), button => button.getBoundingClientRect().toJSON()),
+      codeLeft: row.parentElement!.querySelector(".starter-key-skill")!.getBoundingClientRect().left,
+    }));
+    expect(new Set(buttons.map(button => button.top)).size, `button rows at ${width}px`).toBe(1);
+    expect(buttons[3].right, `archive before skill code at ${width}px`).toBeLessThanOrEqual(codeLeft);
+    if (width >= 768) {
+      expect(buttons.every(button => button.width >= 44 && button.height >= 44)).toBe(true);
+    }
+  }
   const bin = frame.getByRole("button", { name: "Archive retrieval skill" });
   await bin.click();
   const dialog = frame.getByRole("alertdialog", { name: "Archive retrieval skill?" });

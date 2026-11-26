@@ -651,7 +651,7 @@ function sanitizeImportedSlideClass(value: unknown) {
 function standaloneLessonCss() {
   return `
 ${UNIT_RESOURCE_CSS}
-.live-retrieval-controls:has(.live-retrieval-archive){grid-template-columns:repeat(4,minmax(0,1fr));max-width:calc(100% - 54px)}.live-retrieval-archive .presenter-tool-icon{margin:auto}.live-retrieval-archive svg{width:16px;height:16px}.live-retrieval-button[data-live-archived]{cursor:default}
+.live-retrieval-controls:has(.live-retrieval-archive){grid-template-columns:repeat(4,minmax(0,1fr));max-width:calc(100% - 66px)}.live-retrieval-archive .presenter-tool-icon{margin:auto;max-width:100%}.live-retrieval-archive svg{width:16px;max-width:100%;height:16px}.live-retrieval-button[data-live-archived]{cursor:default}
 @media(pointer:coarse) and (min-width:640px){.live-retrieval-controls:has(.live-retrieval-archive){grid-template-columns:repeat(4,44px)}.live-retrieval-controls:has(.live-retrieval-archive) .live-retrieval-button{width:44px;height:44px}}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#f4f7f8;color:#111827;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 :root{--presenter-edge-space:6px;--presenter-toolbar-space:64px;--presenter-slide-width:100vw;--presenter-slide-height:62.5vw}
